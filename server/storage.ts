@@ -155,7 +155,9 @@ export class MemStorage implements IStorage {
         lastName: "User",
         email: "admin@example.com",
         role: UserRole.ADMIN,
-        department: "Administration"
+        department: "Administration",
+        enrollmentNumber: null,
+        groupId: null
       };
       this.users.set(id, user);
     } catch (error) {
@@ -417,37 +419,289 @@ export class MemStorage implements IStorage {
     return updatedNotification;
   }
 
+  // Student Group operations
+  async createStudentGroup(group: InsertStudentGroup): Promise<StudentGroup> {
+    const id = this.currentStudentGroupId++;
+    const now = new Date();
+    
+    // Set default max size (3-5 members)
+    const maxSize = group.maxSize || 5;
+    
+    const newGroup: StudentGroup = {
+      ...group,
+      id,
+      maxSize,
+      createdAt: now
+    };
+    
+    this.studentGroups.set(id, newGroup);
+    return newGroup;
+  }
+  
+  async getStudentGroup(id: number): Promise<StudentGroup | undefined> {
+    const group = this.studentGroups.get(id);
+    if (!group) return undefined;
+    
+    // Enrich with members and faculty info
+    const members = await this.getStudentGroupMembers(id);
+    let faculty = undefined;
+    
+    if (group.collaborationType === CollaborationType.FACULTY_COLLABORATION && group.facultyId) {
+      faculty = await this.getUser(group.facultyId);
+    }
+    
+    return { ...group, members, faculty };
+  }
+  
+  async getStudentGroupByMemberId(userId: number): Promise<StudentGroup | undefined> {
+    // Check if user is in any group
+    const groupId = Array.from(this.studentGroupMembers.entries())
+      .find(([key, id]) => {
+        const [memberId] = key.split('-');
+        return parseInt(memberId) === userId;
+      })?.[1];
+    
+    if (!groupId) return undefined;
+    
+    return this.getStudentGroup(groupId);
+  }
+  
+  async getAvailableStudentGroups(): Promise<StudentGroup[]> {
+    const groups = Array.from(this.studentGroups.values());
+    
+    // Get groups with available slots and enrich with member info
+    return Promise.all(
+      groups.map(async (group) => {
+        const members = await this.getStudentGroupMembers(group.id);
+        let faculty = undefined;
+        
+        if (group.collaborationType === CollaborationType.FACULTY_COLLABORATION && group.facultyId) {
+          faculty = await this.getUser(group.facultyId);
+        }
+        
+        return { ...group, members, faculty };
+      })
+    ).then(groups => 
+      // Filter groups that have space for more members
+      groups.filter(group => group.members.length < group.maxSize)
+    );
+  }
+  
+  async getStudentGroupMembers(groupId: number): Promise<User[]> {
+    // Get all member IDs for this group
+    const memberIds = Array.from(this.studentGroupMembers.entries())
+      .filter(([key, id]) => id === groupId)
+      .map(([key]) => {
+        const [memberId] = key.split('-');
+        return parseInt(memberId);
+      });
+    
+    // Get user objects for each member
+    const members = await Promise.all(
+      memberIds.map(id => this.getUser(id))
+    );
+    
+    return members.filter(Boolean) as User[];
+  }
+  
+  async addStudentToGroup(userId: number, groupId: number): Promise<boolean> {
+    // Check if group exists
+    const group = await this.studentGroups.get(groupId);
+    if (!group) return false;
+    
+    // Check if user exists
+    const user = await this.getUser(userId);
+    if (!user) return false;
+    
+    // Check if group is full
+    const members = await this.getStudentGroupMembers(groupId);
+    if (members.length >= group.maxSize) return false;
+    
+    // Add user to group
+    const key = `${userId}-${groupId}`;
+    this.studentGroupMembers.set(key, groupId);
+    
+    // Update user with groupId
+    this.users.set(userId, { ...user, groupId });
+    
+    return true;
+  }
+  
+  async removeStudentFromGroup(userId: number, groupId: number): Promise<boolean> {
+    // Check if user exists in group
+    const key = `${userId}-${groupId}`;
+    if (!this.studentGroupMembers.has(key)) return false;
+    
+    // Remove user from group
+    this.studentGroupMembers.delete(key);
+    
+    // Update user to remove groupId
+    const user = await this.getUser(userId);
+    if (user) {
+      this.users.set(userId, { ...user, groupId: null });
+    }
+    
+    return true;
+  }
+  
+  async deleteStudentGroup(id: number): Promise<boolean> {
+    // Check if group exists
+    if (!this.studentGroups.has(id)) return false;
+    
+    // Remove all members from group
+    const memberKeys = Array.from(this.studentGroupMembers.entries())
+      .filter(([_, groupId]) => groupId === id)
+      .map(([key]) => key);
+    
+    for (const key of memberKeys) {
+      this.studentGroupMembers.delete(key);
+      
+      // Update user to remove groupId
+      const [userId] = key.split('-');
+      const user = await this.getUser(parseInt(userId));
+      if (user) {
+        this.users.set(user.id, { ...user, groupId: null });
+      }
+    }
+    
+    // Delete group
+    return this.studentGroups.delete(id);
+  }
+  
+  // Project Assessment operations
+  async createProjectAssessment(assessment: InsertProjectAssessment): Promise<ProjectAssessment> {
+    const id = this.currentAssessmentId++;
+    const now = new Date();
+    
+    const newAssessment: ProjectAssessment = {
+      ...assessment,
+      id,
+      createdAt: now
+    };
+    
+    this.projectAssessments.set(id, newAssessment);
+    return newAssessment;
+  }
+  
+  async getProjectAssessment(projectId: number, assessorId: number): Promise<ProjectAssessment | undefined> {
+    return Array.from(this.projectAssessments.values()).find(
+      (assessment) => assessment.projectId === projectId && assessment.assessorId === assessorId
+    );
+  }
+  
+  async getProjectAssessments(projectId: number): Promise<(ProjectAssessment & { assessor: User })[]> {
+    const assessments = Array.from(this.projectAssessments.values()).filter(
+      (assessment) => assessment.projectId === projectId
+    );
+    
+    // Enrich with assessor info
+    return Promise.all(assessments.map(async (assessment) => {
+      const assessor = await this.getUser(assessment.assessorId);
+      return { ...assessment, assessor: assessor! };
+    }));
+  }
+  
+  async updateProjectAssessment(id: number, data: Partial<InsertProjectAssessment>): Promise<ProjectAssessment> {
+    const assessment = this.projectAssessments.get(id);
+    if (!assessment) {
+      throw new Error("Assessment not found");
+    }
+    
+    const updatedAssessment = { ...assessment, ...data };
+    this.projectAssessments.set(id, updatedAssessment);
+    
+    return updatedAssessment;
+  }
+  
+  // Search and report operations
+  async searchProjects(criteria: {
+    projectName?: string;
+    facultyName?: string;
+    studentName?: string;
+    enrollmentNumber?: string;
+    department?: string;
+    status?: string;
+  }): Promise<(StudentProject & { topic: ProjectTopic, student: User })[]> {
+    // Get all projects with topic and student info
+    const projects = await this.getAllProjects();
+    
+    // Filter based on criteria
+    return projects.filter(project => {
+      // Project name filter
+      if (criteria.projectName && !project.topic.title.toLowerCase().includes(criteria.projectName.toLowerCase())) {
+        return false;
+      }
+      
+      // Faculty name filter
+      if (criteria.facultyName) {
+        const facultyFullName = `${project.topic.submittedBy?.firstName} ${project.topic.submittedBy?.lastName}`.toLowerCase();
+        if (!facultyFullName.includes(criteria.facultyName.toLowerCase())) {
+          return false;
+        }
+      }
+      
+      // Student name filter
+      if (criteria.studentName) {
+        const studentFullName = `${project.student.firstName} ${project.student.lastName}`.toLowerCase();
+        if (!studentFullName.includes(criteria.studentName.toLowerCase())) {
+          return false;
+        }
+      }
+      
+      // Enrollment number filter
+      if (criteria.enrollmentNumber && project.student.enrollmentNumber !== criteria.enrollmentNumber) {
+        return false;
+      }
+      
+      // Department filter
+      if (criteria.department && project.student.department !== criteria.department) {
+        return false;
+      }
+      
+      // Status filter
+      if (criteria.status && project.status !== criteria.status) {
+        return false;
+      }
+      
+      return true;
+    });
+  }
+  
   // Statistics
   async getDepartmentStats(): Promise<any> {
-    // In a real application, this would calculate actual statistics
-    // For now, return mock data
-    return {
-      "Computer Science": {
-        progress: 78,
-        studentCount: 24,
-        projectCount: 18
-      },
-      "Information Technology": {
-        progress: 82,
-        studentCount: 20,
-        projectCount: 15
-      },
-      "Electronics Engineering": {
-        progress: 65,
-        studentCount: 18,
-        projectCount: 12
-      },
-      "Mechanical Engineering": {
-        progress: 53,
-        studentCount: 15,
-        projectCount: 10
-      },
-      "Civil Engineering": {
-        progress: 61,
-        studentCount: 16,
-        projectCount: 12
-      }
-    };
+    // Calculate real-time statistics based on actual data
+    const projects = await this.getAllProjects();
+    const users = await this.getAllUsers();
+    
+    // Group by department
+    const departments = new Set(users.map(user => user.department));
+    const stats: Record<string, { progress: number, studentCount: number, projectCount: number }> = {};
+    
+    for (const department of departments) {
+      // Skip empty department
+      if (!department) continue;
+      
+      const departmentStudents = users.filter(user => 
+        user.role === UserRole.STUDENT && user.department === department
+      );
+      
+      const departmentProjects = projects.filter(project => 
+        project.student.department === department
+      );
+      
+      // Calculate average progress
+      const avgProgress = departmentProjects.length > 0
+        ? departmentProjects.reduce((sum, project) => sum + project.progress, 0) / departmentProjects.length
+        : 0;
+      
+      stats[department] = {
+        progress: Math.round(avgProgress),
+        studentCount: departmentStudents.length,
+        projectCount: departmentProjects.length
+      };
+    }
+    
+    return stats;
   }
 }
 

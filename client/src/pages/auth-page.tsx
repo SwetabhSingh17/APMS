@@ -22,6 +22,15 @@ const registerSchema = insertUserSchema.extend({
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
+}).refine((data) => {
+  // Enrollment number is required for student accounts
+  if (data.role === UserRole.STUDENT && !data.enrollmentNumber) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Enrollment number is required for student registration",
+  path: ["enrollmentNumber"]
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;

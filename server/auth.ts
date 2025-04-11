@@ -76,11 +76,24 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ message: "Username already exists" });
       }
       
-      // Restrict Coordinator and Admin registration
-      if (req.body.role === UserRole.COORDINATOR || req.body.role === UserRole.ADMIN) {
-        return res.status(403).json({ 
-          message: "Registration as Coordinator or Admin is not allowed. Please contact administration." 
-        });
+      // Check if trying to register as Admin or Coordinator
+      if (req.body.role === UserRole.ADMIN || req.body.role === UserRole.COORDINATOR) {
+        // Check if an admin or coordinator already exists
+        const users = await storage.getAllUsers();
+        const existingAdmin = users.find(u => u.role === UserRole.ADMIN);
+        const existingCoordinator = users.find(u => u.role === UserRole.COORDINATOR);
+        
+        if (req.body.role === UserRole.ADMIN && existingAdmin) {
+          return res.status(403).json({ 
+            message: "An Admin account already exists. Only one Admin account is allowed in the system." 
+          });
+        }
+        
+        if (req.body.role === UserRole.COORDINATOR && existingCoordinator) {
+          return res.status(403).json({ 
+            message: "A Coordinator account already exists. Only one Coordinator account is allowed in the system." 
+          });
+        }
       }
       
       // Add enrollment number validation for students
@@ -153,6 +166,33 @@ export function setupAuth(app: Express) {
       const existingUser = await storage.getUserByUsername(req.body.username);
       if (existingUser) {
         return res.status(400).json({ message: "Username already exists" });
+      }
+      
+      // Check if trying to create Admin or Coordinator
+      if (req.body.role === UserRole.ADMIN || req.body.role === UserRole.COORDINATOR) {
+        // Check if an admin or coordinator already exists
+        const users = await storage.getAllUsers();
+        const existingAdmin = users.find(u => u.role === UserRole.ADMIN);
+        const existingCoordinator = users.find(u => u.role === UserRole.COORDINATOR);
+        
+        if (req.body.role === UserRole.ADMIN && existingAdmin) {
+          return res.status(403).json({ 
+            message: "An Admin account already exists. Only one Admin account is allowed in the system." 
+          });
+        }
+        
+        if (req.body.role === UserRole.COORDINATOR && existingCoordinator) {
+          return res.status(403).json({ 
+            message: "A Coordinator account already exists. Only one Coordinator account is allowed in the system." 
+          });
+        }
+      }
+      
+      // Validate enrollment number for students
+      if (req.body.role === UserRole.STUDENT && !req.body.enrollmentNumber) {
+        return res.status(400).json({ 
+          message: "Enrollment number is required for student registration" 
+        });
       }
 
       const hashedPassword = await hashPassword(req.body.password);
