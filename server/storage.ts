@@ -18,6 +18,7 @@ import {
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
+import { hashPassword } from "./auth";
 
 const MemoryStore = createMemoryStore(session);
 
@@ -95,16 +96,28 @@ export class MemStorage implements IStorage {
       checkPeriod: 86400000 // 24 hours
     });
     
-    // Create default admin user
-    this.createUser({
-      username: "admin",
-      password: "5ce61e5a35409df7baaf20c3102ecabeca8edb5904b9baba4050fbcacd238d6b5ac8ec1730d33f8f98df48ce8dc3d65cd0aca0bfb071c2b051db24143c249cf0.7cbcbdf5a4c3570b", // "admin123"
-      firstName: "Admin",
-      lastName: "User",
-      email: "admin@example.com",
-      role: UserRole.ADMIN,
-      department: "Administration"
-    });
+    // Initialize with default admin user
+    this.initializeDefaultUser();
+  }
+  
+  private async initializeDefaultUser() {
+    try {
+      const hashedPassword = await hashPassword("admin123");
+      const id = this.currentUserId++;
+      const user: User = { 
+        id,
+        username: "admin",
+        password: hashedPassword,
+        firstName: "Admin",
+        lastName: "User",
+        email: "admin@example.com",
+        role: UserRole.ADMIN,
+        department: "Administration"
+      };
+      this.users.set(id, user);
+    } catch (error) {
+      console.error("Failed to create default admin user:", error);
+    }
   }
 
   // User operations
@@ -120,7 +133,15 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.currentUserId++;
-    const user: User = { ...insertUser, id };
+    
+    // If the user is being created through the API, the password will already be hashed
+    // This is for direct storage calls like the default admin user
+    let password = insertUser.password;
+    if (password && !password.includes('.')) {
+      password = await hashPassword(password);
+    }
+    
+    const user: User = { ...insertUser, id, password };
     this.users.set(id, user);
     return user;
   }
@@ -196,6 +217,7 @@ export class MemStorage implements IStorage {
       ...topic, 
       id, 
       status: "pending", 
+      feedback: null,
       createdAt: now 
     };
     
