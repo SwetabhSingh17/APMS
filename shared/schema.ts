@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, json } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -10,6 +10,28 @@ export enum UserRole {
   STUDENT = "student"
 }
 
+// Student group collaboration types
+export enum CollaborationType {
+  STUDENT_GROUP = "student_group", 
+  FACULTY_COLLABORATION = "faculty_collaboration"
+}
+
+// Student groups table
+export const studentGroups = pgTable("student_groups", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  collaborationType: text("collaboration_type").$type<CollaborationType>().notNull(),
+  facultyId: integer("faculty_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  maxSize: integer("max_size").notNull().default(5),
+});
+
+export const insertStudentGroupSchema = createInsertSchema(studentGroups).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Users table
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -20,6 +42,8 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   role: text("role").$type<UserRole>().notNull(),
   department: text("department").notNull(),
+  enrollmentNumber: text("enrollment_number"),
+  groupId: integer("group_id").references(() => studentGroups.id),
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({

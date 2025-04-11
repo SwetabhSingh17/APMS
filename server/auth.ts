@@ -75,6 +75,20 @@ export function setupAuth(app: Express) {
       if (existingUser) {
         return res.status(400).json({ message: "Username already exists" });
       }
+      
+      // Restrict Coordinator and Admin registration
+      if (req.body.role === UserRole.COORDINATOR || req.body.role === UserRole.ADMIN) {
+        return res.status(403).json({ 
+          message: "Registration as Coordinator or Admin is not allowed. Please contact administration." 
+        });
+      }
+      
+      // Add enrollment number validation for students
+      if (req.body.role === UserRole.STUDENT && !req.body.enrollmentNumber) {
+        return res.status(400).json({ 
+          message: "Enrollment number is required for student registration" 
+        });
+      }
 
       const hashedPassword = await hashPassword(req.body.password);
       const user = await storage.createUser({

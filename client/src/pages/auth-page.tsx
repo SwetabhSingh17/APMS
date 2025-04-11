@@ -208,8 +208,6 @@ export default function AuthPage() {
                             <SelectContent>
                               <SelectItem value={UserRole.STUDENT}>Student</SelectItem>
                               <SelectItem value={UserRole.TEACHER}>Teacher</SelectItem>
-                              <SelectItem value={UserRole.COORDINATOR}>Coordinator</SelectItem>
-                              <SelectItem value={UserRole.ADMIN}>Admin</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
