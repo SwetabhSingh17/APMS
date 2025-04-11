@@ -1,0 +1,152 @@
+import { useAuth } from "@/hooks/use-auth";
+import { Link, useLocation } from "wouter";
+import { UserRole } from "@shared/schema";
+import { cn } from "@/lib/utils";
+import { 
+  Home, 
+  FileText, 
+  CheckCircle, 
+  BarChart2, 
+  Users, 
+  Settings, 
+  LogOut 
+} from "lucide-react";
+
+export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?: () => void }) {
+  const { user, logoutMutation } = useAuth();
+  const [location] = useLocation();
+
+  const userInitials = user ? 
+    `${user.firstName.charAt(0)}${user.lastName.charAt(0)}` : 
+    "NA";
+
+  const handleLogout = () => {
+    logoutMutation.mutate();
+  };
+
+  const linkClass = (path: string) => cn(
+    "flex items-center space-x-3 px-4 py-3 text-foreground hover:bg-accent/10 rounded-md transition-colors",
+    {
+      "bg-primary/10 border-l-4 border-primary text-primary font-medium": location === path,
+    }
+  );
+
+  const displayRole = (role: string) => {
+    switch (role) {
+      case UserRole.ADMIN:
+        return "Admin";
+      case UserRole.COORDINATOR:
+        return "Coordinator";
+      case UserRole.TEACHER:
+        return "Teacher";
+      case UserRole.STUDENT:
+        return "Student";
+      default:
+        return role;
+    }
+  };
+
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+
+  return (
+    <div className={cn(
+      "flex flex-col w-64 bg-card border-r border-border h-full fixed md:static z-40 transition-transform duration-300 md:translate-x-0",
+      isOpen ? "translate-x-0" : "-translate-x-full"
+    )}>
+      <div className="p-4 border-b border-border">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
+            <span className="text-primary-foreground font-bold text-lg">IU</span>
+          </div>
+          <div>
+            <h1 className="font-bold text-primary text-lg">Project Portal</h1>
+            <p className="text-xs text-muted-foreground">Integral University</p>
+          </div>
+        </div>
+      </div>
+      
+      {user && (
+        <div className="p-4 border-b border-border">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+              <span className="text-foreground font-bold">{userInitials}</span>
+            </div>
+            <div>
+              <p className="font-medium">{`${user.firstName} ${user.lastName}`}</p>
+              <span className="inline-block px-2 py-1 text-xs bg-primary text-primary-foreground rounded-full">
+                {displayRole(user.role)}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <nav className="flex-1 overflow-y-auto py-4">
+        <div className="px-3 mb-3 text-xs font-semibold text-muted-foreground uppercase">Main Navigation</div>
+        
+        <Link href="/" onClick={isMobile ? onClose : undefined}>
+          <a className={linkClass("/")}>
+            <Home className="w-5 h-5" />
+            <span>Dashboard</span>
+          </a>
+        </Link>
+        
+        <Link href="/projects" onClick={isMobile ? onClose : undefined}>
+          <a className={linkClass("/projects")}>
+            <FileText className="w-5 h-5" />
+            <span>Projects</span>
+          </a>
+        </Link>
+        
+        {(user?.role === UserRole.COORDINATOR || user?.role === UserRole.ADMIN) && (
+          <Link href="/approve-topics" onClick={isMobile ? onClose : undefined}>
+            <a className={linkClass("/approve-topics")}>
+              <CheckCircle className="w-5 h-5" />
+              <span>Approve Topics</span>
+            </a>
+          </Link>
+        )}
+        
+        {(user?.role === UserRole.COORDINATOR || user?.role === UserRole.ADMIN) && (
+          <Link href="/track-progress" onClick={isMobile ? onClose : undefined}>
+            <a className={linkClass("/track-progress")}>
+              <BarChart2 className="w-5 h-5" />
+              <span>Track Progress</span>
+            </a>
+          </Link>
+        )}
+        
+        {user?.role === UserRole.ADMIN && (
+          <>
+            <div className="px-3 mt-6 mb-3 text-xs font-semibold text-muted-foreground uppercase">Management</div>
+            
+            <Link href="/user-management" onClick={isMobile ? onClose : undefined}>
+              <a className={linkClass("/user-management")}>
+                <Users className="w-5 h-5" />
+                <span>User Management</span>
+              </a>
+            </Link>
+          </>
+        )}
+        
+        <Link href="/settings" onClick={isMobile ? onClose : undefined}>
+          <a className={linkClass("/settings")}>
+            <Settings className="w-5 h-5" />
+            <span>Settings</span>
+          </a>
+        </Link>
+      </nav>
+      
+      <div className="p-4 border-t border-border">
+        <button 
+          onClick={handleLogout}
+          className="flex items-center space-x-3 text-foreground hover:text-destructive"
+          disabled={logoutMutation.isPending}
+        >
+          <LogOut className="w-5 h-5" />
+          <span>{logoutMutation.isPending ? "Logging out..." : "Logout"}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
