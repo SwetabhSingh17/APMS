@@ -20,6 +20,37 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 
+// Helper functions for displaying user roles 
+function getRoleBadgeClasses(role: string): string {
+  switch (role) {
+    case UserRole.ADMIN:
+      return "bg-red-100 text-red-800";
+    case UserRole.COORDINATOR:
+      return "bg-purple-100 text-purple-800";
+    case UserRole.TEACHER:
+      return "bg-blue-100 text-blue-800";
+    case UserRole.STUDENT:
+      return "bg-green-100 text-green-800";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
+}
+
+function getRoleDisplay(role: string): string {
+  switch (role) {
+    case UserRole.ADMIN:
+      return "Admin";
+    case UserRole.COORDINATOR:
+      return "Coordinator";
+    case UserRole.TEACHER:
+      return "Teacher";
+    case UserRole.STUDENT:
+      return "Student";
+    default:
+      return role;
+  }
+}
+
 export default function UserManagement() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -59,8 +90,15 @@ export default function UserManagement() {
     }
   });
 
-  const editForm = useForm<UserFormValues>({
-    resolver: zodResolver(userFormSchema.omit({ password: true, confirmPassword: true })),
+  // Define edit form schema without password fields
+  const editFormSchema = insertUserSchema.extend({
+    // No password or confirmPassword fields required for edit
+  });
+  
+  type EditFormValues = z.infer<typeof editFormSchema>;
+  
+  const editForm = useForm<EditFormValues>({
+    resolver: zodResolver(editFormSchema),
     defaultValues: {
       username: "",
       firstName: "",
@@ -68,6 +106,7 @@ export default function UserManagement() {
       email: "",
       role: UserRole.STUDENT,
       department: "",
+      enrollmentNumber: undefined,
     }
   });
 
@@ -145,12 +184,11 @@ export default function UserManagement() {
     createUserMutation.mutate(userData);
   };
 
-  const onEditSubmit = (data: Partial<UserFormValues>) => {
+  const onEditSubmit = (data: Partial<EditFormValues>) => {
     if (!selectedUser) return;
     
-    // Remove undefined/empty fields and confirmPassword
-    const { confirmPassword, ...rest } = data;
-    const updateData: Partial<InsertUser> = Object.entries(rest).reduce((acc, [key, value]) => {
+    // Remove undefined/empty fields
+    const updateData: Partial<InsertUser> = Object.entries(data).reduce((acc, [key, value]) => {
       if (value !== undefined && value !== "") {
         acc[key as keyof InsertUser] = value;
       }
@@ -401,7 +439,9 @@ export default function UserManagement() {
                           </TableCell>
                           <TableCell>{user.email}</TableCell>
                           <TableCell>{user.department}</TableCell>
-                          <TableCell>{user.topicsCount || 0}</TableCell>
+                          <TableCell>
+                            {user.topicsCount || 0} topics
+                          </TableCell>
                           <TableCell className="text-right">
                             <div className="flex space-x-2 justify-end">
                               <Button 
@@ -422,7 +462,7 @@ export default function UserManagement() {
                             </div>
                           </TableCell>
                         </TableRow>
-                    ))}
+                      ))}
                   </TableBody>
                 </Table>
               </div>
@@ -436,6 +476,7 @@ export default function UserManagement() {
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Department</TableHead>
+                      <TableHead>Enrollment #</TableHead>
                       <TableHead>Project Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -458,16 +499,12 @@ export default function UserManagement() {
                           </TableCell>
                           <TableCell>{user.email}</TableCell>
                           <TableCell>{user.department}</TableCell>
+                          <TableCell>{user.enrollmentNumber || 'N/A'}</TableCell>
                           <TableCell>
-                            {user.hasProject ? (
-                              <span className="px-2 py-1 bg-secondary/10 text-secondary text-xs rounded-full">
-                                Has Project
-                              </span>
-                            ) : (
-                              <span className="px-2 py-1 bg-accent/10 text-accent text-xs rounded-full">
-                                No Project
-                              </span>
-                            )}
+                            {user.projectStatus
+                              ? <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Active</span>
+                              : <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">No Project</span>
+                            }
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex space-x-2 justify-end">
@@ -489,7 +526,7 @@ export default function UserManagement() {
                             </div>
                           </TableCell>
                         </TableRow>
-                    ))}
+                      ))}
                   </TableBody>
                 </Table>
               </div>
@@ -503,7 +540,6 @@ export default function UserManagement() {
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Department</TableHead>
-                      <TableHead>Pending Approvals</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -525,7 +561,6 @@ export default function UserManagement() {
                           </TableCell>
                           <TableCell>{user.email}</TableCell>
                           <TableCell>{user.department}</TableCell>
-                          <TableCell>{user.pendingApprovals || 0}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex space-x-2 justify-end">
                               <Button 
@@ -546,7 +581,7 @@ export default function UserManagement() {
                             </div>
                           </TableCell>
                         </TableRow>
-                    ))}
+                      ))}
                   </TableBody>
                 </Table>
               </div>
@@ -561,7 +596,7 @@ export default function UserManagement() {
           <DialogHeader>
             <DialogTitle>Add New User</DialogTitle>
             <DialogDescription>
-              Create a new user account with specific role and permissions.
+              Create a new user account with the appropriate role.
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -594,6 +629,7 @@ export default function UserManagement() {
                   )}
                 />
               </div>
+              
               <FormField
                 control={form.control}
                 name="email"
@@ -601,12 +637,13 @@ export default function UserManagement() {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="Email address" {...field} />
+                      <Input placeholder="Email address" type="email" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+              
               <FormField
                 control={form.control}
                 name="username"
@@ -620,6 +657,7 @@ export default function UserManagement() {
                   </FormItem>
                 )}
               />
+              
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -628,7 +666,7 @@ export default function UserManagement() {
                     <FormItem>
                       <FormLabel>Password</FormLabel>
                       <FormControl>
-                        <Input type="password" placeholder="Password" {...field} />
+                        <Input placeholder="Password" type="password" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -641,13 +679,14 @@ export default function UserManagement() {
                     <FormItem>
                       <FormLabel>Confirm Password</FormLabel>
                       <FormControl>
-                        <Input type="password" placeholder="Confirm password" {...field} />
+                        <Input placeholder="Confirm password" type="password" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
+              
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -661,14 +700,14 @@ export default function UserManagement() {
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select role" />
+                            <SelectValue placeholder="Select a role" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value={UserRole.STUDENT}>Student</SelectItem>
-                          <SelectItem value={UserRole.TEACHER}>Teacher</SelectItem>
-                          <SelectItem value={UserRole.COORDINATOR}>Coordinator</SelectItem>
                           <SelectItem value={UserRole.ADMIN}>Admin</SelectItem>
+                          <SelectItem value={UserRole.COORDINATOR}>Coordinator</SelectItem>
+                          <SelectItem value={UserRole.TEACHER}>Teacher</SelectItem>
+                          <SelectItem value={UserRole.STUDENT}>Student</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -681,38 +720,25 @@ export default function UserManagement() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Department</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select department" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Computer Science">Computer Science</SelectItem>
-                          <SelectItem value="Information Technology">Information Technology</SelectItem>
-                          <SelectItem value="Electronics Engineering">Electronics Engineering</SelectItem>
-                          <SelectItem value="Mechanical Engineering">Mechanical Engineering</SelectItem>
-                          <SelectItem value="Civil Engineering">Civil Engineering</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <Input placeholder="Department" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
+              
               <DialogFooter className="pt-4">
                 <Button 
-                  type="button" 
                   variant="outline" 
                   onClick={() => setIsAddUserOpen(false)}
+                  type="button"
                 >
                   Cancel
                 </Button>
                 <Button 
-                  type="submit" 
+                  type="submit"
                   disabled={createUserMutation.isPending}
                 >
                   {createUserMutation.isPending ? "Creating..." : "Create User"}
@@ -729,7 +755,7 @@ export default function UserManagement() {
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
             <DialogDescription>
-              Update user information and permissions.
+              Update user information and role.
             </DialogDescription>
           </DialogHeader>
           <Form {...editForm}>
@@ -762,6 +788,7 @@ export default function UserManagement() {
                   )}
                 />
               </div>
+              
               <FormField
                 control={editForm.control}
                 name="email"
@@ -769,12 +796,13 @@ export default function UserManagement() {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="Email address" {...field} />
+                      <Input placeholder="Email address" type="email" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+              
               <FormField
                 control={editForm.control}
                 name="username"
@@ -782,12 +810,13 @@ export default function UserManagement() {
                   <FormItem>
                     <FormLabel>Username</FormLabel>
                     <FormControl>
-                      <Input placeholder="Username" {...field} disabled />
+                      <Input placeholder="Username" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+              
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={editForm.control}
@@ -801,14 +830,14 @@ export default function UserManagement() {
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select role" />
+                            <SelectValue placeholder="Select a role" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value={UserRole.STUDENT}>Student</SelectItem>
-                          <SelectItem value={UserRole.TEACHER}>Teacher</SelectItem>
-                          <SelectItem value={UserRole.COORDINATOR}>Coordinator</SelectItem>
                           <SelectItem value={UserRole.ADMIN}>Admin</SelectItem>
+                          <SelectItem value={UserRole.COORDINATOR}>Coordinator</SelectItem>
+                          <SelectItem value={UserRole.TEACHER}>Teacher</SelectItem>
+                          <SelectItem value={UserRole.STUDENT}>Student</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -821,38 +850,25 @@ export default function UserManagement() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Department</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select department" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Computer Science">Computer Science</SelectItem>
-                          <SelectItem value="Information Technology">Information Technology</SelectItem>
-                          <SelectItem value="Electronics Engineering">Electronics Engineering</SelectItem>
-                          <SelectItem value="Mechanical Engineering">Mechanical Engineering</SelectItem>
-                          <SelectItem value="Civil Engineering">Civil Engineering</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <Input placeholder="Department" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
+              
               <DialogFooter className="pt-4">
                 <Button 
-                  type="button" 
                   variant="outline" 
                   onClick={() => setIsEditUserOpen(false)}
+                  type="button"
                 >
                   Cancel
                 </Button>
                 <Button 
-                  type="submit" 
+                  type="submit"
                   disabled={updateUserMutation.isPending}
                 >
                   {updateUserMutation.isPending ? "Updating..." : "Update User"}
@@ -905,35 +921,4 @@ export default function UserManagement() {
       </Dialog>
     </MainLayout>
   );
-}
-
-// Helper functions
-function getRoleBadgeClasses(role: string): string {
-  switch (role) {
-    case UserRole.ADMIN:
-      return "bg-primary/10 text-primary";
-    case UserRole.COORDINATOR:
-      return "bg-accent/10 text-accent";
-    case UserRole.TEACHER:
-      return "bg-secondary/10 text-secondary";
-    case UserRole.STUDENT:
-      return "bg-muted text-muted-foreground";
-    default:
-      return "bg-muted text-muted-foreground";
-  }
-}
-
-function getRoleDisplay(role: string): string {
-  switch (role) {
-    case UserRole.ADMIN:
-      return "Admin";
-    case UserRole.COORDINATOR:
-      return "Coordinator";
-    case UserRole.TEACHER:
-      return "Teacher";
-    case UserRole.STUDENT:
-      return "Student";
-    default:
-      return role;
-  }
 }
