@@ -14,7 +14,14 @@ import {
   notifications,
   type Notification,
   type InsertNotification,
-  UserRole
+  UserRole,
+  studentGroups,
+  type StudentGroup,
+  type InsertStudentGroup,
+  projectAssessments,
+  type ProjectAssessment,
+  type InsertProjectAssessment,
+  CollaborationType
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -58,6 +65,32 @@ export interface IStorage {
   createNotification(notification: InsertNotification): Promise<Notification>;
   markNotificationAsRead(id: number): Promise<Notification | undefined>;
 
+  // Student Group operations
+  createStudentGroup(group: InsertStudentGroup): Promise<StudentGroup>;
+  getStudentGroup(id: number): Promise<StudentGroup | undefined>;
+  getStudentGroupByMemberId(userId: number): Promise<StudentGroup | undefined>;
+  getAvailableStudentGroups(): Promise<StudentGroup[]>;
+  getStudentGroupMembers(groupId: number): Promise<User[]>;
+  addStudentToGroup(userId: number, groupId: number): Promise<boolean>;
+  removeStudentFromGroup(userId: number, groupId: number): Promise<boolean>;
+  deleteStudentGroup(id: number): Promise<boolean>;
+
+  // Project Assessment operations
+  createProjectAssessment(assessment: InsertProjectAssessment): Promise<ProjectAssessment>;
+  getProjectAssessment(projectId: number, assessorId: number): Promise<ProjectAssessment | undefined>;
+  getProjectAssessments(projectId: number): Promise<(ProjectAssessment & { assessor: User })[]>;
+  updateProjectAssessment(id: number, data: Partial<InsertProjectAssessment>): Promise<ProjectAssessment>;
+
+  // Search and report operations
+  searchProjects(criteria: {
+    projectName?: string;
+    facultyName?: string;
+    studentName?: string;
+    enrollmentNumber?: string;
+    department?: string;
+    status?: string;
+  }): Promise<(StudentProject & { topic: ProjectTopic, student: User })[]>;
+
   // Statistics
   getDepartmentStats(): Promise<any>;
 
@@ -71,6 +104,9 @@ export class MemStorage implements IStorage {
   private studentProjects: Map<number, StudentProject>;
   private projectMilestones: Map<number, ProjectMilestone>;
   private notifications: Map<number, Notification>;
+  private studentGroups: Map<number, StudentGroup>;
+  private studentGroupMembers: Map<string, number>; // userId-groupId mapping
+  private projectAssessments: Map<number, ProjectAssessment>;
   sessionStore: session.SessionStore;
   
   currentUserId: number;
@@ -78,6 +114,8 @@ export class MemStorage implements IStorage {
   currentProjectId: number;
   currentMilestoneId: number;
   currentNotificationId: number;
+  currentStudentGroupId: number;
+  currentAssessmentId: number;
 
   constructor() {
     this.users = new Map();
@@ -85,12 +123,17 @@ export class MemStorage implements IStorage {
     this.studentProjects = new Map();
     this.projectMilestones = new Map();
     this.notifications = new Map();
+    this.studentGroups = new Map();
+    this.studentGroupMembers = new Map();
+    this.projectAssessments = new Map();
     
     this.currentUserId = 1;
     this.currentTopicId = 1;
     this.currentProjectId = 1;
     this.currentMilestoneId = 1;
     this.currentNotificationId = 1;
+    this.currentStudentGroupId = 1;
+    this.currentAssessmentId = 1;
     
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000 // 24 hours
