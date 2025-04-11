@@ -66,6 +66,41 @@ export default function TrackProgress() {
     setSelectedProject(null);
   };
 
+  function getProgressColorClass(progress: number): string {
+    if (progress >= 75) return "bg-blue-500";
+    if (progress >= 50) return "bg-emerald-500";
+    if (progress >= 25) return "bg-amber-500";
+    return "bg-destructive";
+  }
+
+  function getStatusBadge(progress: number) {
+    if (progress >= 100) {
+      return (
+        <span className="px-2 py-1 bg-blue-500/10 text-blue-500 text-xs rounded-full">
+          Completed
+        </span>
+      );
+    } else if (progress >= 60) {
+      return (
+        <span className="px-2 py-1 bg-emerald-500/10 text-emerald-500 text-xs rounded-full">
+          On Track
+        </span>
+      );
+    } else if (progress >= 30) {
+      return (
+        <span className="px-2 py-1 bg-amber-500/10 text-amber-500 text-xs rounded-full">
+          Need Attention
+        </span>
+      );
+    } else {
+      return (
+        <span className="px-2 py-1 bg-destructive/10 text-destructive text-xs rounded-full">
+          At Risk
+        </span>
+      );
+    }
+  }
+
   if (!user || (user.role !== UserRole.COORDINATOR && user.role !== UserRole.ADMIN)) {
     return (
       <MainLayout>
@@ -186,8 +221,8 @@ export default function TrackProgress() {
       </div>
 
       <Card>
-        <CardHeader>
-          <Tabs defaultValue="all">
+        <Tabs defaultValue="all">
+          <CardHeader>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <TabsList>
                 <TabsTrigger value="all">All Projects</TabsTrigger>
@@ -225,14 +260,83 @@ export default function TrackProgress() {
                 </Select>
               </div>
             </div>
-          </Tabs>
-        </CardHeader>
-        
-        <CardContent>
-          <TabsContent value="all" className="mt-0">
-            {isLoading ? (
-              <Skeleton className="h-64 w-full" />
-            ) : (
+          </CardHeader>
+          
+          <CardContent>
+            <TabsContent value="all" className="mt-0">
+              {isLoading ? (
+                <Skeleton className="h-64 w-full" />
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Project Topic</TableHead>
+                        <TableHead>Student</TableHead>
+                        <TableHead>Department</TableHead>
+                        <TableHead>Progress</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredProjects && filteredProjects.length > 0 ? (
+                        filteredProjects.map((project) => (
+                          <TableRow key={project.id} className="hover:bg-muted/50">
+                            <TableCell className="font-medium">{project.topic.title}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                  <span className="text-primary font-medium text-sm">
+                                    {project.student.firstName.charAt(0)}
+                                    {project.student.lastName.charAt(0)}
+                                  </span>
+                                </div>
+                                <span>{`${project.student.firstName} ${project.student.lastName}`}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>{project.topic.department}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
+                                  <div 
+                                    className={`rounded-full h-2 ${getProgressColorClass(project.progress)}`}
+                                    style={{ width: `${project.progress}%` }}
+                                  ></div>
+                                </div>
+                                <span className="text-sm">{project.progress}%</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {getStatusBadge(project.progress)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => openDetailsModal(project)}
+                              >
+                                View Details
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                            {searchQuery || filterDepartment !== "all" 
+                              ? "No projects match your filters"
+                              : "No projects found"}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="atRisk" className="mt-0">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -246,381 +350,271 @@ export default function TrackProgress() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredProjects && filteredProjects.length > 0 ? (
-                      filteredProjects.map((project) => (
-                        <TableRow key={project.id} className="hover:bg-muted/50">
-                          <TableCell className="font-medium">{project.topic.title}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                <span className="text-primary font-medium text-sm">
-                                  {project.student.firstName.charAt(0)}
-                                  {project.student.lastName.charAt(0)}
-                                </span>
-                              </div>
-                              <span>{`${project.student.firstName} ${project.student.lastName}`}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>{project.topic.department}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
-                                <div 
-                                  className={`rounded-full h-2 ${getProgressColorClass(project.progress)}`}
-                                  style={{ width: `${project.progress}%` }}
-                                ></div>
-                              </div>
-                              <span className="text-sm">{project.progress}%</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {getStatusBadge(project.progress)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => openDetailsModal(project)}
-                            >
-                              View Details
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                          {searchQuery || filterDepartment !== "all" 
-                            ? "No projects match your filters"
-                            : "No projects found"}
-                        </TableCell>
-                      </TableRow>
-                    )}
+                    <TableRow>
+                      <TableCell className="font-medium">Smart Traffic Management System</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-primary font-medium text-sm">AP</span>
+                          </div>
+                          <span>Aditya Patel</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>Civil Engineering</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
+                            <div 
+                              className="bg-destructive rounded-full h-2"
+                              style={{ width: "22%" }}
+                            ></div>
+                          </div>
+                          <span className="text-sm">22%</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="px-2 py-1 bg-destructive/10 text-destructive text-xs rounded-full">
+                          At Risk
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                        >
+                          View Details
+                        </Button>
+                      </TableCell>
+                    </TableRow>
                   </TableBody>
                 </Table>
               </div>
-            )}
-          </TabsContent>
-          
-          <TabsContent value="atRisk" className="mt-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Project Topic</TableHead>
-                    <TableHead>Student</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Progress</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell className="font-medium">Smart Traffic Management System</TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                          <span className="text-primary font-medium text-sm">AP</span>
+            </TabsContent>
+            
+            <TabsContent value="onTrack" className="mt-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Project Topic</TableHead>
+                      <TableHead>Student</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Progress</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="font-medium">AI-Enhanced Academic Advisor</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-primary font-medium text-sm">RS</span>
+                          </div>
+                          <span>Rahul Sharma</span>
                         </div>
-                        <span>Aditya Patel</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>Civil Engineering</TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
-                          <div 
-                            className="bg-destructive rounded-full h-2"
-                            style={{ width: "22%" }}
-                          ></div>
+                      </TableCell>
+                      <TableCell>Computer Science</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
+                            <div 
+                              className="bg-emerald-500 rounded-full h-2"
+                              style={{ width: "65%" }}
+                            ></div>
+                          </div>
+                          <span className="text-sm">65%</span>
                         </div>
-                        <span className="text-sm">22%</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="px-2 py-1 bg-destructive/10 text-destructive text-xs rounded-full">
-                        At Risk
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                      >
-                        View Details
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="onTrack" className="mt-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Project Topic</TableHead>
-                    <TableHead>Student</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Progress</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell className="font-medium">AI-Powered Attendance System</TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                          <span className="text-primary font-medium text-sm">RS</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="px-2 py-1 bg-emerald-500/10 text-emerald-500 text-xs rounded-full">
+                          On Track
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                        >
+                          View Details
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="completed" className="mt-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Project Topic</TableHead>
+                      <TableHead>Student</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Progress</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="font-medium">IoT Weather Monitoring System</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-primary font-medium text-sm">PK</span>
+                          </div>
+                          <span>Priya Khan</span>
                         </div>
-                        <span>Rahul Singh</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>Computer Science</TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
-                          <div 
-                            className="bg-secondary rounded-full h-2"
-                            style={{ width: "76%" }}
-                          ></div>
+                      </TableCell>
+                      <TableCell>Electronics Engineering</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
+                            <div 
+                              className="bg-blue-500 rounded-full h-2"
+                              style={{ width: "100%" }}
+                            ></div>
+                          </div>
+                          <span className="text-sm">100%</span>
                         </div>
-                        <span className="text-sm">76%</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="px-2 py-1 bg-secondary/10 text-secondary text-xs rounded-full">
-                        On Track
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                      >
-                        View Details
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="completed" className="mt-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Project Topic</TableHead>
-                    <TableHead>Student</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Progress</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell className="font-medium">E-Waste Management Portal</TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                          <span className="text-primary font-medium text-sm">PK</span>
-                        </div>
-                        <span>Priya Kumar</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>Information Technology</TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
-                          <div 
-                            className="bg-primary rounded-full h-2"
-                            style={{ width: "100%" }}
-                          ></div>
-                        </div>
-                        <span className="text-sm">100%</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
-                        Completed
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                      >
-                        View Details
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-          </TabsContent>
-        </CardContent>
+                      </TableCell>
+                      <TableCell>
+                        <span className="px-2 py-1 bg-blue-500/10 text-blue-500 text-xs rounded-full">
+                          Completed
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                        >
+                          View Details
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            </TabsContent>
+          </CardContent>
+        </Tabs>
       </Card>
 
       {/* Project Details Modal */}
-      <Modal
-        isOpen={isDetailsModalOpen}
-        onClose={closeDetailsModal}
-        title="Project Details"
-      >
-        {selectedProject && (
+      {isDetailsModalOpen && selectedProject && (
+        <Modal 
+          isOpen={isDetailsModalOpen} 
+          onClose={closeDetailsModal}
+          title={selectedProject.topic.title}
+          size="lg"
+        >
           <div className="space-y-6">
-            <div>
-              <h3 className="text-xl font-semibold mb-2">{selectedProject.topic.title}</h3>
-              <p className="text-muted-foreground">{selectedProject.topic.description}</p>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Student</p>
-                <div className="flex items-center space-x-2 mt-1">
-                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-primary font-medium text-xs">
-                      {selectedProject.student.firstName.charAt(0)}
-                      {selectedProject.student.lastName.charAt(0)}
-                    </span>
+            <div className="flex flex-col md:flex-row md:items-center gap-6">
+              <div className="md:w-1/3 space-y-2">
+                <div className="text-sm text-muted-foreground">Progress</div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-full bg-muted rounded-full h-2.5">
+                    <div 
+                      className={`rounded-full h-2.5 ${getProgressColorClass(selectedProject.progress)}`}
+                      style={{ width: `${selectedProject.progress}%` }}
+                    ></div>
                   </div>
-                  <span className="font-medium">{selectedProject.student.firstName} {selectedProject.student.lastName}</span>
+                  <span className="text-lg font-semibold">{selectedProject.progress}%</span>
+                </div>
+                <div>{getStatusBadge(selectedProject.progress)}</div>
+              </div>
+              
+              <div className="md:w-2/3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <div className="text-sm text-muted-foreground">Student</div>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-primary font-medium text-sm">
+                        {selectedProject.student.firstName.charAt(0)}
+                        {selectedProject.student.lastName.charAt(0)}
+                      </span>
+                    </div>
+                    <span className="font-medium">{`${selectedProject.student.firstName} ${selectedProject.student.lastName}`}</span>
+                  </div>
+                </div>
+                
+                <div>
+                  <div className="text-sm text-muted-foreground">Department</div>
+                  <div className="font-medium mt-1">{selectedProject.topic.department}</div>
+                </div>
+                
+                <div>
+                  <div className="text-sm text-muted-foreground">Started</div>
+                  <div className="font-medium mt-1">{new Date(selectedProject.createdAt).toLocaleDateString()}</div>
+                </div>
+                
+                <div>
+                  <div className="text-sm text-muted-foreground">Complexity</div>
+                  <div className="font-medium mt-1">{selectedProject.topic.estimatedComplexity}</div>
                 </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Department</p>
-                <p className="font-medium">{selectedProject.topic.department}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Mentor</p>
-                <div className="flex items-center space-x-2 mt-1">
-                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-primary font-medium text-xs">
-                      {selectedProject.topic.submittedBy?.firstName?.charAt(0) || ""}
-                      {selectedProject.topic.submittedBy?.lastName?.charAt(0) || ""}
-                    </span>
-                  </div>
-                  <span className="font-medium">
-                    {selectedProject.topic.submittedBy?.firstName} {selectedProject.topic.submittedBy?.lastName}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Started On</p>
-                <p className="font-medium">{new Date(selectedProject.createdAt).toLocaleDateString()}</p>
-              </div>
             </div>
             
             <div>
-              <p className="text-sm font-medium mb-2">Project Progress: {selectedProject.progress}%</p>
-              <div className="w-full bg-muted rounded-full h-2">
-                <div 
-                  className={`rounded-full h-2 ${getProgressColorClass(selectedProject.progress)}`}
-                  style={{ width: `${selectedProject.progress}%` }}
-                ></div>
-              </div>
+              <div className="text-sm text-muted-foreground mb-2">Project Description</div>
+              <p className="text-foreground">{selectedProject.topic.description}</p>
             </div>
             
             <div>
-              <h4 className="font-medium mb-2">Milestones</h4>
+              <div className="text-sm text-muted-foreground mb-2">Milestones</div>
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="w-6 h-6 rounded-full bg-secondary/10 flex items-center justify-center mr-2">
-                      <FileText className="h-3 w-3 text-secondary" />
-                    </div>
-                    <span>Project Proposal</span>
+                <div className="flex items-center space-x-2">
+                  <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
                   </div>
-                  <span className="text-sm text-secondary">Completed</span>
+                  <span>Project proposal submission</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="w-6 h-6 rounded-full bg-secondary/10 flex items-center justify-center mr-2">
-                      <FileText className="h-3 w-3 text-secondary" />
-                    </div>
-                    <span>Literature Review</span>
+                
+                <div className="flex items-center space-x-2">
+                  <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
                   </div>
-                  <span className="text-sm text-secondary">Completed</span>
+                  <span>Literature review completion</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center mr-2">
-                      <FileText className="h-3 w-3 text-accent" />
-                    </div>
-                    <span>Implementation</span>
+                
+                <div className="flex items-center space-x-2">
+                  <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center">
+                    <span className="text-xs text-muted-foreground">3</span>
                   </div>
-                  <span className="text-sm text-accent">In Progress</span>
+                  <span className="text-muted-foreground">Implementation of core features</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center mr-2">
-                      <FileText className="h-3 w-3 text-muted-foreground" />
-                    </div>
-                    <span>Testing & Documentation</span>
+                
+                <div className="flex items-center space-x-2">
+                  <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center">
+                    <span className="text-xs text-muted-foreground">4</span>
                   </div>
-                  <span className="text-sm text-muted-foreground">Not Started</span>
+                  <span className="text-muted-foreground">Testing and validation</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center mr-2">
-                      <FileText className="h-3 w-3 text-muted-foreground" />
-                    </div>
-                    <span>Final Presentation</span>
+                
+                <div className="flex items-center space-x-2">
+                  <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center">
+                    <span className="text-xs text-muted-foreground">5</span>
                   </div>
-                  <span className="text-sm text-muted-foreground">Not Started</span>
+                  <span className="text-muted-foreground">Final presentation and report submission</span>
                 </div>
               </div>
             </div>
             
-            <div className="pt-2 flex justify-end">
-              <Button onClick={closeDetailsModal}>Close</Button>
+            <div className="pt-4 border-t border-border flex justify-end space-x-4">
+              <Button variant="outline">Download Report</Button>
+              <Button>Contact Student</Button>
             </div>
           </div>
-        )}
-      </Modal>
+        </Modal>
+      )}
     </MainLayout>
   );
-}
-
-// Helper functions
-function getProgressColorClass(progress: number): string {
-  if (progress < 30) return "bg-destructive";
-  if (progress < 70) return "bg-accent";
-  return "bg-secondary";
-}
-
-function getStatusBadge(progress: number) {
-  if (progress < 30) {
-    return (
-      <span className="px-2 py-1 bg-destructive/10 text-destructive text-xs rounded-full">
-        At Risk
-      </span>
-    );
-  } else if (progress < 70) {
-    return (
-      <span className="px-2 py-1 bg-accent/10 text-accent text-xs rounded-full">
-        In Progress
-      </span>
-    );
-  } else if (progress < 100) {
-    return (
-      <span className="px-2 py-1 bg-secondary/10 text-secondary text-xs rounded-full">
-        On Track
-      </span>
-    );
-  } else {
-    return (
-      <span className="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
-        Completed
-      </span>
-    );
-  }
 }

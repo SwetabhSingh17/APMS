@@ -84,35 +84,27 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?
       <nav className="flex-1 overflow-y-auto py-4">
         <div className="px-3 mb-3 text-xs font-semibold text-muted-foreground uppercase">Main Navigation</div>
         
-        <Link href="/" onClick={isMobile ? onClose : undefined}>
-          <a className={linkClass("/")}>
-            <Home className="w-5 h-5" />
-            <span>Dashboard</span>
-          </a>
+        <Link href="/" onClick={isMobile ? onClose : undefined} className={linkClass("/")}>
+          <Home className="w-5 h-5" />
+          <span>Dashboard</span>
         </Link>
         
-        <Link href="/projects" onClick={isMobile ? onClose : undefined}>
-          <a className={linkClass("/projects")}>
-            <FileText className="w-5 h-5" />
-            <span>Projects</span>
-          </a>
+        <Link href="/projects" onClick={isMobile ? onClose : undefined} className={linkClass("/projects")}>
+          <FileText className="w-5 h-5" />
+          <span>Projects</span>
         </Link>
         
         {(user?.role === UserRole.COORDINATOR || user?.role === UserRole.ADMIN) && (
-          <Link href="/approve-topics" onClick={isMobile ? onClose : undefined}>
-            <a className={linkClass("/approve-topics")}>
-              <CheckCircle className="w-5 h-5" />
-              <span>Approve Topics</span>
-            </a>
+          <Link href="/approve-topics" onClick={isMobile ? onClose : undefined} className={linkClass("/approve-topics")}>
+            <CheckCircle className="w-5 h-5" />
+            <span>Approve Topics</span>
           </Link>
         )}
         
         {(user?.role === UserRole.COORDINATOR || user?.role === UserRole.ADMIN) && (
-          <Link href="/track-progress" onClick={isMobile ? onClose : undefined}>
-            <a className={linkClass("/track-progress")}>
-              <BarChart2 className="w-5 h-5" />
-              <span>Track Progress</span>
-            </a>
+          <Link href="/track-progress" onClick={isMobile ? onClose : undefined} className={linkClass("/track-progress")}>
+            <BarChart2 className="w-5 h-5" />
+            <span>Track Progress</span>
           </Link>
         )}
         
@@ -120,20 +112,16 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?
           <>
             <div className="px-3 mt-6 mb-3 text-xs font-semibold text-muted-foreground uppercase">Management</div>
             
-            <Link href="/user-management" onClick={isMobile ? onClose : undefined}>
-              <a className={linkClass("/user-management")}>
-                <Users className="w-5 h-5" />
-                <span>User Management</span>
-              </a>
+            <Link href="/user-management" onClick={isMobile ? onClose : undefined} className={linkClass("/user-management")}>
+              <Users className="w-5 h-5" />
+              <span>User Management</span>
             </Link>
           </>
         )}
         
-        <Link href="/settings" onClick={isMobile ? onClose : undefined}>
-          <a className={linkClass("/settings")}>
-            <Settings className="w-5 h-5" />
-            <span>Settings</span>
-          </a>
+        <Link href="/settings" onClick={isMobile ? onClose : undefined} className={linkClass("/settings")}>
+          <Settings className="w-5 h-5" />
+          <span>Settings</span>
         </Link>
       </nav>
       
