@@ -132,5 +132,28 @@ export type InsertStudentProject = z.infer<typeof insertStudentProjectSchema>;
 export type ProjectMilestone = typeof projectMilestones.$inferSelect;
 export type InsertProjectMilestone = z.infer<typeof insertProjectMilestoneSchema>;
 
+// Project assessments table
+export const projectAssessments = pgTable("project_assessments", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => studentProjects.id),
+  assessorId: integer("assessor_id").notNull().references(() => users.id),
+  marks: integer("marks").notNull(),
+  feedback: text("feedback"),
+  assessmentDate: timestamp("assessment_date").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertProjectAssessmentSchema = createInsertSchema(projectAssessments).omit({
+  id: true,
+  assessmentDate: true,
+  createdAt: true,
+});
+
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+export type StudentGroup = typeof studentGroups.$inferSelect;
+export type InsertStudentGroup = z.infer<typeof insertStudentGroupSchema>;
+
+export type ProjectAssessment = typeof projectAssessments.$inferSelect;
+export type InsertProjectAssessment = z.infer<typeof insertProjectAssessmentSchema>;

@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -59,6 +59,7 @@ export default function AuthPage() {
       email: "",
       role: UserRole.STUDENT,
       department: "",
+      enrollmentNumber: "",
     },
   });
 
@@ -242,6 +243,25 @@ export default function AuthPage() {
                       )}
                     />
                   </div>
+                  {/* Show enrollment number field for students */}
+                  {registerForm.watch("role") === UserRole.STUDENT && (
+                    <FormField
+                      control={registerForm.control}
+                      name="enrollmentNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Enrollment Number</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter your enrollment number" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                          <FormDescription>
+                            Required for student registration
+                          </FormDescription>
+                        </FormItem>
+                      )}
+                    />
+                  )}
                   <FormField
                     control={registerForm.control}
                     name="password"
