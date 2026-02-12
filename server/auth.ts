@@ -28,6 +28,21 @@ export async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
+// Role-based authorization middleware
+export const requireRole = (roles: UserRole[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    if (!roles.includes(req.user!.role as UserRole)) {
+      return res.status(403).json({ message: "Forbidden: Insufficient permissions" });
+    }
+
+    next();
+  };
+};
+
 export function setupAuth(app: Express, storage: IStorage) {
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "integral-university-project-portal-secret",
@@ -140,7 +155,7 @@ export function setupAuth(app: Express, storage: IStorage) {
       req.login(user, (err) => {
         if (err) return next(err);
         const { password, ...userWithoutPassword } = user;
-        return res.status(200).json(userWithoutPassword);
+        res.status(200).json(userWithoutPassword);
       });
     })(req, res, next);
   });
@@ -157,21 +172,6 @@ export function setupAuth(app: Express, storage: IStorage) {
     const { password, ...userWithoutPassword } = req.user;
     res.json(userWithoutPassword);
   });
-
-  // Role-based authorization middleware
-  const requireRole = (roles: UserRole[]) => {
-    return (req: Request, res: Response, next: NextFunction) => {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-
-      if (!roles.includes(req.user!.role as UserRole)) {
-        return res.status(403).json({ message: "Forbidden: Insufficient permissions" });
-      }
-
-      next();
-    };
-  };
 
   // Admin-only routes
   app.post("/api/admin/users", requireRole([UserRole.ADMIN]), async (req, res, next) => {
@@ -300,5 +300,5 @@ export function setupAuth(app: Express, storage: IStorage) {
     }
   });
 
-  return { requireRole };
+
 }

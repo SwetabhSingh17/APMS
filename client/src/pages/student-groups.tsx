@@ -247,7 +247,7 @@ export default function StudentGroups() {
                   <p className="font-semibold text-lg">
                     {userGroup.faculty?.firstName} {userGroup.faculty?.lastName}
                   </p>
-                  <p className="text-sm text-muted-foreground">{userGroup.faculty?.department}</p>
+                  {/* <p className="text-sm text-muted-foreground">{userGroup.faculty?.department}</p> */}
                 </div>
               </div>
 
@@ -326,7 +326,7 @@ export default function StudentGroups() {
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
                 ) : availableGroups?.length > 0 ? (
-                  availableGroups.map((group: StudentGroup) => (
+                  availableGroups.map((group: any) => (
                     <Card key={group.id}>
                       <CardHeader>
                         <CardTitle>{group.name}</CardTitle>
@@ -379,7 +379,7 @@ export default function StudentGroups() {
                                   {group.faculty?.firstName} {group.faculty?.lastName}
                                 </p>
                                 <p className="text-sm text-muted-foreground">
-                                  {group.faculty?.department}
+                                  {/* {group.faculty?.department} */}
                                 </p>
                               </div>
                             </div>
@@ -562,7 +562,7 @@ export default function StudentGroups() {
                             <SelectContent>
                               {teachers?.map((teacher: User) => (
                                 <SelectItem key={teacher.id} value={teacher.id.toString()}>
-                                  {teacher.firstName} {teacher.lastName} - {teacher.department}
+                                  {teacher.firstName} {teacher.lastName}
                                 </SelectItem>
                               ))}
                             </SelectContent>

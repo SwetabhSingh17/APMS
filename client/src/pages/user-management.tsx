@@ -228,11 +228,14 @@ export default function UserManagement() {
 
     // Remove undefined/empty fields
     const updateData: Partial<InsertUser> = Object.entries(data).reduce((acc, [key, value]) => {
-      if (value !== undefined && value !== "") {
-        acc[key as keyof InsertUser] = value;
+      if (value !== undefined && value !== "" && value !== null) {
+        acc[key as keyof InsertUser] = value as any;
       }
       return acc;
     }, {} as Partial<InsertUser>);
+
+    // Ensure id is not part of the update data
+    if ('id' in updateData) delete updateData.id;
 
     updateUserMutation.mutate({ id: selectedUser.id, data: updateData });
   };
@@ -879,19 +882,7 @@ export default function UserManagement() {
                 )}
               />
 
-              <FormField
-                control={editForm.control}
-                name="department"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Department</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+
 
               <div className="border-t pt-4 mt-4">
                 <h4 className="text-sm font-medium mb-2">Change Password</h4>

@@ -163,7 +163,7 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <p className="font-semibold">{project.topic?.submittedBy?.firstName} {project.topic?.submittedBy?.lastName}</p>
-                      <p className="text-sm text-muted-foreground">{project.topic?.submittedBy?.department}</p>
+                      {/* <p className="text-sm text-muted-foreground">{project.topic?.submittedBy?.department}</p> */}
                     </div>
                   </CardContent>
                 </Card>
@@ -460,7 +460,7 @@ export default function Dashboard() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Department</p>
-              <p className="font-medium">{selectedTopic.department}</p>
+              <p className="font-medium">General</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Date Submitted</p>

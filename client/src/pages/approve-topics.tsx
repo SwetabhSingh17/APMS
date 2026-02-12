@@ -27,7 +27,7 @@ export default function ApproveTopics() {
   const [isTopicModalOpen, setIsTopicModalOpen] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   const { data: pendingTopics = [], isLoading } = useQuery<ProjectTopic[]>({
     queryKey: ["/api/topics/pending"],
     enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN),
@@ -167,9 +167,9 @@ export default function ApproveTopics() {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return topics.filter(
-        topic => 
-          topic.title.toLowerCase().includes(query) || 
-          topic.description.toLowerCase().includes(query)
+        topic =>
+          topic.title.toLowerCase().includes(query) ||
+          topic.description?.toLowerCase().includes(query)
       );
     }
     return topics;
@@ -235,7 +235,7 @@ export default function ApproveTopics() {
           <CardHeader className="pb-0">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="pending">
-                Pending 
+                Pending
                 {pendingTopics && <span className="ml-2 text-xs px-2 py-1 bg-accent/20 text-accent-foreground rounded-full">{filteredPending.length}</span>}
               </TabsTrigger>
               <TabsTrigger value="approved">
@@ -299,7 +299,7 @@ export default function ApproveTopics() {
                             <TableCell>
                               <div>
                                 <p className="font-medium text-foreground">{topic.title}</p>
-                                <p className="text-sm text-muted-foreground">{topic.description.substring(0, 60)}...</p>
+                                <p className="text-sm text-muted-foreground">{(topic.description || "").substring(0, 60)}...</p>
                               </div>
                             </TableCell>
                             <TableCell>
@@ -312,7 +312,7 @@ export default function ApproveTopics() {
                                 </div>
                                 <div>
                                   <p>{topic.submittedBy?.firstName} {topic.submittedBy?.lastName}</p>
-                                  <p className="text-xs text-muted-foreground">{topic.submittedBy?.department}</p>
+                                  {/* <p className="text-xs text-muted-foreground">{topic.submittedBy?.department}</p> */}
                                 </div>
                               </div>
                             </TableCell>
@@ -321,9 +321,9 @@ export default function ApproveTopics() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex space-x-2 justify-end">
-                                <Button 
-                                  variant="default" 
-                                  size="sm" 
+                                <Button
+                                  variant="default"
+                                  size="sm"
                                   className="bg-secondary hover:bg-secondary/90"
                                   onClick={() => openTopicModal(topic)}
                                 >
@@ -336,7 +336,7 @@ export default function ApproveTopics() {
                       ) : (
                         <TableRow>
                           <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                            {searchQuery 
+                            {searchQuery
                               ? "No pending topics match your filters"
                               : "No pending topics to approve"}
                           </TableCell>
@@ -388,7 +388,7 @@ export default function ApproveTopics() {
                             <TableCell>
                               <div>
                                 <p className="font-medium text-foreground">{topic.title}</p>
-                                <p className="text-sm text-muted-foreground">{topic.description.substring(0, 60)}...</p>
+                                <p className="text-sm text-muted-foreground">{(topic.description || "").substring(0, 60)}...</p>
                               </div>
                             </TableCell>
                             <TableCell>
@@ -401,7 +401,7 @@ export default function ApproveTopics() {
                                 </div>
                                 <div>
                                   <p>{topic.submittedBy?.firstName} {topic.submittedBy?.lastName}</p>
-                                  <p className="text-xs text-muted-foreground">{topic.submittedBy?.department}</p>
+                                  {/* <p className="text-xs text-muted-foreground">{topic.submittedBy?.department}</p> */}
                                 </div>
                               </div>
                             </TableCell>
@@ -432,7 +432,7 @@ export default function ApproveTopics() {
                       ) : (
                         <TableRow>
                           <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                            {searchQuery 
+                            {searchQuery
                               ? "No approved topics match your filters"
                               : "No approved topics yet"}
                           </TableCell>
@@ -484,7 +484,7 @@ export default function ApproveTopics() {
                             <TableCell>
                               <div>
                                 <p className="font-medium text-foreground">{topic.title}</p>
-                                <p className="text-sm text-muted-foreground">{topic.description.substring(0, 60)}...</p>
+                                <p className="text-sm text-muted-foreground">{(topic.description || "").substring(0, 60)}...</p>
                               </div>
                             </TableCell>
                             <TableCell>
@@ -497,7 +497,7 @@ export default function ApproveTopics() {
                                 </div>
                                 <div>
                                   <p>{topic.submittedBy?.firstName} {topic.submittedBy?.lastName}</p>
-                                  <p className="text-xs text-muted-foreground">{topic.submittedBy?.department}</p>
+                                  {/* <p className="text-xs text-muted-foreground">{topic.submittedBy?.department}</p> */}
                                 </div>
                               </div>
                             </TableCell>
@@ -528,7 +528,7 @@ export default function ApproveTopics() {
                       ) : (
                         <TableRow>
                           <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                            {searchQuery 
+                            {searchQuery
                               ? "No rejected topics match your filters"
                               : "No rejected topics"}
                           </TableCell>
@@ -555,7 +555,7 @@ export default function ApproveTopics() {
               <h4 className="font-medium mb-2">{selectedTopic.title}</h4>
               <p className="text-sm text-muted-foreground">{selectedTopic.description}</p>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <p className="text-sm text-muted-foreground">Submitted By</p>
@@ -574,34 +574,34 @@ export default function ApproveTopics() {
                 </p>
               </div>
             </div>
-            
+
             <div className="mb-4">
               <Label htmlFor="feedback" className="block text-sm font-medium mb-1">Feedback (optional)</Label>
-              <Textarea 
+              <Textarea
                 id="feedback"
-                rows={3} 
-                className="w-full text-sm" 
+                rows={3}
+                className="w-full text-sm"
                 placeholder="Add any feedback or suggestions..."
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
               />
             </div>
-            
+
             <div className="flex space-x-3 justify-end">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={closeTopicModal}
               >
                 Cancel
               </Button>
-              <Button 
+              <Button
                 variant="destructive"
                 onClick={handleReject}
                 disabled={rejectMutation.isPending || approveMutation.isPending}
               >
                 {rejectMutation.isPending ? "Rejecting..." : "Reject Topic"}
               </Button>
-              <Button 
+              <Button
                 variant="default"
                 className="bg-secondary hover:bg-secondary/90"
                 onClick={handleApprove}

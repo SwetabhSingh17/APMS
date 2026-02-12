@@ -179,7 +179,7 @@ export default function Settings() {
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="profile">
           <Card>
             <CardHeader>
@@ -223,7 +223,7 @@ export default function Settings() {
                       />
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <FormField
                       control={profileForm.control}
@@ -239,7 +239,7 @@ export default function Settings() {
                       )}
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label>Username</Label>
                     <Input value={user.username} disabled />
@@ -247,15 +247,15 @@ export default function Settings() {
                       Your username cannot be changed.
                     </p>
                   </div>
-                  
-                  <div className="space-y-2">
+
+                  {/* <div className="space-y-2">
                     <Label>Department</Label>
                     <Input value={user.department} disabled />
                     <p className="text-sm text-muted-foreground">
                       Your department is managed by administrators.
                     </p>
-                  </div>
-                  
+                  </div> */}
+
                   <div className="space-y-2">
                     <Label>Role</Label>
                     <Input value={user.role} disabled />
@@ -263,7 +263,7 @@ export default function Settings() {
                       Your role is assigned by administrators and cannot be changed.
                     </p>
                   </div>
-                  
+
                   <div className="flex justify-end">
                     <Button
                       type="submit"
@@ -277,7 +277,7 @@ export default function Settings() {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="password">
           <Card>
             <CardHeader>
@@ -304,7 +304,7 @@ export default function Settings() {
                       )}
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <FormField
                       control={passwordForm.control}
@@ -323,7 +323,7 @@ export default function Settings() {
                       )}
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <FormField
                       control={passwordForm.control}
@@ -339,7 +339,7 @@ export default function Settings() {
                       )}
                     />
                   </div>
-                  
+
                   <div className="flex justify-end">
                     <Button
                       type="submit"
@@ -353,7 +353,7 @@ export default function Settings() {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="notifications">
           <Card>
             <CardHeader>
@@ -377,9 +377,9 @@ export default function Settings() {
                     onCheckedChange={() => handleNotificationChange('emailNotifications')}
                   />
                 </div>
-                
+
                 <Separator />
-                
+
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label htmlFor="project-updates">Project Updates</Label>
@@ -393,9 +393,9 @@ export default function Settings() {
                     onCheckedChange={() => handleNotificationChange('projectUpdates')}
                   />
                 </div>
-                
+
                 <Separator />
-                
+
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label htmlFor="deadline-reminders">Deadline Reminders</Label>
@@ -409,9 +409,9 @@ export default function Settings() {
                     onCheckedChange={() => handleNotificationChange('deadlineReminders')}
                   />
                 </div>
-                
+
                 <Separator />
-                
+
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label htmlFor="system-announcements">System Announcements</Label>
@@ -434,7 +434,7 @@ export default function Settings() {
             </CardFooter>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="appearance">
           <Card>
             <CardHeader>
@@ -476,7 +476,7 @@ export default function Settings() {
                   </Button>
                 </div>
                 <p className="text-sm text-muted-foreground mt-3">
-                  {theme === "system" 
+                  {theme === "system"
                     ? "Using your system theme preference"
                     : `Using ${theme} theme`}
                 </p>

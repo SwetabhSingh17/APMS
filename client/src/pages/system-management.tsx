@@ -30,7 +30,7 @@ export default function SystemManagement() {
     // Redirect if not admin
     if (user && user.role !== UserRole.ADMIN) {
         setLocation("/");
-        return null;
+        return <></>;
     }
 
     // Admin Reset State
