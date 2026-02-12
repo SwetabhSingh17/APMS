@@ -299,6 +299,7 @@ export default function Topics() {
                       placeholder="Provide a detailed description of the project topic"
                       rows={4}
                       {...field}
+                      value={field.value || ""}
                     />
                   </FormControl>
                   <FormMessage />
@@ -404,6 +405,7 @@ export default function Topics() {
                       placeholder="Provide a detailed description of the project topic"
                       rows={4}
                       {...field}
+                      value={field.value || ""}
                     />
                   </FormControl>
                   <FormMessage />

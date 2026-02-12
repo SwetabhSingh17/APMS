@@ -61,8 +61,8 @@ IntegralProjectHub/
 │   │   └── lib/            # QueryClient, utils, ProtectedRoute
 │   └── index.html
 ├── server/                 # Backend API
-│   ├── index.ts            # Express app entry point
-│   ├── routes.ts           # 30+ REST API endpoints
+│   ├── routes/             # Modular API routes (auth, users, projects, etc.)
+│   ├── index.ts            # Express app entry point & route aggregation
 │   ├── auth.ts             # Passport.js auth setup (RBAC)
 │   ├── storage/            # IStorage interface + Drizzle implementation
 │   ├── db.ts               # Database connection & migrations

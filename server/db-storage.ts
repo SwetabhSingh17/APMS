@@ -48,7 +48,6 @@ export class DBStorage implements IStorage {
           lastName: "User",
           email: "admin@example.com",
           role: UserRole.ADMIN,
-          department: "Administration",
           enrollmentNumber: null,
           groupId: null
         } as unknown as InsertUser);
@@ -418,7 +417,7 @@ export class DBStorage implements IStorage {
       if (criteria.projectName && !p.topic.title.toLowerCase().includes(criteria.projectName.toLowerCase())) return false;
       if (criteria.studentName && !(p.student.firstName + ' ' + p.student.lastName).toLowerCase().includes(criteria.studentName.toLowerCase())) return false;
       if (criteria.enrollmentNumber && p.student.enrollmentNumber && !p.student.enrollmentNumber.includes(criteria.enrollmentNumber)) return false;
-      if (criteria.department && p.student.department !== criteria.department) return false;
+      // if (criteria.department && p.student.department !== criteria.department) return false;
       if (criteria.status && p.status !== criteria.status) return false;
       return true;
     });
@@ -430,7 +429,7 @@ export class DBStorage implements IStorage {
     const stats: Record<string, { progress: number, studentCount: number, projectCount: number }> = {};
 
     for (const p of projects) {
-      const dept = p.student.department || 'Unknown';
+      const dept = 'General';
       if (!stats[dept]) stats[dept] = { progress: 0, studentCount: 0, projectCount: 0 };
 
       stats[dept].projectCount++;

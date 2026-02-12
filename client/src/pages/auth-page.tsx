@@ -269,7 +269,7 @@ export default function AuthPage() {
                         <FormItem>
                           <FormLabel>Enrollment Number</FormLabel>
                           <FormControl>
-                            <Input placeholder="Enter your enrollment number" {...field} />
+                            <Input placeholder="Enter your enrollment number" {...field} value={field.value || ""} />
                           </FormControl>
                           <FormMessage />
                           <FormDescription>
