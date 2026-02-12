@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Eye, EyeOff, Info } from "lucide-react";
+import { useState } from "react";
 
 const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -39,6 +41,7 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 export default function AuthPage() {
   const [_, setLocation] = useLocation();
   const { user, loginMutation, registerMutation } = useAuth();
+  const [showPassword, setShowPassword] = useState(false);
 
   // Redirect if user is already logged in
   useEffect(() => {
@@ -67,10 +70,22 @@ export default function AuthPage() {
       lastName: "",
       email: "",
       role: UserRole.STUDENT,
-      department: "",
       enrollmentNumber: "",
     },
   });
+
+  // Handle registration errors
+  useEffect(() => {
+    if (registerMutation.error) {
+      const error = registerMutation.error as Error;
+      if (error.message.includes("enrollment number is already registered")) {
+        registerForm.setError("enrollmentNumber", {
+          type: "manual",
+          message: "This enrollment number is already registered",
+        });
+      }
+    }
+  }, [registerMutation.error, registerForm]);
 
   const onLoginSubmit = (data: LoginFormValues) => {
     loginMutation.mutate(data);
@@ -101,7 +116,7 @@ export default function AuthPage() {
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="register">Register</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="login">
               <Form {...loginForm}>
                 <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
@@ -125,15 +140,34 @@ export default function AuthPage() {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="Enter your password" {...field} />
+                          <div className="relative">
+                            <Input
+                              type={showPassword ? "text" : "password"}
+                              placeholder="Enter your password"
+                              {...field}
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                              onClick={() => setShowPassword(!showPassword)}
+                            >
+                              {showPassword ? (
+                                <EyeOff className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <Eye className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </Button>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <Button 
-                    type="submit" 
-                    className="w-full" 
+                  <Button
+                    type="submit"
+                    className="w-full"
                     disabled={loginMutation.isPending}
                   >
                     {loginMutation.isPending ? "Logging in..." : "Login"}
@@ -141,7 +175,7 @@ export default function AuthPage() {
                 </form>
               </Form>
             </TabsContent>
-            
+
             <TabsContent value="register">
               <Form {...registerForm}>
                 <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
@@ -199,15 +233,15 @@ export default function AuthPage() {
                       </FormItem>
                     )}
                   />
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4">
                     <FormField
                       control={registerForm.control}
                       name="role"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Role</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
+                          <Select
+                            onValueChange={field.onChange}
                             defaultValue={field.value}
                           >
                             <FormControl>
@@ -224,33 +258,7 @@ export default function AuthPage() {
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={registerForm.control}
-                      name="department"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Department</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select department" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="Computer Science">Computer Science</SelectItem>
-                              <SelectItem value="Information Technology">Information Technology</SelectItem>
-                              <SelectItem value="Electronics Engineering">Electronics Engineering</SelectItem>
-                              <SelectItem value="Mechanical Engineering">Mechanical Engineering</SelectItem>
-                              <SelectItem value="Civil Engineering">Civil Engineering</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+
                   </div>
                   {/* Show enrollment number field for students */}
                   {registerForm.watch("role") === UserRole.STUDENT && (
@@ -297,9 +305,9 @@ export default function AuthPage() {
                       </FormItem>
                     )}
                   />
-                  <Button 
-                    type="submit" 
-                    className="w-full" 
+                  <Button
+                    type="submit"
+                    className="w-full"
                     disabled={registerMutation.isPending}
                   >
                     {registerMutation.isPending ? "Registering..." : "Register"}
@@ -310,6 +318,17 @@ export default function AuthPage() {
           </Tabs>
         </CardContent>
       </Card>
-    </div>
+
+
+      {/* Creator Info Button */}
+      <Button
+        variant="outline"
+        size="icon"
+        className="fixed bottom-4 right-4 h-10 w-10 get-started-btn rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
+        onClick={() => setLocation("/about")}
+      >
+        <Info className="h-6 w-6 text-primary" />
+      </Button>
+    </div >
   );
 }

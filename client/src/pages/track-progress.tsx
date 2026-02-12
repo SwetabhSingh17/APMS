@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import MainLayout from "@/components/layout/main-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,46 +8,102 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProgressBar from "@/components/dashboard/progress-bar";
-import { Search, FileText } from "lucide-react";
+import { Search, FileText, FileDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UserRole } from "@shared/schema";
+import { UserRole, ProjectMilestone, StudentProject, ProjectTopic, User } from "@shared/schema";
 import Modal from "@/components/ui/modal";
+import axios, { AxiosResponse } from "axios";
+import * as XLSX from 'xlsx';
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+
+interface ProjectWithMilestones extends StudentProject {
+  topic: ProjectTopic;
+  student: User;
+  milestones: ProjectMilestone[];
+}
 
 export default function TrackProgress() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterDepartment, setFilterDepartment] = useState("all");
+
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<any>(null);
+  const [selectedProject, setSelectedProject] = useState<ProjectWithMilestones | null>(null);
 
-  const { data: projects, isLoading } = useQuery({
-    queryKey: ["/api/projects"],
-    enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN)
-  });
-
-  const { data: departmentStats, isLoading: isLoadingStats } = useQuery({
-    queryKey: ["/api/departments/stats"],
-    enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN)
-  });
-
-  const filterProjects = (items: any[] | undefined) => {
-    if (!items) return [];
-
-    // Filter by department
-    let filtered = items;
-    if (filterDepartment !== "all") {
-      filtered = filtered.filter(item => item.topic.department === filterDepartment);
+  const { data: projects, isLoading } = useQuery<ProjectWithMilestones[]>({
+    queryKey: ['/api/projects'],
+    enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN),
+    queryFn: async () => {
+      const res: AxiosResponse<ProjectWithMilestones[]> = await axios.get('/api/projects');
+      return res.data;
     }
+  });
 
-    // Filter by search query
+  const { data: stats, isLoading: isLoadingStats } = useQuery<any>({
+    queryKey: ["/api/stats"],
+    enabled: !!user
+  });
+
+  // Excel Export Mutation
+  const exportExcelMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/export-excel", {});
+      if (!res.ok) throw new Error("Excel export failed");
+      return res.json();
+    },
+    onSuccess: (result) => {
+      // Create worksheet from data
+      const ws = XLSX.utils.json_to_sheet(result.data);
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Projects Report");
+      // Generate Excel file and download
+      XLSX.writeFile(wb, `project-report-${new Date().toISOString().split('T')[0]}.xlsx`);
+
+      toast({
+        title: "Export Successful",
+        description: "Excel report downloaded successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Export Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const getOverallProgress = () => {
+    if (!projects || projects.length === 0) return 0;
+    const totalProgress = projects.reduce((sum, p) => sum + p.progress, 0);
+    return Math.round(totalProgress / projects.length);
+  };
+
+  const getPhasePercentage = (phase: string) => {
+    if (!stats?.projectPhases) return 0;
+    // Normalized check usually helps if casing differs, but assuming exact match for now based on stats shape
+    const map: Record<string, number> = {
+      "Topic Selection": stats.projectPhases.topicSelection,
+      "Development": stats.projectPhases.implementation, // Mapping Development to Implementation as per logic
+      "Final Review": stats.projectPhases.testing // Mapping Final Review to Testing
+    };
+    return map[phase] || 0;
+  };
+
+  const filterProjects = (projects: ProjectWithMilestones[] | undefined) => {
+    if (!projects) return [];
+    let filtered = [...projects];
+
+
+
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        item => 
-          item.topic.title.toLowerCase().includes(query) || 
-          item.student.firstName.toLowerCase().includes(query) ||
-          item.student.lastName.toLowerCase().includes(query)
+      filtered = filtered.filter(project =>
+        project.topic.title.toLowerCase().includes(query) ||
+        `${project.student.firstName} ${project.student.lastName}`.toLowerCase().includes(query)
       );
     }
 
@@ -150,70 +206,21 @@ export default function TrackProgress() {
               </div>
             ) : (
               <div className="space-y-6">
-                <ProgressBar 
-                  label="Topic Selection Phase" 
-                  percentage={85} 
-                  color="bg-secondary" 
+                <ProgressBar
+                  label="Topic Selection Phase"
+                  percentage={getPhasePercentage("Topic Selection")}
+                  color="bg-secondary"
                 />
-                <ProgressBar 
-                  label="Research & Planning" 
-                  percentage={62} 
-                  color="bg-primary" 
+                <ProgressBar
+                  label="Development Phase"
+                  percentage={getPhasePercentage("Development")}
+                  color="bg-primary"
                 />
-                <ProgressBar 
-                  label="Implementation" 
-                  percentage={41} 
-                  color="bg-accent" 
+                <ProgressBar
+                  label="Final Review Phase"
+                  percentage={getPhasePercentage("Final Review")}
+                  color="bg-accent"
                 />
-                <ProgressBar 
-                  label="Testing & Documentation" 
-                  percentage={18} 
-                  color="bg-destructive" 
-                />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle>Department Progress</CardTitle>
-            <CardDescription>
-              Average progress by department
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoadingStats ? (
-              <div className="space-y-4">
-                {Array(5).fill(0).map((_, i) => (
-                  <div key={i} className="bg-muted p-3 rounded-lg space-y-2">
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-6 w-12" />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="bg-muted p-3 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Computer Science</p>
-                  <p className="text-lg font-semibold text-primary">78%</p>
-                </div>
-                <div className="bg-muted p-3 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Information Technology</p>
-                  <p className="text-lg font-semibold text-primary">82%</p>
-                </div>
-                <div className="bg-muted p-3 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Electronics Engineering</p>
-                  <p className="text-lg font-semibold text-primary">65%</p>
-                </div>
-                <div className="bg-muted p-3 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Mechanical Engineering</p>
-                  <p className="text-lg font-semibold text-primary">53%</p>
-                </div>
-                <div className="bg-muted p-3 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Civil Engineering</p>
-                  <p className="text-lg font-semibold text-primary">61%</p>
-                </div>
               </div>
             )}
           </CardContent>
@@ -221,47 +228,44 @@ export default function TrackProgress() {
       </div>
 
       <Card>
-        <Tabs defaultValue="all">
+        <Tabs defaultValue="all" className="w-full">
           <CardHeader>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex flex-col gap-2">
+                <CardTitle>Projects Overview</CardTitle>
+                <CardDescription>Monitor and track all student projects</CardDescription>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="relative flex-1 md:max-w-xs">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search projects..."
+                    className="pl-10"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <Button
+                  onClick={() => exportExcelMutation.mutate()}
+                  disabled={exportExcelMutation.isPending}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <FileDown className="h-4 w-4" />
+                  {exportExcelMutation.isPending ? "Exporting..." : "Export as Excel"}
+                </Button>
+              </div>
+            </div>
+            <div className="mt-4">
               <TabsList>
                 <TabsTrigger value="all">All Projects</TabsTrigger>
                 <TabsTrigger value="atRisk">At Risk</TabsTrigger>
                 <TabsTrigger value="onTrack">On Track</TabsTrigger>
                 <TabsTrigger value="completed">Completed</TabsTrigger>
               </TabsList>
-              
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                  <Input
-                    placeholder="Search by project or student..."
-                    className="pl-10 w-full md:w-64"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-                
-                <Select 
-                  value={filterDepartment} 
-                  onValueChange={setFilterDepartment}
-                >
-                  <SelectTrigger className="w-full md:w-56">
-                    <SelectValue placeholder="Filter by department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Departments</SelectItem>
-                    <SelectItem value="Computer Science">Computer Science</SelectItem>
-                    <SelectItem value="Information Technology">Information Technology</SelectItem>
-                    <SelectItem value="Electronics Engineering">Electronics Engineering</SelectItem>
-                    <SelectItem value="Mechanical Engineering">Mechanical Engineering</SelectItem>
-                    <SelectItem value="Civil Engineering">Civil Engineering</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
           </CardHeader>
-          
+
           <CardContent>
             <TabsContent value="all" className="mt-0">
               {isLoading ? (
@@ -273,7 +277,7 @@ export default function TrackProgress() {
                       <TableRow>
                         <TableHead>Project Topic</TableHead>
                         <TableHead>Student</TableHead>
-                        <TableHead>Department</TableHead>
+                        <TableHead>Enrollment #</TableHead>
                         <TableHead>Progress</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Action</TableHead>
@@ -295,11 +299,11 @@ export default function TrackProgress() {
                                 <span>{`${project.student.firstName} ${project.student.lastName}`}</span>
                               </div>
                             </TableCell>
-                            <TableCell>{project.topic.department}</TableCell>
+                            <TableCell>{project.student.enrollmentNumber || 'N/A'}</TableCell>
                             <TableCell>
                               <div className="flex items-center space-x-2">
                                 <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
-                                  <div 
+                                  <div
                                     className={`rounded-full h-2 ${getProgressColorClass(project.progress)}`}
                                     style={{ width: `${project.progress}%` }}
                                   ></div>
@@ -311,8 +315,8 @@ export default function TrackProgress() {
                               {getStatusBadge(project.progress)}
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button 
-                                variant="outline" 
+                              <Button
+                                variant="outline"
                                 size="sm"
                                 onClick={() => openDetailsModal(project)}
                               >
@@ -324,7 +328,7 @@ export default function TrackProgress() {
                       ) : (
                         <TableRow>
                           <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                            {searchQuery || filterDepartment !== "all" 
+                            {searchQuery
                               ? "No projects match your filters"
                               : "No projects found"}
                           </TableCell>
@@ -335,7 +339,7 @@ export default function TrackProgress() {
                 </div>
               )}
             </TabsContent>
-            
+
             <TabsContent value="atRisk" className="mt-0">
               <div className="overflow-x-auto">
                 <Table>
@@ -343,54 +347,68 @@ export default function TrackProgress() {
                     <TableRow>
                       <TableHead>Project Topic</TableHead>
                       <TableHead>Student</TableHead>
-                      <TableHead>Department</TableHead>
+                      <TableHead>Enrollment #</TableHead>
                       <TableHead>Progress</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    <TableRow>
-                      <TableCell className="font-medium">Smart Traffic Management System</TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-primary font-medium text-sm">AP</span>
-                          </div>
-                          <span>Aditya Patel</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>Civil Engineering</TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
-                            <div 
-                              className="bg-destructive rounded-full h-2"
-                              style={{ width: "22%" }}
-                            ></div>
-                          </div>
-                          <span className="text-sm">22%</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="px-2 py-1 bg-destructive/10 text-destructive text-xs rounded-full">
-                          At Risk
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                        >
-                          View Details
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+                    {filteredProjects && filteredProjects.length > 0 ? (
+                      filteredProjects
+                        .filter(project => project.progress < 30)
+                        .map((project) => (
+                          <TableRow key={project.id} className="hover:bg-muted/50">
+                            <TableCell className="font-medium">{project.topic.title}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                  <span className="text-primary font-medium text-sm">
+                                    {project.student.firstName.charAt(0)}
+                                    {project.student.lastName.charAt(0)}
+                                  </span>
+                                </div>
+                                <span>{`${project.student.firstName} ${project.student.lastName}`}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>{project.student.enrollmentNumber || 'N/A'}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
+                                  <div
+                                    className={`rounded-full h-2 ${getProgressColorClass(project.progress)}`}
+                                    style={{ width: `${project.progress}%` }}
+                                  ></div>
+                                </div>
+                                <span className="text-sm">{project.progress}%</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {getStatusBadge(project.progress)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openDetailsModal(project)}
+                              >
+                                View Details
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          No projects at risk
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </div>
             </TabsContent>
-            
+
             <TabsContent value="onTrack" className="mt-0">
               <div className="overflow-x-auto">
                 <Table>
@@ -398,54 +416,68 @@ export default function TrackProgress() {
                     <TableRow>
                       <TableHead>Project Topic</TableHead>
                       <TableHead>Student</TableHead>
-                      <TableHead>Department</TableHead>
+                      <TableHead>Enrollment #</TableHead>
                       <TableHead>Progress</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    <TableRow>
-                      <TableCell className="font-medium">AI-Enhanced Academic Advisor</TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-primary font-medium text-sm">RS</span>
-                          </div>
-                          <span>Rahul Sharma</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>Computer Science</TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
-                            <div 
-                              className="bg-emerald-500 rounded-full h-2"
-                              style={{ width: "65%" }}
-                            ></div>
-                          </div>
-                          <span className="text-sm">65%</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="px-2 py-1 bg-emerald-500/10 text-emerald-500 text-xs rounded-full">
-                          On Track
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                        >
-                          View Details
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+                    {filteredProjects && filteredProjects.length > 0 ? (
+                      filteredProjects
+                        .filter(project => project.progress >= 30 && project.progress < 100)
+                        .map((project) => (
+                          <TableRow key={project.id} className="hover:bg-muted/50">
+                            <TableCell className="font-medium">{project.topic.title}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                  <span className="text-primary font-medium text-sm">
+                                    {project.student.firstName.charAt(0)}
+                                    {project.student.lastName.charAt(0)}
+                                  </span>
+                                </div>
+                                <span>{`${project.student.firstName} ${project.student.lastName}`}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>{project.student.enrollmentNumber || 'N/A'}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
+                                  <div
+                                    className={`rounded-full h-2 ${getProgressColorClass(project.progress)}`}
+                                    style={{ width: `${project.progress}%` }}
+                                  ></div>
+                                </div>
+                                <span className="text-sm">{project.progress}%</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {getStatusBadge(project.progress)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openDetailsModal(project)}
+                              >
+                                View Details
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          No projects on track
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </div>
             </TabsContent>
-            
+
             <TabsContent value="completed" className="mt-0">
               <div className="overflow-x-auto">
                 <Table>
@@ -453,49 +485,63 @@ export default function TrackProgress() {
                     <TableRow>
                       <TableHead>Project Topic</TableHead>
                       <TableHead>Student</TableHead>
-                      <TableHead>Department</TableHead>
+                      <TableHead>Enrollment #</TableHead>
                       <TableHead>Progress</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    <TableRow>
-                      <TableCell className="font-medium">IoT Weather Monitoring System</TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-primary font-medium text-sm">PK</span>
-                          </div>
-                          <span>Priya Khan</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>Electronics Engineering</TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
-                            <div 
-                              className="bg-blue-500 rounded-full h-2"
-                              style={{ width: "100%" }}
-                            ></div>
-                          </div>
-                          <span className="text-sm">100%</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="px-2 py-1 bg-blue-500/10 text-blue-500 text-xs rounded-full">
-                          Completed
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                        >
-                          View Details
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+                    {filteredProjects && filteredProjects.length > 0 ? (
+                      filteredProjects
+                        .filter(project => project.progress === 100)
+                        .map((project) => (
+                          <TableRow key={project.id} className="hover:bg-muted/50">
+                            <TableCell className="font-medium">{project.topic.title}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                  <span className="text-primary font-medium text-sm">
+                                    {project.student.firstName.charAt(0)}
+                                    {project.student.lastName.charAt(0)}
+                                  </span>
+                                </div>
+                                <span>{`${project.student.firstName} ${project.student.lastName}`}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>{project.student.enrollmentNumber || 'N/A'}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
+                                  <div
+                                    className={`rounded-full h-2 ${getProgressColorClass(project.progress)}`}
+                                    style={{ width: `${project.progress}%` }}
+                                  ></div>
+                                </div>
+                                <span className="text-sm">{project.progress}%</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {getStatusBadge(project.progress)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openDetailsModal(project)}
+                              >
+                                View Details
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          No completed projects
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </div>
@@ -506,111 +552,77 @@ export default function TrackProgress() {
 
       {/* Project Details Modal */}
       {isDetailsModalOpen && selectedProject && (
-        <Modal 
-          isOpen={isDetailsModalOpen} 
+        <Modal
+          isOpen={isDetailsModalOpen}
           onClose={closeDetailsModal}
-          title={selectedProject.topic.title}
-          size="lg"
+          title="Project Details"
+          description="Detailed information about the selected project"
         >
           <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center gap-6">
-              <div className="md:w-1/3 space-y-2">
-                <div className="text-sm text-muted-foreground">Progress</div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-full bg-muted rounded-full h-2.5">
-                    <div 
-                      className={`rounded-full h-2.5 ${getProgressColorClass(selectedProject.progress)}`}
-                      style={{ width: `${selectedProject.progress}%` }}
-                    ></div>
-                  </div>
-                  <span className="text-lg font-semibold">{selectedProject.progress}%</span>
-                </div>
-                <div>{getStatusBadge(selectedProject.progress)}</div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold">{selectedProject.topic.title}</h3>
+              <p className="text-sm text-muted-foreground">{selectedProject.topic.description}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium">Student</p>
+                <p className="text-sm text-muted-foreground">
+                  {selectedProject.student.firstName} {selectedProject.student.lastName}
+                </p>
               </div>
-              
-              <div className="md:w-2/3 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <div className="text-sm text-muted-foreground">Student</div>
-                  <div className="flex items-center space-x-2 mt-1">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-primary font-medium text-sm">
-                        {selectedProject.student.firstName.charAt(0)}
-                        {selectedProject.student.lastName.charAt(0)}
-                      </span>
-                    </div>
-                    <span className="font-medium">{`${selectedProject.student.firstName} ${selectedProject.student.lastName}`}</span>
-                  </div>
-                </div>
-                
-                <div>
-                  <div className="text-sm text-muted-foreground">Department</div>
-                  <div className="font-medium mt-1">{selectedProject.topic.department}</div>
-                </div>
-                
-                <div>
-                  <div className="text-sm text-muted-foreground">Started</div>
-                  <div className="font-medium mt-1">{new Date(selectedProject.createdAt).toLocaleDateString()}</div>
-                </div>
-                
-                <div>
-                  <div className="text-sm text-muted-foreground">Complexity</div>
-                  <div className="font-medium mt-1">{selectedProject.topic.estimatedComplexity}</div>
-                </div>
+
+              <div>
+                <p className="text-sm font-medium">Start Date</p>
+                <p className="text-sm text-muted-foreground">
+                  {new Date(selectedProject.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-medium">Complexity</p>
+                <p className="text-sm text-muted-foreground">{selectedProject.topic.estimatedComplexity}</p>
               </div>
             </div>
-            
+
             <div>
-              <div className="text-sm text-muted-foreground mb-2">Project Description</div>
-              <p className="text-foreground">{selectedProject.topic.description}</p>
-            </div>
-            
-            <div>
-              <div className="text-sm text-muted-foreground mb-2">Milestones</div>
-              <div className="space-y-3">
-                <div className="flex items-center space-x-2">
-                  <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <span>Project proposal submission</span>
+              <p className="text-sm font-medium mb-2">Overall Progress</p>
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <ProgressBar
+                    label=""
+                    percentage={selectedProject.progress}
+                    color={getProgressColorClass(selectedProject.progress)}
+                  />
                 </div>
-                
-                <div className="flex items-center space-x-2">
-                  <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <span>Literature review completion</span>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center">
-                    <span className="text-xs text-muted-foreground">3</span>
-                  </div>
-                  <span className="text-muted-foreground">Implementation of core features</span>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center">
-                    <span className="text-xs text-muted-foreground">4</span>
-                  </div>
-                  <span className="text-muted-foreground">Testing and validation</span>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center">
-                    <span className="text-xs text-muted-foreground">5</span>
-                  </div>
-                  <span className="text-muted-foreground">Final presentation and report submission</span>
-                </div>
+                <span className="text-sm font-medium">{selectedProject.progress}%</span>
+              </div>
+              <div className="mt-2">
+                {getStatusBadge(selectedProject.progress)}
               </div>
             </div>
-            
-            <div className="pt-4 border-t border-border flex justify-end space-x-4">
-              <Button variant="outline">Download Report</Button>
-              <Button>Contact Student</Button>
+
+            <div>
+              <p className="text-sm font-medium mb-2">Technology Stack</p>
+              <p className="text-sm text-muted-foreground">{selectedProject.topic.technology}</p>
+            </div>
+
+            {selectedProject?.milestones?.map((milestone: ProjectMilestone) => (
+              <div key={milestone.id} className="flex items-center gap-4 mb-4">
+                <div>
+                  <p className="text-sm font-medium">{milestone.title}</p>
+                  <p className="text-xs text-muted-foreground">{milestone.description}</p>
+                </div>
+                <span className={`text-xs px-2 py-1 rounded-full ${milestone.status === "completed"
+                  ? "bg-blue-500/10 text-blue-500"
+                  : "bg-amber-500/10 text-amber-500"
+                  }`}>
+                  {milestone.status === "completed" ? "Completed" : "Pending"}
+                </span>
+              </div>
+            ))}
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={closeDetailsModal}>Close</Button>
             </div>
           </div>
         </Modal>

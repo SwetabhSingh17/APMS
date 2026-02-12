@@ -1,8 +1,10 @@
 import { useAuth } from "@/hooks/use-auth";
-import { Bell, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { NotificationDropdown } from "@/components/notifications/notification-dropdown";
 
 type HeaderProps = {
   onToggleSidebar: () => void;
@@ -21,6 +23,9 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
         break;
       case "/projects":
         setTitle("Projects");
+        break;
+      case "/student-topics":
+        setTitle("Available Topics");
         break;
       case "/approve-topics":
         setTitle("Approve Topics");
@@ -66,11 +71,9 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
           </div>
         </div>
         
-        <div className="flex items-center space-x-4">
-          <Button variant="ghost" size="sm" className="relative text-foreground hover:text-primary">
-            <Bell className="w-6 h-6" />
-            <span className="absolute top-0 right-0 w-2 h-2 bg-destructive rounded-full"></span>
-          </Button>
+        <div className="flex items-center space-x-2">
+          <ThemeToggle />
+          <NotificationDropdown />
           
           <div className="md:hidden">
             <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">

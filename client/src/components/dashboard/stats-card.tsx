@@ -23,8 +23,23 @@ export default function StatsCard({
   borderColor,
   change,
 }: StatsCardProps) {
+  const getBorderColorClass = (color: string) => {
+    switch (color) {
+      case 'primary':
+        return 'border-primary';
+      case 'secondary':
+        return 'border-secondary';
+      case 'accent':
+        return 'border-accent';
+      case 'destructive':
+        return 'border-destructive';
+      default:
+        return 'border-primary';
+    }
+  };
+
   return (
-    <Card className={cn("p-4 border-l-4", `border-l-${borderColor}`)}>
+    <Card className={cn("p-4 border-l-4", getBorderColorClass(borderColor))}>
       <div className="flex justify-between items-start">
         <div>
           <p className="text-muted-foreground text-sm">{title}</p>

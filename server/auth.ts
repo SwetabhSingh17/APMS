@@ -1,15 +1,15 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
-import { Express } from "express";
+import { Express, Request, Response, NextFunction } from "express";
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { storage } from "./storage";
+import type { IStorage } from "./storage/interface";
 import { User as SelectUser, UserRole } from "@shared/schema";
 
 declare global {
   namespace Express {
-    interface User extends SelectUser {}
+    interface User extends SelectUser { }
   }
 }
 
@@ -28,7 +28,7 @@ export async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
-export function setupAuth(app: Express) {
+export function setupAuth(app: Express, storage: IStorage) {
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "integral-university-project-portal-secret",
     resave: false,
@@ -63,6 +63,9 @@ export function setupAuth(app: Express) {
   passport.deserializeUser(async (id: number, done) => {
     try {
       const user = await storage.getUser(id);
+      if (!user) {
+        return done(null, false);
+      }
       done(null, user);
     } catch (error) {
       done(error);
@@ -75,32 +78,42 @@ export function setupAuth(app: Express) {
       if (existingUser) {
         return res.status(400).json({ message: "Username already exists" });
       }
-      
+
       // Check if trying to register as Admin or Coordinator
       if (req.body.role === UserRole.ADMIN || req.body.role === UserRole.COORDINATOR) {
         // Check if an admin or coordinator already exists
         const users = await storage.getAllUsers();
         const existingAdmin = users.find(u => u.role === UserRole.ADMIN);
         const existingCoordinator = users.find(u => u.role === UserRole.COORDINATOR);
-        
+
         if (req.body.role === UserRole.ADMIN && existingAdmin) {
-          return res.status(403).json({ 
-            message: "An Admin account already exists. Only one Admin account is allowed in the system." 
+          return res.status(403).json({
+            message: "An Admin account already exists. Only one Admin account is allowed in the system."
           });
         }
-        
+
         if (req.body.role === UserRole.COORDINATOR && existingCoordinator) {
-          return res.status(403).json({ 
-            message: "A Coordinator account already exists. Only one Coordinator account is allowed in the system." 
+          return res.status(403).json({
+            message: "A Coordinator account already exists. Only one Coordinator account is allowed in the system."
           });
         }
       }
-      
+
       // Add enrollment number validation for students
-      if (req.body.role === UserRole.STUDENT && !req.body.enrollmentNumber) {
-        return res.status(400).json({ 
-          message: "Enrollment number is required for student registration" 
-        });
+      if (req.body.role === UserRole.STUDENT) {
+        if (!req.body.enrollmentNumber) {
+          return res.status(400).json({
+            message: "Enrollment number is required for student registration"
+          });
+        }
+
+        // Check for duplicate enrollment number
+        const existingEnrollment = await storage.getUserByEnrollmentNumber(req.body.enrollmentNumber);
+        if (existingEnrollment) {
+          return res.status(400).json({
+            message: "This enrollment number is already registered"
+          });
+        }
       }
 
       const hashedPassword = await hashPassword(req.body.password);
@@ -119,11 +132,11 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err, user, info) => {
+  app.post("/api/login", (req: Request, res: Response, next: NextFunction) => {
+    passport.authenticate("local", (err: any, user: Express.User | false, info: any) => {
       if (err) return next(err);
       if (!user) return res.status(401).json({ message: "Invalid username or password" });
-      
+
       req.login(user, (err) => {
         if (err) return next(err);
         const { password, ...userWithoutPassword } = user;
@@ -147,15 +160,15 @@ export function setupAuth(app: Express) {
 
   // Role-based authorization middleware
   const requireRole = (roles: UserRole[]) => {
-    return (req: Express.Request, res: Express.Response, next: Express.NextFunction) => {
+    return (req: Request, res: Response, next: NextFunction) => {
       if (!req.isAuthenticated()) {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      
-      if (!roles.includes(req.user.role as UserRole)) {
+
+      if (!roles.includes(req.user!.role as UserRole)) {
         return res.status(403).json({ message: "Forbidden: Insufficient permissions" });
       }
-      
+
       next();
     };
   };
@@ -167,31 +180,31 @@ export function setupAuth(app: Express) {
       if (existingUser) {
         return res.status(400).json({ message: "Username already exists" });
       }
-      
+
       // Check if trying to create Admin or Coordinator
       if (req.body.role === UserRole.ADMIN || req.body.role === UserRole.COORDINATOR) {
         // Check if an admin or coordinator already exists
         const users = await storage.getAllUsers();
         const existingAdmin = users.find(u => u.role === UserRole.ADMIN);
         const existingCoordinator = users.find(u => u.role === UserRole.COORDINATOR);
-        
+
         if (req.body.role === UserRole.ADMIN && existingAdmin) {
-          return res.status(403).json({ 
-            message: "An Admin account already exists. Only one Admin account is allowed in the system." 
+          return res.status(403).json({
+            message: "An Admin account already exists. Only one Admin account is allowed in the system."
           });
         }
-        
+
         if (req.body.role === UserRole.COORDINATOR && existingCoordinator) {
-          return res.status(403).json({ 
-            message: "A Coordinator account already exists. Only one Coordinator account is allowed in the system." 
+          return res.status(403).json({
+            message: "A Coordinator account already exists. Only one Coordinator account is allowed in the system."
           });
         }
       }
-      
+
       // Validate enrollment number for students
       if (req.body.role === UserRole.STUDENT && !req.body.enrollmentNumber) {
-        return res.status(400).json({ 
-          message: "Enrollment number is required for student registration" 
+        return res.status(400).json({
+          message: "Enrollment number is required for student registration"
         });
       }
 
@@ -215,7 +228,7 @@ export function setupAuth(app: Express) {
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
-      
+
       const { password, ...userWithoutPassword } = user;
       res.status(200).json(userWithoutPassword);
     } catch (error) {
@@ -230,7 +243,7 @@ export function setupAuth(app: Express) {
       if (!success) {
         return res.status(404).json({ message: "User not found" });
       }
-      
+
       res.status(200).json({ message: "User deleted successfully" });
     } catch (error) {
       next(error);
@@ -256,7 +269,7 @@ export function setupAuth(app: Express) {
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
-      
+
       const { password, ...userWithoutPassword } = user;
       res.status(200).json(userWithoutPassword);
     } catch (error) {
@@ -273,14 +286,14 @@ export function setupAuth(app: Express) {
     try {
       const { currentPassword, newPassword } = req.body;
       const user = await storage.getUser(req.user.id);
-      
+
       if (!user || !(await comparePasswords(currentPassword, user.password))) {
         return res.status(400).json({ message: "Current password is incorrect" });
       }
 
       const hashedPassword = await hashPassword(newPassword);
       await storage.updateUser(req.user.id, { password: hashedPassword });
-      
+
       res.status(200).json({ message: "Password updated successfully" });
     } catch (error) {
       next(error);

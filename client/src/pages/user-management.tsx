@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Search, UserPlus, UserCog, Edit, Trash2, Eye, EyeOff } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { InsertUser, UserRole } from "@shared/schema";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -51,6 +51,18 @@ function getRoleDisplay(role: string): string {
   }
 }
 
+interface UserData {
+  id: number;
+  username: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: UserRole;
+  enrollmentNumber: string | null;
+  topicsCount?: number;
+  projectStatus?: string;
+}
+
 export default function UserManagement() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -61,17 +73,26 @@ export default function UserManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterRole, setFilterRole] = useState("all");
 
-  const { data: users, isLoading } = useQuery({
+  const { data: users, isLoading } = useQuery<UserData[]>({
     queryKey: ["/api/users"],
-    enabled: !!user && user.role === UserRole.ADMIN
+    enabled: !!user && (user.role === UserRole.ADMIN || user.role === UserRole.COORDINATOR)
   });
 
-  // Define form schema with additional validation
+  // Define form schema
   const userFormSchema = insertUserSchema.extend({
     confirmPassword: z.string().min(1, "Please confirm your password"),
   }).refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
     path: ["confirmPassword"],
+  }).refine((data) => {
+    // Enrollment number is required only for student accounts
+    if (data.role === UserRole.STUDENT && !data.enrollmentNumber) {
+      return false;
+    }
+    return true;
+  }, {
+    message: "Enrollment number is required for student registration",
+    path: ["enrollmentNumber"]
   });
 
   type UserFormValues = z.infer<typeof userFormSchema>;
@@ -86,17 +107,28 @@ export default function UserManagement() {
       lastName: "",
       email: "",
       role: UserRole.STUDENT,
-      department: "",
+      enrollmentNumber: "",
     }
   });
 
   // Define edit form schema without password fields
   const editFormSchema = insertUserSchema.extend({
-    // No password or confirmPassword fields required for edit
+    password: z.string().min(6, "Password must be at least 6 characters").optional(),
+    confirmPassword: z.string().optional(),
+    enrollmentNumber: z.string().nullable().optional(),
+  }).refine((data) => {
+    // If one password field is provided, both must be provided and must match
+    if (data.password || data.confirmPassword) {
+      return data.password === data.confirmPassword;
+    }
+    return true;
+  }, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
   });
-  
+
   type EditFormValues = z.infer<typeof editFormSchema>;
-  
+
   const editForm = useForm<EditFormValues>({
     resolver: zodResolver(editFormSchema),
     defaultValues: {
@@ -105,8 +137,9 @@ export default function UserManagement() {
       lastName: "",
       email: "",
       role: UserRole.STUDENT,
-      department: "",
-      enrollmentNumber: undefined,
+      enrollmentNumber: null,
+      password: "",
+      confirmPassword: "",
     }
   });
 
@@ -181,12 +214,18 @@ export default function UserManagement() {
 
   const onSubmit = (data: UserFormValues) => {
     const { confirmPassword, ...userData } = data;
+
+    // Remove enrollment number for non-student roles
+    if (userData.role !== UserRole.STUDENT) {
+      delete userData.enrollmentNumber;
+    }
+
     createUserMutation.mutate(userData);
   };
 
   const onEditSubmit = (data: Partial<EditFormValues>) => {
     if (!selectedUser) return;
-    
+
     // Remove undefined/empty fields
     const updateData: Partial<InsertUser> = Object.entries(data).reduce((acc, [key, value]) => {
       if (value !== undefined && value !== "") {
@@ -206,7 +245,6 @@ export default function UserManagement() {
       lastName: user.lastName,
       email: user.email,
       role: user.role,
-      department: user.department,
     });
     setIsEditUserOpen(true);
   };
@@ -222,7 +260,7 @@ export default function UserManagement() {
     }
   };
 
-  const filterUsers = (items: any[] | undefined) => {
+  const filterUsers = (items: UserData[] | undefined): UserData[] => {
     if (!items) return [];
 
     // Filter by role
@@ -235,8 +273,8 @@ export default function UserManagement() {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
-        item => 
-          item.username.toLowerCase().includes(query) || 
+        item =>
+          item.username.toLowerCase().includes(query) ||
           item.firstName.toLowerCase().includes(query) ||
           item.lastName.toLowerCase().includes(query) ||
           item.email.toLowerCase().includes(query)
@@ -248,7 +286,7 @@ export default function UserManagement() {
 
   const filteredUsers = filterUsers(users);
 
-  if (!user || user.role !== UserRole.ADMIN) {
+  if (!user || (user.role !== UserRole.ADMIN && user.role !== UserRole.COORDINATOR)) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-full">
@@ -261,7 +299,7 @@ export default function UserManagement() {
             </CardHeader>
             <CardContent>
               <p className="text-center text-muted-foreground">
-                This page is only accessible to administrators.
+                This page is only accessible to administrators and coordinators.
               </p>
             </CardContent>
           </Card>
@@ -285,7 +323,7 @@ export default function UserManagement() {
               Manage user accounts and permissions
             </CardDescription>
           </div>
-          <Button 
+          <Button
             onClick={() => {
               form.reset();
               setIsAddUserOpen(true);
@@ -306,10 +344,10 @@ export default function UserManagement() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            
+
             <div className="w-full md:w-56">
-              <Select 
-                value={filterRole} 
+              <Select
+                value={filterRole}
                 onValueChange={setFilterRole}
               >
                 <SelectTrigger>
@@ -333,7 +371,7 @@ export default function UserManagement() {
               <TabsTrigger value="students">Students</TabsTrigger>
               <TabsTrigger value="coordinators">Coordinators</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="all-users">
               {isLoading ? (
                 <Skeleton className="h-64 w-full" />
@@ -346,7 +384,6 @@ export default function UserManagement() {
                         <TableHead>Username</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Role</TableHead>
-                        <TableHead>Department</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -372,18 +409,17 @@ export default function UserManagement() {
                                 {getRoleDisplay(user.role)}
                               </span>
                             </TableCell>
-                            <TableCell>{user.department}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex space-x-2 justify-end">
-                                <Button 
-                                  variant="outline" 
+                                <Button
+                                  variant="outline"
                                   size="sm"
                                   onClick={() => handleEditUser(user)}
                                 >
                                   <Edit className="h-4 w-4" />
                                 </Button>
-                                <Button 
-                                  variant="outline" 
+                                <Button
+                                  variant="outline"
                                   size="sm"
                                   className="text-destructive hover:text-destructive"
                                   onClick={() => handleDeleteUser(user)}
@@ -396,8 +432,8 @@ export default function UserManagement() {
                         ))
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                            {searchQuery || filterRole !== "all" 
+                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                            {searchQuery || filterRole !== "all"
                               ? "No users match your filters"
                               : "No users found"}
                           </TableCell>
@@ -408,7 +444,7 @@ export default function UserManagement() {
                 </div>
               )}
             </TabsContent>
-            
+
             <TabsContent value="teachers">
               <div className="overflow-x-auto">
                 <Table>
@@ -416,7 +452,6 @@ export default function UserManagement() {
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
-                      <TableHead>Department</TableHead>
                       <TableHead>Topics Submitted</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -438,21 +473,20 @@ export default function UserManagement() {
                             </div>
                           </TableCell>
                           <TableCell>{user.email}</TableCell>
-                          <TableCell>{user.department}</TableCell>
                           <TableCell>
                             {user.topicsCount || 0} topics
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex space-x-2 justify-end">
-                              <Button 
-                                variant="outline" 
+                              <Button
+                                variant="outline"
                                 size="sm"
                                 onClick={() => handleEditUser(user)}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button 
-                                variant="outline" 
+                              <Button
+                                variant="outline"
                                 size="sm"
                                 className="text-destructive hover:text-destructive"
                                 onClick={() => handleDeleteUser(user)}
@@ -467,7 +501,7 @@ export default function UserManagement() {
                 </Table>
               </div>
             </TabsContent>
-            
+
             <TabsContent value="students">
               <div className="overflow-x-auto">
                 <Table>
@@ -475,7 +509,6 @@ export default function UserManagement() {
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
-                      <TableHead>Department</TableHead>
                       <TableHead>Enrollment #</TableHead>
                       <TableHead>Project Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -498,7 +531,6 @@ export default function UserManagement() {
                             </div>
                           </TableCell>
                           <TableCell>{user.email}</TableCell>
-                          <TableCell>{user.department}</TableCell>
                           <TableCell>{user.enrollmentNumber || 'N/A'}</TableCell>
                           <TableCell>
                             {user.projectStatus
@@ -508,15 +540,15 @@ export default function UserManagement() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex space-x-2 justify-end">
-                              <Button 
-                                variant="outline" 
+                              <Button
+                                variant="outline"
                                 size="sm"
                                 onClick={() => handleEditUser(user)}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button 
-                                variant="outline" 
+                              <Button
+                                variant="outline"
                                 size="sm"
                                 className="text-destructive hover:text-destructive"
                                 onClick={() => handleDeleteUser(user)}
@@ -531,7 +563,7 @@ export default function UserManagement() {
                 </Table>
               </div>
             </TabsContent>
-            
+
             <TabsContent value="coordinators">
               <div className="overflow-x-auto">
                 <Table>
@@ -539,7 +571,6 @@ export default function UserManagement() {
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
-                      <TableHead>Department</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -560,18 +591,17 @@ export default function UserManagement() {
                             </div>
                           </TableCell>
                           <TableCell>{user.email}</TableCell>
-                          <TableCell>{user.department}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex space-x-2 justify-end">
-                              <Button 
-                                variant="outline" 
+                              <Button
+                                variant="outline"
                                 size="sm"
                                 onClick={() => handleEditUser(user)}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button 
-                                variant="outline" 
+                              <Button
+                                variant="outline"
                                 size="sm"
                                 className="text-destructive hover:text-destructive"
                                 onClick={() => handleDeleteUser(user)}
@@ -629,7 +659,7 @@ export default function UserManagement() {
                   )}
                 />
               </div>
-              
+
               <FormField
                 control={form.control}
                 name="email"
@@ -643,7 +673,7 @@ export default function UserManagement() {
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="username"
@@ -657,7 +687,7 @@ export default function UserManagement() {
                   </FormItem>
                 )}
               />
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -686,16 +716,16 @@ export default function UserManagement() {
                   )}
                 />
               </div>
-              
-              <div className="grid grid-cols-2 gap-4">
+
+              <div className="grid grid-cols-1 gap-4">
                 <FormField
                   control={form.control}
                   name="role"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Role</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
+                      <Select
+                        onValueChange={field.onChange}
                         defaultValue={field.value}
                       >
                         <FormControl>
@@ -714,30 +744,37 @@ export default function UserManagement() {
                     </FormItem>
                   )}
                 />
+              </div>
+
+              {/* Show enrollment number field for students */}
+              {form.watch("role") === UserRole.STUDENT && (
                 <FormField
                   control={form.control}
-                  name="department"
+                  name="enrollmentNumber"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Department</FormLabel>
+                      <FormLabel>Enrollment Number</FormLabel>
                       <FormControl>
-                        <Input placeholder="Department" {...field} />
+                        <Input placeholder="Enter enrollment number" {...field} value={field.value || ''} />
                       </FormControl>
                       <FormMessage />
+                      <FormDescription>
+                        Required for student registration
+                      </FormDescription>
                     </FormItem>
                   )}
                 />
-              </div>
-              
+              )}
+
               <DialogFooter className="pt-4">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => setIsAddUserOpen(false)}
                   type="button"
                 >
                   Cancel
                 </Button>
-                <Button 
+                <Button
                   type="submit"
                   disabled={createUserMutation.isPending}
                 >
@@ -751,15 +788,29 @@ export default function UserManagement() {
 
       {/* Edit User Dialog */}
       <Dialog open={isEditUserOpen} onOpenChange={setIsEditUserOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
             <DialogDescription>
-              Update user information and role.
+              Update user information. Leave password fields empty to keep the current password.
             </DialogDescription>
           </DialogHeader>
           <Form {...editForm}>
             <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Username</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={editForm.control}
@@ -768,12 +819,13 @@ export default function UserManagement() {
                     <FormItem>
                       <FormLabel>First Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="First name" {...field} />
+                        <Input {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
                 <FormField
                   control={editForm.control}
                   name="lastName"
@@ -781,14 +833,14 @@ export default function UserManagement() {
                     <FormItem>
                       <FormLabel>Last Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="Last name" {...field} />
+                        <Input {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
-              
+
               <FormField
                 control={editForm.control}
                 name="email"
@@ -796,82 +848,89 @@ export default function UserManagement() {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="Email address" type="email" {...field} />
+                      <Input type="email" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={editForm.control}
-                name="username"
+                name="role"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Username</FormLabel>
+                    <FormLabel>Role</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={UserRole.ADMIN}>Admin</SelectItem>
+                        <SelectItem value={UserRole.COORDINATOR}>Coordinator</SelectItem>
+                        <SelectItem value={UserRole.TEACHER}>Teacher</SelectItem>
+                        <SelectItem value={UserRole.STUDENT}>Student</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="department"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Department</FormLabel>
                     <FormControl>
-                      <Input placeholder="Username" {...field} />
+                      <Input {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={editForm.control}
-                  name="role"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Role</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                      >
+
+              <div className="border-t pt-4 mt-4">
+                <h4 className="text-sm font-medium mb-2">Change Password</h4>
+                <p className="text-sm text-muted-foreground mb-4">Leave blank to keep the current password</p>
+
+                <div className="space-y-4">
+                  <FormField
+                    control={editForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>New Password</FormLabel>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a role" />
-                          </SelectTrigger>
+                          <Input type="password" {...field} value={field.value || ''} />
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value={UserRole.ADMIN}>Admin</SelectItem>
-                          <SelectItem value={UserRole.COORDINATOR}>Coordinator</SelectItem>
-                          <SelectItem value={UserRole.TEACHER}>Teacher</SelectItem>
-                          <SelectItem value={UserRole.STUDENT}>Student</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={editForm.control}
-                  name="department"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Department</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Department" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={editForm.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Confirm New Password</FormLabel>
+                        <FormControl>
+                          <Input type="password" {...field} value={field.value || ''} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
-              
-              <DialogFooter className="pt-4">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsEditUserOpen(false)}
-                  type="button"
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  type="submit"
-                  disabled={updateUserMutation.isPending}
-                >
-                  {updateUserMutation.isPending ? "Updating..." : "Update User"}
+
+              <DialogFooter>
+                <Button type="submit" disabled={updateUserMutation.isPending}>
+                  {updateUserMutation.isPending ? "Saving..." : "Save Changes"}
                 </Button>
               </DialogFooter>
             </form>
@@ -903,13 +962,13 @@ export default function UserManagement() {
             </div>
           )}
           <DialogFooter className="pt-4">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setIsConfirmDeleteOpen(false)}
             >
               Cancel
             </Button>
-            <Button 
+            <Button
               variant="destructive"
               onClick={confirmDeleteUser}
               disabled={deleteUserMutation.isPending}

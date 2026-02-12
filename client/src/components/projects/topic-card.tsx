@@ -31,12 +31,8 @@ export default function TopicCard({
         <p className="text-sm text-muted-foreground mb-4">{topic.description}</p>
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div>
-            <p className="text-muted-foreground">Department</p>
-            <p className="font-medium">{topic.department}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Complexity</p>
-            <p className="font-medium">{topic.estimatedComplexity}</p>
+            <p className="text-muted-foreground">Technology</p>
+            <p className="font-medium">{topic.technology}</p>
           </div>
           <div>
             <p className="text-muted-foreground">Submitted</p>

@@ -1,0 +1,284 @@
+╔════════════════════════════════════════════════════════════════════════╗
+║                                                                        ║
+║          INTEGRAL PROJECT HUB - SUPER EASY SETUP GUIDE                ║
+║                                                                        ║
+║          Welcome! This guide will help you get started.               ║
+║          No technical knowledge needed!                               ║
+║                                                                        ║
+╚════════════════════════════════════════════════════════════════════════╝
+
+
+┌────────────────────────────────────────────────────────────────────────┐
+│                          WHAT WILL HAPPEN?                             │
+└────────────────────────────────────────────────────────────────────────┘
+
+When you run the installation script, the computer will:
+
+1. Download and install the "brain" of the application (Node.js)
+2. Download and install the "memory" of the application (PostgreSQL database)
+3. Set up all the pieces needed to run the website
+4. Start the website automatically!
+
+This will take about 5-10 minutes. Don't worry if you see lots of text 
+scrolling by - that's normal! The computer is just telling you what it's doing.
+
+
+════════════════════════════════════════════════════════════════════════
+                    FOR WINDOWS USERS (Windows 10/11)
+════════════════════════════════════════════════════════════════════════
+
+🎯 EASIEST METHOD - Use the Batch File:
+
+STEP 1: Find the Setup_Assistant folder
+   • Open File Explorer (the folder icon on your taskbar)
+   • Navigate to where you saved the IntegralProjectHub folder
+   • Open the "Setup_Assistant" folder inside it
+
+STEP 2: Run the installation
+   • Look for: INSTALL_WINDOWS.bat
+   • DOUBLE-CLICK on "INSTALL_WINDOWS.bat"
+   • Click "YES" when Windows asks for permission
+   
+   💡 This file automatically handles all security settings!
+
+STEP 3: Wait patiently (see STEP 5 below for what to expect)
+
+───────────────────────────────────────────────────────────────────────
+
+⚙️ ALTERNATIVE METHOD - If you see a "Script Execution" error:
+
+If you get an error like "running scripts is disabled", follow these steps:
+
+STEP 1: Open PowerShell as Administrator
+   • Press Windows key
+   • Type "PowerShell"
+   • RIGHT-CLICK on "Windows PowerShell"
+   • Select "Run as administrator"
+   • Click "YES" when asked for permission
+
+STEP 2: Navigate to the Setup_Assistant folder
+   • In PowerShell, type: cd 
+   • DON'T PRESS ENTER YET!
+   • Open File Explorer, find the Setup_Assistant folder
+   • Drag the Setup_Assistant folder into the PowerShell window
+   • Now press Enter
+
+STEP 3: Run the installation with security bypass
+   • Type this EXACTLY:
+     PowerShell -ExecutionPolicy Bypass -File install_windows.ps1
+   • Press Enter
+
+STEP 4: When a blue box appears
+   • A blue window will pop up asking "Do you want to allow this?"
+   • This is normal and safe!
+   • Click "YES" or "Run anyway"
+   
+   💡 The script needs permission to install software on your computer.
+
+STEP 5: Wait patiently
+   • You'll see lots of text scrolling in the blue window
+   • This is the computer downloading and installing everything
+   • DO NOT CLOSE THE WINDOW!
+   • This will take 5-10 minutes
+   
+   What you'll see:
+   ✓ "Installing Node.js..." (the brain)
+   ✓ "Installing PostgreSQL..." (the memory)  
+   ✓ "Installing dependencies..." (the tools)
+   ✓ "Setting up database..." (the storage)
+
+STEP 6: Success!
+   • When you see "🎉 Installation Complete!"
+   • Your web browser will open automatically
+   • The website will be at: http://localhost:3000
+   
+STEP 7: Stop the server (when you're done)
+   • Go back to the blue PowerShell window
+   • Press Ctrl+C on your keyboard
+   • The website will stop running
+
+
+════════════════════════════════════════════════════════════════════════
+                    FOR MAC USERS (macOS)
+════════════════════════════════════════════════════════════════════════
+
+STEP 1: Open Terminal
+   • Press Cmd+Space (hold Command and press Space)
+   • Type "Terminal" and press Enter
+   • A window with white or black text will appear - this is Terminal!
+
+STEP 2: Go to the Setup_Assistant folder
+   • In Terminal, type: cd 
+   • DON'T PRESS ENTER YET!
+   • Open Finder and find your IntegralProjectHub folder
+   • Drag the "Setup_Assistant" folder into the Terminal window
+   • Now press Enter
+   
+   💡 Example: You should see something like:
+      cd /Users/YourName/Desktop/IntegralProjectHub/Setup_Assistant
+
+STEP 3: Make the installation file runnable
+   • Type this exactly: chmod +x install_mac_linux.sh
+   • Press Enter
+   • Nothing visible will happen - that's okay!
+
+STEP 4: Run the installation
+   • Type this exactly: ./install_mac_linux.sh
+   • Press Enter
+
+STEP 5: Enter your password
+   • The Terminal will ask for your password
+   • This is YOUR computer password (the one you use to log in)
+   • Type it and press Enter
+   
+   💡 NOTE: You won't see the password as you type - this is normal!
+            Just type it and press Enter.
+
+STEP 6: Wait patiently
+   • You'll see lots of text scrolling in the Terminal
+   • This is the computer downloading and installing everything
+   • DO NOT CLOSE THE TERMINAL!
+   • This will take 5-10 minutes
+   
+   What you'll see:
+   ✓ "Installing Node.js..." (the brain)
+   ✓ "Installing PostgreSQL..." (the memory)
+   ✓ "Installing dependencies..." (the tools)
+   ✓ "Setting up database..." (the storage)
+
+STEP 7: Success!
+   • When you see "🎉 Installation Complete!"
+   • Open your web browser (Safari, Chrome, Firefox)
+   • Go to: http://localhost:3000
+   
+STEP 8: Stop the server (when you're done)
+   • Go back to Terminal
+   • Press Ctrl+C on your keyboard
+   • The website will stop running
+
+
+════════════════════════════════════════════════════════════════════════
+                    FOR LINUX USERS (Ubuntu, Fedora, etc.)
+════════════════════════════════════════════════════════════════════════
+
+STEP 1: Open Terminal
+   • Press Ctrl+Alt+T on your keyboard
+   • Or search for "Terminal" in your application menu
+
+STEP 2: Go to the Setup_Assistant folder
+   • Type: cd /path/to/IntegralProjectHub/Setup_Assistant
+   • Replace "/path/to" with where you saved the project
+   • Press Enter
+
+STEP 3: Make the installation file runnable
+   • Type: chmod +x install_mac_linux.sh
+   • Press Enter
+
+STEP 4: Run the installation
+   • Type: ./install_mac_linux.sh
+   • Press Enter
+
+STEP 5: Enter your password
+   • The Terminal will ask for your sudo password
+   • Type it and press Enter
+   
+   💡 NOTE: You won't see the password as you type - this is normal!
+
+STEP 6: Wait patiently
+   • Follow the same guidance as Mac users above
+   • Wait for "🎉 Installation Complete!"
+
+STEP 7: Success!
+   • Open your web browser
+   • Go to: http://localhost:3000
+
+
+════════════════════════════════════════════════════════════════════════
+                           TROUBLESHOOTING
+════════════════════════════════════════════════════════════════════════
+
+PROBLEM: "winget is not recognized" (Windows)
+SOLUTION: You need to install winget first:
+   1. Open Microsoft Store
+   2. Search for "App Installer"
+   3. Install it
+   4. Restart your computer
+   5. Try the installation again
+
+PROBLEM: "command not found" (Mac/Linux)
+SOLUTION: Make sure you're in the right folder:
+   1. Open Finder/File Manager
+   2. Find the Setup_Assistant folder
+   3. Drag it into Terminal (after typing "cd ")
+   4. Try again
+
+PROBLEM: "Permission denied"
+SOLUTION: You need to make the file executable:
+   • Mac/Linux: Run "chmod +x install_mac_linux.sh" first
+
+PROBLEM: Installation stops or freezes
+SOLUTION: 
+   1. Close the Terminal/PowerShell window
+   2. Start over from STEP 1
+   3. If it happens again, restart your computer first
+
+PROBLEM: "Port 3000 already in use"
+SOLUTION: Another program is using that port:
+   1. Restart your computer
+   2. Try the installation again
+
+PROBLEM: Can't find the file
+SOLUTION: Make sure you:
+   1. Unzipped the project folder completely
+   2. Look inside IntegralProjectHub folder
+   3. Then inside Setup_Assistant folder
+
+
+════════════════════════════════════════════════════════════════════════
+                      NEED MORE HELP?
+════════════════════════════════════════════════════════════════════════
+
+If the automatic installation doesn't work, you can install manually:
+
+1. Install Node.js:
+   • Visit: https://nodejs.org/
+   • Download the "LTS" version (recommended for most users)
+   • Run the installer
+
+2. Install PostgreSQL:
+   • Visit: https://www.postgresql.org/download/
+   • Choose your operating system
+   • Download and run the installer
+   • Remember the password you set!
+
+3. After installing both, run the installation script again.
+
+
+════════════════════════════════════════════════════════════════════════
+                      RUNNING IT AGAIN LATER
+════════════════════════════════════════════════════════════════════════
+
+Once everything is installed, you DON'T need to run the installation 
+script again. To start the website in the future:
+
+WINDOWS:
+   1. Open PowerShell in the IntegralProjectHub folder
+   2. Type: npm run dev
+   3. Press Enter
+
+MAC/LINUX:
+   1. Open Terminal
+   2. Navigate to IntegralProjectHub folder
+   3. Type: npm run dev
+   4. Press Enter
+
+To stop: Press Ctrl+C in the Terminal/PowerShell window
+
+
+════════════════════════════════════════════════════════════════════════
+
+                     🎉 THAT'S IT! ENJOY! 🎉
+
+             Your website will be at: http://localhost:3000
+
+════════════════════════════════════════════════════════════════════════

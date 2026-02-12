@@ -15,6 +15,8 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useTheme } from "@/components/theme-provider";
+import { Moon, Sun, Monitor } from "lucide-react";
 
 const profileFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -37,6 +39,7 @@ type PasswordFormValues = z.infer<typeof passwordFormSchema>;
 export default function Settings() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { theme, setTheme } = useTheme();
   const [notificationSettings, setNotificationSettings] = useState({
     emailNotifications: true,
     projectUpdates: true,
@@ -174,6 +177,7 @@ export default function Settings() {
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="password">Password</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="appearance">Appearance</TabsTrigger>
         </TabsList>
         
         <TabsContent value="profile">
@@ -428,6 +432,56 @@ export default function Settings() {
                 Notification settings are saved automatically
               </p>
             </CardFooter>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="appearance">
+          <Card>
+            <CardHeader>
+              <CardTitle>Appearance</CardTitle>
+              <CardDescription>
+                Customize the appearance of the application
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Theme</h3>
+                <p className="text-sm text-muted-foreground">
+                  Select your preferred theme for the application.
+                </p>
+                <div className="grid grid-cols-3 gap-4">
+                  <Button
+                    variant={theme === "light" ? "default" : "outline"}
+                    className="w-full"
+                    onClick={() => setTheme("light")}
+                  >
+                    <Sun className="h-5 w-5 mr-2" />
+                    Light
+                  </Button>
+                  <Button
+                    variant={theme === "dark" ? "default" : "outline"}
+                    className="w-full"
+                    onClick={() => setTheme("dark")}
+                  >
+                    <Moon className="h-5 w-5 mr-2" />
+                    Dark
+                  </Button>
+                  <Button
+                    variant={theme === "system" ? "default" : "outline"}
+                    className="w-full"
+                    onClick={() => setTheme("system")}
+                  >
+                    <Monitor className="h-5 w-5 mr-2" />
+                    System
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground mt-3">
+                  {theme === "system" 
+                    ? "Using your system theme preference"
+                    : `Using ${theme} theme`}
+                </p>
+              </div>
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>

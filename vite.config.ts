@@ -10,12 +10,12 @@ export default defineConfig({
     runtimeErrorOverlay(),
     themePlugin(),
     ...(process.env.NODE_ENV !== "production" &&
-    process.env.REPL_ID !== undefined
+      process.env.REPL_ID !== undefined
       ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer(),
-          ),
-        ]
+        await import("@replit/vite-plugin-cartographer").then((m) =>
+          m.cartographer(),
+        ),
+      ]
       : []),
   ],
   resolve: {
@@ -29,5 +29,14 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+  },
+  server: {
+    host: '0.0.0.0', // Explicitly bind to all network interfaces
+    port: 5173,
+    strictPort: false,
+    hmr: {
+      protocol: 'ws',
+      host: 'localhost', // Clients will use their connection host
+    },
   },
 });

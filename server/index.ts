@@ -1,11 +1,32 @@
+/**
+ * Server Entry Point — Integral Project Hub
+ *
+ * Bootstraps the Express application with:
+ *  1. JSON/URL-encoded body parsing
+ *  2. Request logging middleware (API routes only)
+ *  3. Passport.js session authentication
+ *  4. REST API route registration
+ *  5. Vite dev server (development) or static file serving (production)
+ *  6. Database migration runner on startup
+ *
+ * Listens on all network interfaces (0.0.0.0) for LAN dev access.
+ */
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { runMigrations, db } from "./db";
+import { DBStorage } from "./db-storage";
+import passport from "passport";
+import { createServer } from "http";
+import { setupAuth } from "./auth";
 
+// Initialize express app
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Add request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -22,13 +43,8 @@ app.use((req, res, next) => {
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        logLine += `\nResponse: ${JSON.stringify(capturedJsonResponse, null, 2)}`;
       }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
       log(logLine);
     }
   });
@@ -36,35 +52,53 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
-  const server = await registerRoutes(app);
+// Create storage instance
+const storage = new DBStorage();
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+// Setup authentication
+setupAuth(app, storage);
 
-    res.status(status).json({ message });
-    throw err;
-  });
+// Register routes
+registerRoutes(app, storage);
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
+// Start server
+const port = process.env.PORT || 3000;
+
+async function startServer() {
+  try {
+    // Run migrations
+    await runMigrations();
+
+    // Create HTTP server
+    const server = createServer(app);
+
+    // Setup Vite in development
+    if (process.env.NODE_ENV === "development") {
+      await setupVite(app, server);
+    } else {
+      serveStatic(app);
+    }
+
+    // Start listening
+    server.listen(Number(port), '0.0.0.0', async () => {
+      log(`Server running on http://0.0.0.0:${port}`);
+      log(`Local: http://localhost:${port}`);
+
+      // Get network IP dynamically
+      const { networkInterfaces } = await import('os');
+      const nets = networkInterfaces();
+      const networkIP = Object.values(nets)
+        .flat()
+        .find(net => net?.family === 'IPv4' && !net.internal)?.address;
+
+      if (networkIP) {
+        log(`Network: http://${networkIP}:${port}`);
+      }
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
   }
+}
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
-})();
+startServer();
