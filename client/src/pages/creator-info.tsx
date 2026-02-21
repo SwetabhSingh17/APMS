@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { ExternalLink, Linkedin, ArrowLeft } from "lucide-react";
 import { useLocation } from "wouter";
 import { useEffect, useRef, useState } from "react";
-import mermaid from "mermaid";
 
 export default function CreatorInfoPage() {
     const [_, setLocation] = useLocation();
@@ -235,16 +234,6 @@ export default function CreatorInfoPage() {
         };
     }, []);
 
-    // Initialize Mermaid
-    useEffect(() => {
-        mermaid.initialize({
-            startOnLoad: true,
-            theme: "dark",
-            securityLevel: "loose",
-        });
-        mermaid.contentLoaded();
-    }, []);
-
     return (
         <div className="min-h-screen bg-black text-white overflow-hidden relative font-sans selection:bg-cyan-500 selection:text-black">
 
@@ -314,42 +303,10 @@ export default function CreatorInfoPage() {
                             </p>
                         </div>
                     </div>
-
-                    {/* Mermaid Diagram Section */}
-                    <div className="bg-gradient-to-br from-white/10 to-transparent p-6 md:p-10 rounded-3xl border border-white/10 backdrop-blur-md mt-12 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-500 fill-mode-forwards">
-                        <h3 className="text-xl md:text-2xl font-light text-white mb-6 text-center">APMS Ecosystem Architecture</h3>
-                        <div className="overflow-x-auto">
-                            <pre className="mermaid bg-black/50 p-6 rounded-xl border border-white/5 text-sm md:text-base font-mono flex justify-center min-w-max">
-                                {`graph TD
-    %% Styling
-    classDef default fill:#111,stroke:#333,stroke-width:2px,color:#fff;
-    classDef user fill:#0369a1,stroke:#bae6fd,stroke-width:2px,color:#fff;
-    classDef core fill:#047857,stroke:#6ee7b7,stroke-width:2px,color:#fff;
-    classDef output fill:#be185d,stroke:#fbcfe8,stroke-width:2px,color:#fff;
-
-    %% Nodes
-    A[Student]:::user -->|Submit Topic| B(Topic Proposal)
-    A -->|Form Group| C(Student Group)
-    
-    D[Teacher]:::user -->|Evaluate| E(Project Milestone)
-    D -->|Grade| F[Final Assessment]:::output
-    
-    G[Coordinator/Admin]:::user -->|Approve| B
-    G -->|Monitor| H(Progress Tracking)
-    
-    B -->|Verified| I{Core Database}:::core
-    C -->|Registered| I
-    E -->|Logged| I
-    I --> H
-    H --> F
-                                `}
-                            </pre>
-                        </div>
-                    </div>
                 </main>
 
                 {/* Spacer for Watermark */}
-                <div className="h-48"></div>
+                <div className="h-32"></div>
 
             </div>
 
