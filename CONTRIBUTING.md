@@ -1,4 +1,4 @@
-# Contributing to Integral Project Hub
+# Contributing to APMS (Academic Project Management System)
 
 Thank you for considering contributing! Here's how to get started.
 
@@ -7,7 +7,7 @@ Thank you for considering contributing! Here's how to get started.
 1. **Fork** the repository and clone your fork:
    ```bash
    git clone https://github.com/<your-username>/APMS.git
-   cd IntegralProjectHub
+   cd APMS
    ```
 
 2. **Install dependencies:**

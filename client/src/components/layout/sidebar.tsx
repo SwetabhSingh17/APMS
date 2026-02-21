@@ -65,7 +65,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?
           </div>
           <div>
             <h1 className="font-bold text-primary text-lg">Project Portal</h1>
-            <p className="text-xs text-muted-foreground">Integral University</p>
+            <p className="text-xs text-muted-foreground">{import.meta.env.VITE_INSTITUTION_NAME || "APMS"}</p>
           </div>
         </div>
       </div>

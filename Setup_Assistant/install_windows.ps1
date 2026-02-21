@@ -1,10 +1,10 @@
-# Integral Project Hub - Windows Installation Script
+# APMS (Academic Project Management System) - Windows Installation Script
 # Created by: Swetabh Singh
 # Run with: PowerShell -ExecutionPolicy Bypass -File install_windows.ps1
 
 Write-Host ""
 Write-Host "========================================"
-Write-Host "  Integral Project Hub - Setup"
+Write-Host "  APMS (Academic Project Management System) - Setup"
 Write-Host "  By - Swetabh Singh"
 Write-Host "========================================"
 Write-Host ""

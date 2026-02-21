@@ -1,13 +1,13 @@
 @echo off
 REM ============================================================================
-REM Integral Project Hub - Windows Installation Launcher
+REM APMS (Academic Project Management System) - Windows Installation Launcher
 REM Created by: Swetabh Singh
 REM This batch file bypasses PowerShell execution policy restrictions
 REM ============================================================================
 
 echo.
 echo ========================================
-echo   Integral Project Hub Setup
+echo   APMS (Academic Project Management System) Setup
 echo   By - Swetabh Singh
 echo ========================================
 echo.

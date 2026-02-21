@@ -1,5 +1,5 @@
 <p align="center">
-  <h1 align="center">🎓 Integral Project Hub</h1>
+  <h1 align="center">🎓 APMS (Academic Project Management System)</h1>
   <p align="center">
     A comprehensive project management system for educational institutions — streamlining project topic approval, student group formation, faculty mentoring, and progress tracking.
   </p>
@@ -49,7 +49,7 @@
 ## 📁 Project Structure
 
 ```
-IntegralProjectHub/
+APMS/
 ├── client/                 # Frontend SPA
 │   ├── src/
 │   │   ├── pages/          # 15 route pages (auth, dashboard, projects, etc.)
@@ -101,7 +101,7 @@ If you prefer to run the steps manually:
 1. **Clone the repository**
    ```bash
    git clone https://github.com/SwetabhSingh17/APMS.git
-   cd IntegralProjectHub
+   cd APMS
    ```
 
 2. **Install dependencies**

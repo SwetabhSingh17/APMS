@@ -1,5 +1,5 @@
 /**
- * Server Entry Point — Integral Project Hub
+ * Server Entry Point — APMS (Academic Project Management System)
  *
  * Bootstraps the Express application with:
  *  1. JSON/URL-encoded body parsing

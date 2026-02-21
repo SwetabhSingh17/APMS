@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ============================================================================
-# Integral Project Hub - Automatic Installation Script
+# APMS (Academic Project Management System) - Automatic Installation Script
 # Created by: Swetabh Singh
 # For macOS and Linux Systems
 # ============================================================================

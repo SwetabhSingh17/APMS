@@ -1,5 +1,5 @@
 /**
- * Shared Database Schema — Integral Project Hub
+ * Shared Database Schema — APMS (Academic Project Management System)
  *
  * Central definition file for all Drizzle ORM table schemas, Zod validation
  * schemas, and inferred TypeScript types. This module is imported by both the
