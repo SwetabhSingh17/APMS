@@ -80,6 +80,22 @@ This is where the magic happens! We are going to tell the computer to gather all
 
 ---
 
+## 🗂️ Step 4.5: Unpacking the Old Files (Restoring a Database Backup)
+
+*Wait! Did your teacher or friend give you a backup file of the database (like a saved game)? Let's load it!*
+
+If you have a backup file, you can put it into the filing cabinet so you don't have to start from scratch.
+
+1. First, make sure you ran the `npm run db:push` command in Step 4 so the filing cabinet is built.
+2. If you have backup files (usually ending in `.sql` or `.json`), make sure they are saved inside the `database/backups` folder of your project.
+3. Now, tell the computer to load the saved game:
+   ```bash
+   npm run db:restore
+   ```
+4. It will read the backup files and carefully place all the old projects, names, and groups back into the cabinet!
+
+---
+
 ## 🎉 Step 5: Turning on the Power! (Running the Server)
 
 Are you ready to see what you built?
