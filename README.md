@@ -32,6 +32,37 @@
 
 ---
 
+## 📊 System Architecture & Workflow
+
+The following graph outlines how different users interact within the APMS ecosystem, from topic creation to final grading:
+
+```mermaid
+graph TD
+    %% Styling
+    classDef default fill:#111,stroke:#333,stroke-width:2px,color:#fff;
+    classDef user fill:#0369a1,stroke:#bae6fd,stroke-width:2px,color:#fff;
+    classDef core fill:#047857,stroke:#6ee7b7,stroke-width:2px,color:#fff;
+    classDef output fill:#be185d,stroke:#fbcfe8,stroke-width:2px,color:#fff;
+
+    %% Nodes
+    A[Student]:::user -->|Submit Topic| B(Topic Proposal)
+    A -->|Form Group| C(Student Group)
+    
+    D[Teacher]:::user -->|Evaluate| E(Project Milestone)
+    D -->|Grade| F[Final Assessment]:::output
+    
+    G[Coordinator/Admin]:::user -->|Approve| B
+    G -->|Monitor| H(Progress Tracking)
+    
+    B -->|Verified| I{Core Database}:::core
+    C -->|Registered| I
+    E -->|Logged| I
+    I --> H
+    H --> F
+```
+
+---
+
 ## 🏗️ Tech Stack
 
 | Layer | Technology |
