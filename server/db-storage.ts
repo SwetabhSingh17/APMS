@@ -1,4 +1,4 @@
-import { IStorage } from "./storage/interface";
+// Storage implementation
 import {
   User, ProjectTopic, StudentProject, StudentGroup, ProjectMilestone, ProjectAssessment, Notification, UserRole,
   InsertUser, InsertProjectTopic, InsertStudentProject, InsertStudentGroup, InsertProjectAssessment, InsertNotification,
@@ -23,7 +23,7 @@ async function hashPassword(password: string) {
   return `${buf.toString("hex")}.${salt}`;
 }
 
-export class DBStorage implements IStorage {
+export class DBStorage {
   sessionStore: session.Store;
 
   constructor() {

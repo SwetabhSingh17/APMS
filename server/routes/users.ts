@@ -1,9 +1,9 @@
 import { Router, Request, Response } from "express";
-import { IStorage } from "../storage/interface";
+import { DBStorage } from "../db-storage";
 import { UserRole } from "@shared/schema";
 import { isAuthenticatedRequest } from "./utils";
 
-export function registerUserRoutes(router: Router, storage: IStorage) {
+export function registerUserRoutes(router: Router, storage: DBStorage) {
     // Get user profile
     router.get("/api/profile", async (req: Request, res: Response) => {
         if (!isAuthenticatedRequest(req)) {

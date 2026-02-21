@@ -1,11 +1,11 @@
 import { Router, Request, Response } from "express";
-import { IStorage } from "../storage/interface";
+import { DBStorage } from "../db-storage";
 import { UserRole, insertProjectAssessmentSchema } from "@shared/schema";
 import { requireRole } from "../auth";
 import { isAuthenticatedRequest } from "./utils";
 import { z } from "zod";
 
-export function registerProjectRoutes(router: Router, storage: IStorage) {
+export function registerProjectRoutes(router: Router, storage: DBStorage) {
     // Get projects for current student
     router.get("/api/projects/my", requireRole([UserRole.STUDENT]), async (req: Request, res: Response) => {
         if (!isAuthenticatedRequest(req)) {

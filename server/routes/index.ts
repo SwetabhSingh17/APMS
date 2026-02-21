@@ -1,6 +1,6 @@
 import { Express, Router } from "express";
 import { createServer, type Server } from "http";
-import { IStorage } from "../storage/interface";
+import { DBStorage } from "../db-storage";
 
 import { registerAuthRoutes } from "./auth";
 import { registerUserRoutes } from "./users";
@@ -10,7 +10,7 @@ import { registerTopicRoutes } from "./topics";
 import { registerGroupRoutes } from "./groups";
 import { registerAdminRoutes } from "./admin";
 
-export async function registerRoutes(app: Express, storage: IStorage): Promise<Server> {
+export async function registerRoutes(app: Express, storage: DBStorage): Promise<Server> {
     const router = Router();
 
     registerAuthRoutes(router, storage);

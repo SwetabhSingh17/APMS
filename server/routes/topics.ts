@@ -1,11 +1,11 @@
 import { Router, Request, Response } from "express";
-import { IStorage } from "../storage/interface";
+import { DBStorage } from "../db-storage";
 import { UserRole, insertProjectTopicSchema } from "@shared/schema";
 import { requireRole } from "../auth";
 import { isAuthenticatedRequest } from "./utils";
 import { z } from "zod";
 
-export function registerTopicRoutes(router: Router, storage: IStorage) {
+export function registerTopicRoutes(router: Router, storage: DBStorage) {
     // Get all pending topics
     router.get("/api/topics/pending", requireRole([UserRole.COORDINATOR, UserRole.ADMIN]), async (req: Request, res: Response) => {
         try {

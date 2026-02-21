@@ -4,7 +4,7 @@ import { Express, Request, Response, NextFunction } from "express";
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import type { IStorage } from "./storage/interface";
+import { DBStorage } from "./db-storage";
 import { User as SelectUser, UserRole } from "@shared/schema";
 
 declare global {
@@ -43,7 +43,7 @@ export const requireRole = (roles: UserRole[]) => {
   };
 };
 
-export function setupAuth(app: Express, storage: IStorage) {
+export function setupAuth(app: Express, storage: DBStorage) {
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "integral-university-project-portal-secret",
     resave: false,

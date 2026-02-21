@@ -5,7 +5,7 @@ import { UserRole } from "@shared/schema";
 
 type ProtectedRouteProps = {
   path: string;
-  component: () => React.JSX.Element;
+  component: React.ComponentType<any>;
   allowedRoles?: UserRole[];
 };
 

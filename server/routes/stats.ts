@@ -1,10 +1,10 @@
 import { Router, Request, Response } from "express";
-import { IStorage } from "../storage/interface";
+import { DBStorage } from "../db-storage";
 import { UserRole } from "@shared/schema";
 import { requireRole } from "../auth";
 import { isAuthenticatedRequest } from "./utils";
 
-export function registerStatsRoutes(router: Router, storage: IStorage) {
+export function registerStatsRoutes(router: Router, storage: DBStorage) {
     // Get statistics for dashboard
     router.get("/api/stats", async (req: Request, res: Response) => {
         try {

@@ -1,11 +1,11 @@
 import { Router, Request, Response } from "express";
-import { IStorage } from "../storage/interface";
+import { DBStorage } from "../db-storage";
 import { UserRole } from "@shared/schema";
 import { requireRole } from "../auth";
 import { isAuthenticatedRequest } from "./utils";
 import { hashPassword } from "../auth";
 
-export function registerAdminRoutes(router: Router, storage: IStorage) {
+export function registerAdminRoutes(router: Router, storage: DBStorage) {
     // User Management
     router.get("/api/users", requireRole([UserRole.ADMIN, UserRole.COORDINATOR]), async (req: Request, res: Response) => {
         try {

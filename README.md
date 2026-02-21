@@ -83,13 +83,20 @@ IntegralProjectHub/
 
 ## 🚀 Getting Started
 
-### Prerequisites
+### Quick Start (Recommended)
 
-- **Node.js** v18 or higher
-- **PostgreSQL** v12 or higher
-- **npm** or **yarn**
+For the simplest setup experience, run the included initialization script. It will automatically install dependencies, check your environment, sync the database, and start the development server:
 
-### Installation
+```bash
+# Make the script executable (mac/linux)
+chmod +x start.sh
+# Run the setup script
+./start.sh
+```
+
+### Manual Installation
+
+If you prefer to run the steps manually:
 
 1. **Clone the repository**
    ```bash

@@ -1,10 +1,10 @@
 import { Router, Request, Response } from "express";
-import { IStorage } from "../storage/interface";
+import { DBStorage } from "../db-storage";
 import { UserRole } from "@shared/schema";
 import { requireRole } from "../auth";
 import { isAuthenticatedRequest } from "./utils";
 
-export function registerGroupRoutes(router: Router, storage: IStorage) {
+export function registerGroupRoutes(router: Router, storage: DBStorage) {
     // Create a new student group
     router.post("/api/student-groups", requireRole([UserRole.STUDENT]), async (req: Request, res: Response) => {
         if (!isAuthenticatedRequest(req)) {

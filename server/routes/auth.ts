@@ -1,10 +1,10 @@
 import { Router, Request, Response } from "express";
 import passport from "passport";
-import { IStorage } from "../storage/interface";
+import { DBStorage } from "../db-storage";
 import { isAuthenticatedRequest } from "./utils";
 import { hashPassword } from "../auth";
 
-export function registerAuthRoutes(router: Router, storage: IStorage) {
+export function registerAuthRoutes(router: Router, storage: DBStorage) {
     // Authentication routes
     router.post("/auth/login", passport.authenticate("local"), (req: Request, res: Response) => {
         if (!isAuthenticatedRequest(req)) {

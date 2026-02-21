@@ -21,13 +21,19 @@ import passport from "passport";
 import { createServer } from "http";
 import { setupAuth } from "./auth";
 
-// Initialize express app
+// Initialize core express application instance
 const app = express();
+
+// Configure middleware for standard application/json and form-url parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Add request logging middleware
-app.use((req, res, next) => {
+/**
+ * Diagnostics & Logging Middleware
+ * Captures request latency and JSON body responses for all `/api` routes
+ * to facilitate telemetry and debugging.
+ */
+app.use((req: Request, res: Response, next: NextFunction) => {
   const start = Date.now();
   const path = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
@@ -64,27 +70,34 @@ registerRoutes(app, storage);
 // Start server
 const port = process.env.PORT || 3000;
 
-async function startServer() {
+/**
+ * Application Bootstrap Function
+ * Ensures deterministic startup sequence:
+ * 1. Database schema migration
+ * 2. HTTP server bindings
+ * 3. Environment-aware static routing or Vite HMR hook
+ */
+async function startServer(): Promise<void> {
   try {
-    // Run migrations
+    // 1. Validate DB schema before serving traffic
     await runMigrations();
 
-    // Create HTTP server
+    // 2. Initialize bound physical web server
     const server = createServer(app);
 
-    // Setup Vite in development
+    // 3. Mount assets dynamically based on environment
     if (process.env.NODE_ENV === "development") {
       await setupVite(app, server);
     } else {
       serveStatic(app);
     }
 
-    // Start listening
+    // 4. Begin accepting incoming requests
     server.listen(Number(port), '0.0.0.0', async () => {
       log(`Server running on http://0.0.0.0:${port}`);
       log(`Local: http://localhost:${port}`);
 
-      // Get network IP dynamically
+      // Probe OS interfaces for broadcast IP
       const { networkInterfaces } = await import('os');
       const nets = networkInterfaces();
       const networkIP = Object.values(nets)
@@ -96,9 +109,10 @@ async function startServer() {
       }
     });
   } catch (error) {
-    console.error("Failed to start server:", error);
+    console.error("Failed to start server. System halted:", error);
     process.exit(1);
   }
 }
 
+// Invoke boot procedure
 startServer();
