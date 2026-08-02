@@ -1,7 +1,13 @@
 # Version History
 
-## Version 1.1.0 (Current)
+## Version 1.1.1 (Current)
 
+### Bug Fixes & Stability
+1. **Migration Pipeline**: Removed the broken file-based migrator in `server/db.ts` that caused startup crashes when `migrations/_journal.json` was missing.
+2. Standardized database schema synchronization on `drizzle-kit push` (`npm run db:push`).
+3. Added a startup database connectivity check (`SELECT 1`) to ensure the PostgreSQL instance is reachable before serving traffic.
+
+## Version 1.1.0
 ### Security Enhancements
 1. Added `helmet` middleware for robust HTTP security headers (HSTS, X-Frame-Options, CSP, etc.)
 2. Implemented `express-rate-limit` on `/api/login` and `/api/register` (5 req / 15 min per IP)

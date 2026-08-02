@@ -265,23 +265,13 @@ else
     print_success "Database already exists: $DB_NAME"
 fi
 
-# Run migrations
-print_info "Running database migrations..."
-
-if [ -d "database/migrations" ]; then
-    for migration in database/migrations/*.sql; do
-        if [ -f "$migration" ]; then
-            print_info "Applying migration: $(basename $migration)"
-            if [ "$SYSTEM" = "mac" ]; then
-                psql -U $DB_USER -d $DB_NAME -f "$migration" 2>/dev/null || print_warning "Migration may have already been applied"
-            else
-                sudo -u postgres psql -d $DB_NAME -f "$migration" 2>/dev/null || print_warning "Migration may have already been applied"
-            fi
-        fi
-    done
-    print_success "Migrations completed"
+# Sync database schema using Drizzle
+print_info "Syncing database schema..."
+npm run db:push
+if [ $? -eq 0 ]; then
+    print_success "Schema sync completed"
 else
-    print_warning "No migrations directory found"
+    print_warning "Schema sync failed or skipped"
 fi
 
 # Seed test data

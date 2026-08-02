@@ -12,6 +12,7 @@ This document outlines suggested architectural, security, and maintenance improv
 
 ### Database and ORM
 - [x] **Soft Deletes** — Implemented `is_deleted` boolean on `users` and `project_topics` tables. `deleteUser()` and `deleteProjectTopic()` now perform `UPDATE ... SET is_deleted = true` instead of `DELETE`. All query methods filter out soft-deleted records.
+- [x] **Migration Pipeline** — Stripped broken file-based migrator in `db.ts` and formally standardized on `drizzle-kit push` for schema synchronization.
 
 ### Frontend Architecture
 - [x] **Error Boundaries** — Created a global `ErrorBoundary` component wrapping the entire app in `App.tsx`. Unhandled JS errors now show a styled fallback UI with a retry button instead of crashing the page.
@@ -33,7 +34,6 @@ This document outlines suggested architectural, security, and maintenance improv
 - **Input Sanitization**: Add server-side sanitization (e.g., `xss` or `DOMPurify` on the server) for user-generated text fields (topic descriptions, feedback, group names) to prevent stored XSS attacks.
 
 ### 3. Database and ORM
-- **Migration Pipeline for Production**: Set up a CI/CD step that runs `drizzle-kit migrate` instead of `db:push` in production environments to avoid accidental schema data loss.
 - **Database Indexing**: Add indexes on frequently queried columns:
   - `users.username`, `users.email`, `users.enrollment_number` (already unique, but ensure index exists)
   - `project_topics.status` + `project_topics.is_deleted` (composite index for filtered queries)

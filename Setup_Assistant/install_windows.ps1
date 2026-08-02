@@ -356,8 +356,9 @@ else {
 }
 Write-Host ""
 
-Write-Host "Database will be migrated automatically when the application starts" -ForegroundColor Cyan
-Write-Host "The application uses Drizzle ORM which handles database setup" -ForegroundColor Cyan
+Write-Host "Syncing database schema..." -ForegroundColor Cyan
+npm run db:push
+Write-Host "Schema sync completed" -ForegroundColor Green
 Write-Host ""
 
 # Launch Application

@@ -188,8 +188,7 @@ All configuration is managed through environment variables in a `.env` file at t
 | `npm run build` | Build for production (client + server) |
 | `npm start` | Start production server |
 | `npm run check` | Run TypeScript type checking |
-| `npm run db:push` | Push schema changes to database |
-| `npm run db:migrate` | Run database migrations |
+| `npm run db:push` | Push schema changes to database (Replaces db:migrate) |
 | `npm run db:backup` | Backup database schema and data |
 | `npm run db:restore` | Restore database from backup |
 | `npm run db:hard-reset` | ⚠️ Full database reset (destructive) |
