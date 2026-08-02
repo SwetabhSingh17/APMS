@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { migrate } from 'drizzle-orm/postgres-js/migrator';
+import { sql } from 'drizzle-orm';
 import * as schema from '@shared/schema';
 import pg from 'pg';
 const { Pool } = pg;
@@ -24,13 +24,20 @@ export const db = drizzle(client, { schema });
 // Initialize pg Pool for session store
 export const pool = new Pool(dbConfig);
 
-// Run migrations
+/**
+ * Verify database connectivity on startup.
+ *
+ * This project uses `drizzle-kit push` (npm run db:push) to synchronize
+ * the schema directly — file-based migrations are not used. This function
+ * simply confirms the database is reachable before the server starts
+ * accepting traffic.
+ */
 export async function runMigrations() {
   try {
-    await migrate(db, { migrationsFolder: './migrations' });
-    console.log('Migrations completed successfully');
+    await db.execute(sql`SELECT 1`);
+    console.log('Database connection verified successfully');
   } catch (error) {
-    console.error('Error running migrations:', error);
+    console.error('Database connection failed:', error);
     throw error;
   }
 }
