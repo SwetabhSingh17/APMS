@@ -56,6 +56,32 @@ export default function ApproveTopics() {
     mutationFn: async (topicId: number) => {
       await apiRequest("POST", `/api/topics/${topicId}/approve`, { feedback });
     },
+    onMutate: async (topicId: number) => {
+      // Cancel outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ["/api/topics/pending"] });
+      await queryClient.cancelQueries({ queryKey: ["/api/topics/approved"] });
+
+      // Snapshot previous values for rollback
+      const previousPending = queryClient.getQueryData<ProjectTopic[]>(["/api/topics/pending"]);
+      const previousApproved = queryClient.getQueryData<ProjectTopic[]>(["/api/topics/approved"]);
+
+      // Optimistically remove from pending
+      queryClient.setQueryData<ProjectTopic[]>(
+        ["/api/topics/pending"],
+        (old) => old?.filter((t) => t.id !== topicId) ?? []
+      );
+
+      // Optimistically add to approved
+      const approvedTopic = previousPending?.find((t) => t.id === topicId);
+      if (approvedTopic) {
+        queryClient.setQueryData<ProjectTopic[]>(
+          ["/api/topics/approved"],
+          (old) => [...(old ?? []), { ...approvedTopic, status: "approved" }]
+        );
+      }
+
+      return { previousPending, previousApproved };
+    },
     onSuccess: () => {
       toast({
         title: "Topic approved successfully",
@@ -65,7 +91,14 @@ export default function ApproveTopics() {
       queryClient.invalidateQueries({ queryKey: ["/api/topics/pending"] });
       queryClient.invalidateQueries({ queryKey: ["/api/topics/approved"] });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _topicId, context) => {
+      // Rollback to snapshots on failure
+      if (context?.previousPending) {
+        queryClient.setQueryData(["/api/topics/pending"], context.previousPending);
+      }
+      if (context?.previousApproved) {
+        queryClient.setQueryData(["/api/topics/approved"], context.previousApproved);
+      }
       toast({
         title: "Failed to approve topic",
         description: error.message,
@@ -78,6 +111,30 @@ export default function ApproveTopics() {
     mutationFn: async (topicId: number) => {
       await apiRequest("POST", `/api/topics/${topicId}/reject`, { feedback });
     },
+    onMutate: async (topicId: number) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/topics/pending"] });
+      await queryClient.cancelQueries({ queryKey: ["/api/topics/rejected"] });
+
+      const previousPending = queryClient.getQueryData<ProjectTopic[]>(["/api/topics/pending"]);
+      const previousRejected = queryClient.getQueryData<ProjectTopic[]>(["/api/topics/rejected"]);
+
+      // Optimistically remove from pending
+      queryClient.setQueryData<ProjectTopic[]>(
+        ["/api/topics/pending"],
+        (old) => old?.filter((t) => t.id !== topicId) ?? []
+      );
+
+      // Optimistically add to rejected
+      const rejectedTopic = previousPending?.find((t) => t.id === topicId);
+      if (rejectedTopic) {
+        queryClient.setQueryData<ProjectTopic[]>(
+          ["/api/topics/rejected"],
+          (old) => [...(old ?? []), { ...rejectedTopic, status: "rejected", feedback }]
+        );
+      }
+
+      return { previousPending, previousRejected };
+    },
     onSuccess: () => {
       toast({
         title: "Topic rejected",
@@ -87,7 +144,13 @@ export default function ApproveTopics() {
       queryClient.invalidateQueries({ queryKey: ["/api/topics/pending"] });
       queryClient.invalidateQueries({ queryKey: ["/api/topics/rejected"] });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _topicId, context) => {
+      if (context?.previousPending) {
+        queryClient.setQueryData(["/api/topics/pending"], context.previousPending);
+      }
+      if (context?.previousRejected) {
+        queryClient.setQueryData(["/api/topics/rejected"], context.previousRejected);
+      }
       toast({
         title: "Failed to reject topic",
         description: error.message,

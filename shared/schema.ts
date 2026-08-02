@@ -49,12 +49,14 @@ export const users = pgTable("users", {
   role: text("role").notNull(),
   enrollmentNumber: text("enrollment_number"),
   groupId: integer("group_id").references(() => studentGroups.id),
+  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
+  isDeleted: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -70,12 +72,14 @@ export const projectTopics = pgTable("project_topics", {
   estimatedComplexity: text("estimated_complexity").notNull().default("Medium"),
   status: text("status").notNull().default("pending"),
   feedback: text("feedback"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const insertProjectTopicSchema = createInsertSchema(projectTopics).omit({
   id: true,
+  isDeleted: true,
   createdAt: true,
   updatedAt: true,
   feedback: true,

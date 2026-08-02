@@ -27,6 +27,8 @@
 - **Project Assessments** — Faculty grading with score and feedback  
 - **User Management** — Admin panel for bulk user operations, role changes, password resets  
 - **System Management** — Database export/import, Excel reports, full reset capabilities  
+- **Security Hardened** — Helmet HTTP headers, rate-limited auth endpoints, soft-delete data retention  
+- **Error Resilient** — Global React Error Boundaries with graceful fallback UI  
 - **Dark/Light Theme** — System-aware with manual toggle  
 - **Responsive Design** — Mobile-friendly layouts with collapsible sidebar  
 
@@ -214,3 +216,10 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 ## 📄 License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🤖 AI Context & Future Fixes
+
+- **AI Context**: A dedicated context file (`AI_CONTEXT.md`) provides LLMs and AI assistants with a comprehensive overview of the architecture, stack, and workflows. This file is ignored by git to keep it restricted to local workspace use.
+- **Fixes Required**: A list of architectural, security, and maintenance suggestions is maintained in `Fixes_required.md`. Contributors can refer to it for planned refactoring.

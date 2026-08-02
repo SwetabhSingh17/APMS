@@ -64,12 +64,12 @@ export class DBStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
+    const [user] = await db.select().from(users).where(and(eq(users.username, username), eq(users.isDeleted, false)));
     return user as User | undefined;
   }
 
   async getUserByEnrollmentNumber(enrollmentNumber: string): Promise<User | null> {
-    const [user] = await db.select().from(users).where(eq(users.enrollmentNumber, enrollmentNumber));
+    const [user] = await db.select().from(users).where(and(eq(users.enrollmentNumber, enrollmentNumber), eq(users.isDeleted, false)));
     return (user as User) || null;
   }
 
@@ -84,12 +84,12 @@ export class DBStorage {
   }
 
   async deleteUser(id: number): Promise<boolean> {
-    const [deleted] = await db.delete(users).where(eq(users.id, id)).returning();
+    const [deleted] = await db.update(users).set({ isDeleted: true }).where(eq(users.id, id)).returning();
     return !!deleted;
   }
 
   async getAllUsers(): Promise<User[]> {
-    return (await db.select().from(users)) as User[];
+    return (await db.select().from(users).where(eq(users.isDeleted, false))) as User[];
   }
 
   async getUserProfile(id: number): Promise<User | undefined> {
@@ -116,7 +116,7 @@ export class DBStorage {
   }
 
   async getPendingTopics(): Promise<ProjectTopic[]> {
-    const topics = await db.select().from(projectTopics).where(eq(projectTopics.status, "pending"));
+    const topics = await db.select().from(projectTopics).where(and(eq(projectTopics.status, "pending"), eq(projectTopics.isDeleted, false)));
     const topicsWithSubmitter = await Promise.all(topics.map(async (topic) => {
       const [submitter] = await db.select().from(users).where(eq(users.id, topic.submittedById));
       return { ...(topic as ProjectTopic), submittedBy: submitter as any };
@@ -125,7 +125,7 @@ export class DBStorage {
   }
 
   async getApprovedTopics(): Promise<ProjectTopic[]> {
-    const topics = await db.select().from(projectTopics).where(eq(projectTopics.status, "approved"));
+    const topics = await db.select().from(projectTopics).where(and(eq(projectTopics.status, "approved"), eq(projectTopics.isDeleted, false)));
 
     const allottedTopicIds = (await db.select({ topicId: studentProjects.topicId }).from(studentProjects)).map(p => p.topicId);
 
@@ -139,11 +139,11 @@ export class DBStorage {
   }
 
   async getRejectedTopics(): Promise<ProjectTopic[]> {
-    return (await db.select().from(projectTopics).where(eq(projectTopics.status, "rejected"))) as ProjectTopic[];
+    return (await db.select().from(projectTopics).where(and(eq(projectTopics.status, "rejected"), eq(projectTopics.isDeleted, false)))) as ProjectTopic[];
   }
 
   async getAllTopics(): Promise<ProjectTopic[]> {
-    return (await db.select().from(projectTopics)) as ProjectTopic[];
+    return (await db.select().from(projectTopics).where(eq(projectTopics.isDeleted, false))) as ProjectTopic[];
   }
 
   async createProjectTopic(topic: InsertProjectTopic): Promise<ProjectTopic> {
@@ -173,7 +173,7 @@ export class DBStorage {
   }
 
   async deleteProjectTopic(id: number): Promise<boolean> {
-    const [deleted] = await db.delete(projectTopics).where(eq(projectTopics.id, id)).returning();
+    const [deleted] = await db.update(projectTopics).set({ isDeleted: true }).where(eq(projectTopics.id, id)).returning();
     return !!deleted;
   }
 
@@ -357,7 +357,7 @@ export class DBStorage {
   }
 
   async getUsersByRole(role: UserRole): Promise<User[]> {
-    return (await db.select().from(users).where(eq(users.role, role))) as User[];
+    return (await db.select().from(users).where(and(eq(users.role, role), eq(users.isDeleted, false)))) as User[];
   }
 
 

@@ -13,6 +13,7 @@
  */
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
+import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { runMigrations, db } from "./db";
@@ -23,6 +24,11 @@ import { setupAuth } from "./auth";
 
 // Initialize core express application instance
 const app = express();
+
+// Security: Set robust HTTP headers via helmet
+app.use(helmet({
+  contentSecurityPolicy: process.env.NODE_ENV === "production" ? undefined : false,
+}));
 
 // Configure middleware for standard application/json and form-url parsing
 app.use(express.json());

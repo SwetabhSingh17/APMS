@@ -9,6 +9,7 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { UserRole } from "@shared/schema";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Loader2 } from "lucide-react";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Lazy-loaded routes
 const AuthPage = lazy(() => import("@/pages/auth-page"));
@@ -92,14 +93,16 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="system" storageKey="integral-ui-theme">
-        <AuthProvider>
-          <Router />
-          <Toaster />
-        </AuthProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider defaultTheme="system" storageKey="integral-ui-theme">
+          <AuthProvider>
+            <Router />
+            <Toaster />
+          </AuthProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -2,10 +2,23 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Express, Request, Response, NextFunction } from "express";
 import session from "express-session";
+import { rateLimit } from "express-rate-limit";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { DBStorage } from "./db-storage";
 import { User as SelectUser, UserRole } from "@shared/schema";
+
+/**
+ * Rate limiter for authentication endpoints (login, register).
+ * Limits each IP to 5 requests per 15-minute window.
+ */
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,
+  message: { message: "Too many attempts. Please try again after 15 minutes." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 declare global {
   namespace Express {
@@ -87,7 +100,7 @@ export function setupAuth(app: Express, storage: DBStorage) {
     }
   });
 
-  app.post("/api/register", async (req, res, next) => {
+  app.post("/api/register", authLimiter, async (req, res, next) => {
     try {
       const existingUser = await storage.getUserByUsername(req.body.username);
       if (existingUser) {
@@ -147,7 +160,7 @@ export function setupAuth(app: Express, storage: DBStorage) {
     }
   });
 
-  app.post("/api/login", (req: Request, res: Response, next: NextFunction) => {
+  app.post("/api/login", authLimiter, (req: Request, res: Response, next: NextFunction) => {
     passport.authenticate("local", (err: any, user: Express.User | false, info: any) => {
       if (err) return next(err);
       if (!user) return res.status(401).json({ message: "Invalid username or password" });

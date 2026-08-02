@@ -1,6 +1,24 @@
 # Version History
 
-## Version 1.0.0 (Current)
+## Version 1.1.0 (Current)
+
+### Security Enhancements
+1. Added `helmet` middleware for robust HTTP security headers (HSTS, X-Frame-Options, CSP, etc.)
+2. Implemented `express-rate-limit` on `/api/login` and `/api/register` (5 req / 15 min per IP)
+
+### Database & ORM
+1. Implemented soft deletes on `users` and `project_topics` tables via `is_deleted` boolean column
+2. `deleteUser()` and `deleteProjectTopic()` now perform UPDATE instead of DELETE
+3. All query methods filter out soft-deleted records automatically
+
+### Frontend Architecture
+1. Created global `ErrorBoundary` component wrapping the entire app — unhandled errors now show a styled fallback UI instead of a white screen
+2. Added optimistic UI updates to Topic Approval page (approve/reject) using TanStack Query `onMutate` with automatic rollback on failure
+
+### Documentation
+1. Updated `Fixes_required.md` with completed items and 20+ new improvement suggestions across 7 categories
+
+## Version 1.0.1
 
 ### Database Schema Updates
 1. Fixed duplicate users table definition in `shared/schema.ts`
