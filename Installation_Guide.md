@@ -6,6 +6,18 @@ Just ask an adult to help you read these instructions, and let's get building! �
 
 ---
 
+## 📥 Step 0: Getting the Code!
+
+First, we need to download the code to your computer! 
+You can either download it as a ZIP file from GitHub and extract it, or if you have Git installed, you can open your Terminal/Command Prompt and type:
+
+```bash
+git clone https://github.com/SwetabhSingh17/APMS.git
+cd APMS
+```
+
+---
+
 ## 🎒 Step 1: Getting Our Tools Ready!
 
 We have a special "Setup Assistant" that will do almost all the hard work for you!

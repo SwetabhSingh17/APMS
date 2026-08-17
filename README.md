@@ -120,6 +120,14 @@ APMS/
 
 For the simplest setup experience, use the automated Setup Assistant. It will automatically install dependencies, set up the database, and start the server.
 
+**Step 1: Get the Code**
+```bash
+git clone https://github.com/SwetabhSingh17/APMS.git
+cd APMS
+```
+
+**Step 2: Run the Setup Assistant**
+
 **Windows Users:**
 1. Open the `Setup_Assistant` folder.
 2. Double-click `INSTALL_WINDOWS.bat`.
