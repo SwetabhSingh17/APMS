@@ -265,13 +265,35 @@ else
     print_success "Database already exists: $DB_NAME"
 fi
 
-# Sync database schema using Drizzle
-print_info "Syncing database schema..."
-npm run db:push
-if [ $? -eq 0 ]; then
-    print_success "Schema sync completed"
-else
-    print_warning "Schema sync failed or skipped"
+# Check for backups
+print_info "Checking for database backups..."
+BACKUP_DIR="database/backups"
+SKIP_PUSH=false
+
+if [ -d "$BACKUP_DIR" ]; then
+    LATEST_BACKUP=$(ls -t "$BACKUP_DIR"/*.sql 2>/dev/null | head -n 1 || true)
+    if [ -n "$LATEST_BACKUP" ]; then
+        print_success "Found database backup: $(basename "$LATEST_BACKUP")"
+        print_info "Restoring database from backup..."
+        npm run db:restore -- "$LATEST_BACKUP"
+        if [ $? -eq 0 ]; then
+            print_success "Database restore completed"
+            SKIP_PUSH=true
+        else
+            print_warning "Database restore failed, falling back to schema sync"
+        fi
+    fi
+fi
+
+if [ "$SKIP_PUSH" = false ]; then
+    # Sync database schema using Drizzle
+    print_info "Syncing database schema..."
+    npm run db:push
+    if [ $? -eq 0 ]; then
+        print_success "Schema sync completed"
+    else
+        print_warning "Schema sync failed or skipped"
+    fi
 fi
 
 # Seed test data

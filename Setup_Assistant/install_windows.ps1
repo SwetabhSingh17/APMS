@@ -359,9 +359,25 @@ else {
 }
 Write-Host ""
 
-Write-Host "Syncing database schema..." -ForegroundColor Cyan
-npm run db:push
-Write-Host "Schema sync completed" -ForegroundColor Green
+Write-Host "Checking for database backups..." -ForegroundColor Cyan
+$backupDir = "database\backups"
+$backupFiles = @()
+if (Test-Path $backupDir) {
+    $backupFiles = Get-ChildItem -Path $backupDir -Filter "*.sql"
+}
+
+if ($backupFiles.Count -gt 0) {
+    $latestBackup = $backupFiles | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    $backupPath = $latestBackup.FullName
+    Write-Host "Found database backup: $($latestBackup.Name)" -ForegroundColor Green
+    Write-Host "Restoring database from backup..." -ForegroundColor Cyan
+    npm run db:restore -- "`"$backupPath`""
+    Write-Host "Database restore completed" -ForegroundColor Green
+} else {
+    Write-Host "No backups found. Syncing database schema..." -ForegroundColor Cyan
+    npm run db:push
+    Write-Host "Schema sync completed" -ForegroundColor Green
+}
 Write-Host ""
 
 # Launch Application
