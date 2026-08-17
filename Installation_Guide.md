@@ -60,15 +60,17 @@ Our website needs a filing cabinet to remember things. We need to give it a secr
 
 If you used the Setup Assistant, your blocks are already put together! You can skip to **Step 5**!
 
-If you want to do it manually, here is how:
-1. Type this to download any missing pieces:
-   ```bash
-   npm install
-   ```
-2. Type this to build our database cabinet:
-   ```bash
-   npm run db:push
-   ```
+### 🛑 What if my Antivirus blocks the Setup Assistant?
+Sometimes, Antivirus programs (like Windows Defender) block automated scripts. If you see a blue warning window, just click **"More Info"** and then **"Run anyway"**. 
+
+If it is completely blocked and refuses to work, you can build it manually:
+1. Go to **nodejs.org** and install Node.js.
+2. Go to **postgresql.org** and install PostgreSQL. *(When it asks for a password during setup, set it to `root123`)*.
+3. Open your Terminal or Command Prompt box inside the `APMS` folder.
+4. Type `npm install` and press Enter.
+5. Make a copy of the `.env.example` file and name the new file `.env`.
+6. Type `npm run db:push` and press Enter to build the database.
+7. You're done! Proceed to Step 5.
 
 *(Wait a minute or two... the computer is thinking hard! ⏱️)*
 

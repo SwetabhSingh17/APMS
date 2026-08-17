@@ -216,6 +216,14 @@ PROBLEM: "Permission denied"
 SOLUTION: You need to make the file executable:
    • Mac/Linux: Run "chmod +x install_mac_linux.sh" first
 
+PROBLEM: Antivirus blocks the file or shows a blue warning
+SOLUTION: 
+   1. If Windows SmartScreen (blue box) appears, click "More info" 
+      then click "Run anyway".
+   2. If a third-party Antivirus (Norton, McAfee) completely blocks it, 
+      you can either temporarily pause it, OR scroll down and use the 
+      "Manual Installation" method below.
+
 PROBLEM: Installation stops or freezes
 SOLUTION: 
    1. Close the Terminal/PowerShell window
@@ -238,7 +246,7 @@ SOLUTION: Make sure you:
                       NEED MORE HELP?
 ════════════════════════════════════════════════════════════════════════
 
-If the automatic installation doesn't work, you can install manually:
+If the automatic installation doesn't work (or gets blocked by Antivirus), you can install manually:
 
 1. Install Node.js:
    • Visit: https://nodejs.org/
@@ -249,9 +257,14 @@ If the automatic installation doesn't work, you can install manually:
    • Visit: https://www.postgresql.org/download/
    • Choose your operating system
    • Download and run the installer
-   • Remember the password you set!
+   • IMPORTANT: Set the password to "root123" when asked!
 
-3. After installing both, run the installation script again.
+3. Run the commands manually:
+   • Open your Terminal or Command Prompt in the APMS folder
+   • Type: npm install
+   • Copy .env.example to .env
+   • Type: npm run db:push
+   • Type: npm run dev
 
 
 ════════════════════════════════════════════════════════════════════════
