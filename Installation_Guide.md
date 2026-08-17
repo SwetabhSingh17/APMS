@@ -18,79 +18,94 @@ cd APMS
 
 ---
 
-## 🎒 Step 1: Getting Our Tools Ready!
+## 🎒 Step 1: Getting Our Tools Ready! (Installation)
 
-We have a special "Setup Assistant" that will do almost all the hard work for you!
+We have a special "Setup Assistant" that will do almost all the hard work for you! Choose your computer type below:
 
-### 🪟 If you have a Windows computer:
+### 🪟 Windows Installation
+
+**Option A: The Automated Setup Assistant (Easiest!)**
 1. Open the folder where you saved this project.
 2. Open the **`Setup_Assistant`** folder.
 3. Double-click the **`INSTALL_WINDOWS.bat`** file.
 4. Click "YES" when Windows asks for permission, and wait for the magic to happen!
 *(A blue box will open and start downloading everything you need. When it says "Installation Complete!", you can close it.)*
 
-### 🍎 If you have an Apple computer (Mac) or Linux:
-1. Keep holding `Command` (or `Ctrl`+`Alt`+`T` on Linux) and tap the Spacebar. Type the word "Terminal" and press Enter. A black box will pop up!
-2. Drag the **`Setup_Assistant`** folder into the Terminal box and press Enter.
+**Option B: Manual Step-by-Step (If the .bat file doesn't run or gets blocked)**
+If your Antivirus (like Windows Defender) blocks the `.bat` file completely, you can build it manually:
+1. Go to **nodejs.org** and install Node.js.
+2. Go to **postgresql.org** and install PostgreSQL. *(⚠️ IMPORTANT: When it asks for a password during setup, set it to `root123`)*.
+3. Open the **Command Prompt** (type `cmd` in your Windows search bar).
+4. Navigate to your project folder (e.g. `cd Downloads\APMS`).
+5. Type `npm install` and press Enter.
+6. Type `copy .env.example .env` and press Enter to create your secret settings file.
+7. Type `npm run db:push` and press Enter to build the database.
+   *(⚠️ If this step shows an error in red, open the `.env` file and make sure the `DB_PASSWORD` matches what you set in step 2!)*
+8. Skip to **Step 2**!
+
+---
+
+### 🍎 Mac Installation
+
+**Option A: The Automated Setup Assistant**
+1. Press `Command` + `Space`, type "Terminal", and press Enter.
+2. Open Finder, find the **`Setup_Assistant`** folder, and drag it into the Terminal window. Press Enter.
 3. Type this magic spell and press Enter:
    ```bash
    chmod +x install_mac_linux.sh
    ./install_mac_linux.sh
    ```
-4. It might ask for your computer password. Type it in (you won't see the letters as you type) and press Enter!
+4. It might ask for your computer password. Type it in (you won't see the letters) and press Enter!
 
----
-
-## 🎁 Step 2: You're almost done!
-
----
-
-## 🔑 Step 3: The Secret Password Key
-
-Our website needs a filing cabinet to remember things. We need to give it a secret key! Ask an adult for help here.
-
-1. Tell the computer to make a secret settings file:
-   - **For Mac/Linux, type:** `cp .env.example .env`
-   - **For Windows, type:** `copy .env.example .env`
-2. This creates a hidden file called `.env`. (Adults: you can open this and change `DATABASE_URL` if you want to use a real database!).
-
----
-
-## 🏗️ Step 4: Putting the Blocks Together
-
-If you used the Setup Assistant, your blocks are already put together! You can skip to **Step 5**!
-
-### 🛑 What if my Antivirus blocks the Setup Assistant?
-Sometimes, Antivirus programs (like Windows Defender) block automated scripts. If you see a blue warning window, just click **"More Info"** and then **"Run anyway"**. 
-
-If it is completely blocked and refuses to work, you can build it manually:
+**Option B: Manual Step-by-Step (If the .sh file doesn't run)**
 1. Go to **nodejs.org** and install Node.js.
-2. Go to **postgresql.org** and install PostgreSQL. *(When it asks for a password during setup, set it to `root123`)*.
-3. Open your Terminal or Command Prompt box inside the `APMS` folder.
+2. Download Postgres app from **postgresapp.com** and install it.
+3. Open your Terminal and navigate to the project folder (`cd path/to/APMS`).
 4. Type `npm install` and press Enter.
-5. Make a copy of the `.env.example` file and name the new file `.env`.
+5. Type `cp .env.example .env` and press Enter.
 6. Type `npm run db:push` and press Enter to build the database.
-7. You're done! Proceed to Step 5.
-
-*(Wait a minute or two... the computer is thinking hard! ⏱️)*
+7. Skip to **Step 2**!
 
 ---
 
-## � Step 4.5: Loading a Saved Game! (Optional)
+### 🐧 Linux Installation
+
+**Option A: The Automated Setup Assistant**
+1. Press `Ctrl`+`Alt`+`T` to open your Terminal.
+2. Type `cd path/to/APMS/Setup_Assistant` (replace with your actual folder path) and press Enter.
+3. Type this magic spell and press Enter:
+   ```bash
+   chmod +x install_mac_linux.sh
+   ./install_mac_linux.sh
+   ```
+4. Type your sudo password and press Enter!
+
+**Option B: Manual Step-by-Step**
+1. Install Node.js (`sudo apt install nodejs npm`).
+2. Install PostgreSQL (`sudo apt install postgresql`).
+3. Open your Terminal in the project folder.
+4. Type `npm install` and press Enter.
+5. Type `cp .env.example .env` and press Enter.
+6. Type `npm run db:push` and press Enter.
+7. Skip to **Step 2**!
+
+---
+
+## 💾 Step 2: Loading a Saved Game! (Optional)
 
 *Wait! Did your teacher or friend already build a cabinet and give you the saved game file?*
 
-If they gave you a backup file (ending in `.sql` or `.json`):
+If they gave you a backup file (ending in `.sql`):
 1. Put the file inside the folder named `database/backups`.
 2. Type this spell to load the saved game:
    ```bash
    npm run db:restore
    ```
-3. *Poof!* All the old projects and friends are back!
+3. *Poof!* All the old projects and friends are back! *(Note: The Setup Assistant does this automatically if the file is there!)*
 
 ---
 
-## 🎉 Step 5: Turning on the Power! It's Alive!
+## 🎉 Step 3: Turning on the Power! It's Alive!
 
 Are you ready to see your creation? Let's turn the power on!
 
@@ -107,7 +122,7 @@ You are amazing! You just built a real website all by yourself! Give yourself a 
 
 ---
 
-### � Bonus: Want to make it super fast? (Production)
+### 🏎️ Bonus: Want to make it super fast? (Production)
 
 When you are done playing and want to make the website super fast:
 1. Go to your black Terminal box and press `Ctrl + C` to turn the engine off.
