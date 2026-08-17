@@ -8,46 +8,28 @@ Just ask an adult to help you read these instructions, and let's get building! �
 
 ## 🎒 Step 1: Getting Our Tools Ready!
 
-We need special "builder tools" for our computer. Ask your grown-up to help you install them based on what kind of computer you have:
-
-### 🍎 If you have an Apple computer (Mac):
-1. Keep holding `Command` and tap the Spacebar. Type the word "Terminal" and press Enter. A black box will pop up!
-2. Copy this magic spell and paste it into the box, then press Enter:
-   ```bash
-   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-   ```
-3. When it is finished, type this to install our tools, and hit Enter:
-   ```bash
-   brew install node git
-   ```
+We have a special "Setup Assistant" that will do almost all the hard work for you!
 
 ### 🪟 If you have a Windows computer:
-1. Ask an adult to go to **nodejs.org** and download "Node". Install it by clicking "Next" a bunch of times!
-2. Ask an adult to go to **gitforwindows.org** and download "Git". Install that one too!
-3. Click the Start button at the bottom, type `cmd`, and press Enter. A black box will pop up!
+1. Open the folder where you saved this project.
+2. Open the **`Setup_Assistant`** folder.
+3. Double-click the **`INSTALL_WINDOWS.bat`** file.
+4. Click "YES" when Windows asks for permission, and wait for the magic to happen!
+*(A blue box will open and start downloading everything you need. When it says "Installation Complete!", you can close it.)*
 
-### 🐧 If you use a Linux computer:
-1. Press `Ctrl + Alt + T` to open your Terminal box.
-2. Type these two lines, and press Enter after each one:
+### 🍎 If you have an Apple computer (Mac) or Linux:
+1. Keep holding `Command` (or `Ctrl`+`Alt`+`T` on Linux) and tap the Spacebar. Type the word "Terminal" and press Enter. A black box will pop up!
+2. Drag the **`Setup_Assistant`** folder into the Terminal box and press Enter.
+3. Type this magic spell and press Enter:
    ```bash
-   sudo apt update
-   sudo apt install nodejs npm git
+   chmod +x install_mac_linux.sh
+   ./install_mac_linux.sh
    ```
+4. It might ask for your computer password. Type it in (you won't see the letters as you type) and press Enter!
 
 ---
 
-## 🎁 Step 2: Downloading the Magic Box of Code
-
-Now we need to get the blocks to build our website!
-
-1. In your black Terminal box, type this exactly and press Enter:
-   ```bash
-   git clone https://github.com/SwetabhSingh17/APMS.git IntegralProjectHub
-   ```
-2. Now type this to "walk inside" our new box of blocks:
-   ```bash
-   cd IntegralProjectHub
-   ```
+## 🎁 Step 2: You're almost done!
 
 ---
 
@@ -64,8 +46,9 @@ Our website needs a filing cabinet to remember things. We need to give it a secr
 
 ## 🏗️ Step 4: Putting the Blocks Together
 
-Let's tell the computer to snap all the pieces together!
+If you used the Setup Assistant, your blocks are already put together! You can skip to **Step 5**!
 
+If you want to do it manually, here is how:
 1. Type this to download any missing pieces:
    ```bash
    npm install

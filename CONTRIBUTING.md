@@ -4,6 +4,10 @@ Thank you for considering contributing! Here's how to get started.
 
 ## Getting Started
 
+> **Tip:** You can use the automated scripts in the `Setup_Assistant` folder to instantly set up your environment, database, and dependencies.
+
+If you prefer to set up manually:
+
 1. **Fork** the repository and clone your fork:
    ```bash
    git clone https://github.com/<your-username>/APMS.git

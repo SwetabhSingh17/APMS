@@ -141,7 +141,7 @@ else {
     foreach ($packageId in $pgPackageIds) {
         Write-Host "Trying package ID: $packageId" -ForegroundColor Cyan
         
-        $result = winget install -e --id $packageId --silent --accept-package-agreements --accept-source-agreements 2>&1
+        $result = winget install -e --id $packageId --silent --override "--mode unattended --superpassword root123 --serverport 5432" --accept-package-agreements --accept-source-agreements 2>&1
         
         Start-Sleep -Seconds 3
         
@@ -332,6 +332,9 @@ Write-Host ""
 
 $dbName = "integral_project_hub"
 Write-Host "Checking if database '$dbName' exists..." -ForegroundColor Cyan
+
+# Set default password for psql commands
+$env:PGPASSWORD="root123"
 
 # Check if DB exists
 # We use try/catch or just ignore error if psql fails (e.g. auth failed), but simple check is best

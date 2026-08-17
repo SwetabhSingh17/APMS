@@ -118,13 +118,18 @@ APMS/
 
 ### Quick Start (Recommended)
 
-For the simplest setup experience, run the included initialization script. It will automatically install dependencies, check your environment, sync the database, and start the development server:
+For the simplest setup experience, use the automated Setup Assistant. It will automatically install dependencies, set up the database, and start the server.
 
+**Windows Users:**
+1. Open the `Setup_Assistant` folder.
+2. Double-click `INSTALL_WINDOWS.bat`.
+
+**Mac / Linux Users:**
+1. Open Terminal and navigate to the `Setup_Assistant` folder.
+2. Run the installation script:
 ```bash
-# Make the script executable (mac/linux)
-chmod +x start.sh
-# Run the setup script
-./start.sh
+chmod +x install_mac_linux.sh
+./install_mac_linux.sh
 ```
 
 ### Manual Installation
