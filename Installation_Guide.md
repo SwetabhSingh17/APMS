@@ -31,17 +31,33 @@ We have a special "Setup Assistant" that will do almost all the hard work for yo
 4. Click "YES" when Windows asks for permission, and wait for the magic to happen!
 *(A blue box will open and start downloading everything you need. When it says "Installation Complete!", you can close it.)*
 
-**Option B: Manual Step-by-Step (If the .bat file doesn't run or gets blocked)**
-If your Antivirus (like Windows Defender) blocks the `.bat` file completely, you can build it manually:
+**Option B: Manual Step-by-Step (For Windows Server, or if the .bat file gets blocked)**
+If you are on a Windows Server (which lacks the Microsoft Store for automated installs), or if your Antivirus blocks the `.bat` file, you can build it manually:
 1. Go to **nodejs.org** and install Node.js.
-2. Go to **postgresql.org** and install PostgreSQL. *(⚠️ IMPORTANT: When it asks for a password during setup, set it to `root123`)*.
-3. Open the **Command Prompt** (type `cmd` in your Windows search bar).
-4. Navigate to your project folder (e.g. `cd Downloads\APMS`).
-5. Type `npm install` and press Enter.
-6. Type `copy .env.example .env` and press Enter to create your secret settings file.
-7. Type `npm run db:push` and press Enter to build the database.
+2. Go to **postgresql.org** and install PostgreSQL (version 15 or 16). *(⚠️ IMPORTANT: When it asks for a password during setup, set it to `root123`)*.
+3. Open the **Command Prompt** (type `cmd` in your Windows search bar, right-click and "Run as Administrator").
+4. Navigate to your project folder (e.g. your Downloads folder):
+   ```cmd
+   cd Downloads\APMS
+   ```
+5. Install the required tools:
+   ```cmd
+   npm install
+   ```
+6. Create your secret settings file:
+   ```cmd
+   copy .env.example .env
+   ```
+7. Create the empty database by running this command exactly as written *(Type `root123` if asked for a password. If you installed PostgreSQL 15, change `16` to `15`)*:
+   ```cmd
+   "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres -c "CREATE DATABASE integral_project_hub;"
+   ```
+8. Build the tables inside the database:
+   ```cmd
+   npm run db:push
+   ```
    *(⚠️ If this step shows an error in red, open the `.env` file and make sure the `DB_PASSWORD` matches what you set in step 2!)*
-8. Skip to **Step 2**!
+9. Skip to **Step 2**!
 
 ---
 
@@ -60,10 +76,22 @@ If your Antivirus (like Windows Defender) blocks the `.bat` file completely, you
 **Option B: Manual Step-by-Step (If the .sh file doesn't run)**
 1. Go to **nodejs.org** and install Node.js.
 2. Download Postgres app from **postgresapp.com** and install it.
-3. Open your Terminal and navigate to the project folder (`cd path/to/APMS`).
-4. Type `npm install` and press Enter.
-5. Type `cp .env.example .env` and press Enter.
-6. Type `npm run db:push` and press Enter to build the database.
+3. Open your Terminal and navigate to the project folder:
+   ```bash
+   cd path/to/APMS
+   ```
+4. Install the required tools:
+   ```bash
+   npm install
+   ```
+5. Create your secret settings file:
+   ```bash
+   cp .env.example .env
+   ```
+6. Build the database:
+   ```bash
+   npm run db:push
+   ```
 7. Skip to **Step 2**!
 
 ---
@@ -81,12 +109,27 @@ If your Antivirus (like Windows Defender) blocks the `.bat` file completely, you
 4. Type your sudo password and press Enter!
 
 **Option B: Manual Step-by-Step**
-1. Install Node.js (`sudo apt install nodejs npm`).
-2. Install PostgreSQL (`sudo apt install postgresql`).
-3. Open your Terminal in the project folder.
-4. Type `npm install` and press Enter.
-5. Type `cp .env.example .env` and press Enter.
-6. Type `npm run db:push` and press Enter.
+1. Install Node.js:
+   ```bash
+   sudo apt install nodejs npm
+   ```
+2. Install PostgreSQL:
+   ```bash
+   sudo apt install postgresql
+   ```
+3. Open your Terminal and navigate to the project folder.
+4. Install the required tools:
+   ```bash
+   npm install
+   ```
+5. Create your secret settings file:
+   ```bash
+   cp .env.example .env
+   ```
+6. Build the database:
+   ```bash
+   npm run db:push
+   ```
 7. Skip to **Step 2**!
 
 ---
