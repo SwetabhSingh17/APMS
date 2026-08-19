@@ -1,6 +1,13 @@
 # Version History
 
-## Version 1.1.1 (Current)
+## Version 1.1.2 (Current)
+### Notifications & UI
+1. **Real-Time Notifications**: Integrated WebSocket server for instant, zero-polling popups when assignments, approvals, or account modifications occur.
+2. **Notification Routing Rules**: Advanced logic applied so only relevant stakeholders receive notifications (e.g. students don't see topic approvals; admins see coordinator modifications).
+3. **Interactive Dashboard Widgets**: Dashboard StatsCards are now clickable, routing users directly to respective detail pages with hover animations.
+4. **Windows Server Setup**: Created `start_server.bat` for one-click production deployments on Windows Servers.
+
+## Version 1.1.1
 
 ### Bug Fixes & Stability
 1. **Migration Pipeline**: Removed the broken file-based migrator in `server/db.ts` that caused startup crashes when `migrations/_journal.json` was missing.

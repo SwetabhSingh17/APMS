@@ -168,6 +168,11 @@ You are amazing! You just built a real website all by yourself! Give yourself a 
 ### 🏎️ Bonus: Want to make it super fast? (Production)
 
 When you are done playing and want to make the website super fast:
+
+**For Windows Users:**
+Just double-click the **`start_server.bat`** file in your APMS folder! It will automatically build and start your website in production mode.
+
+**For Mac/Linux Users (or manual Windows):**
 1. Go to your black Terminal box and press `Ctrl + C` to turn the engine off.
 2. Type this to pack your website tightly into a race-car box:
    ```bash
