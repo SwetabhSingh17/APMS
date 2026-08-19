@@ -124,6 +124,18 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
                 return res.status(404).json({ message: "User not found" });
             }
 
+            // Notify Admins if a Coordinator made this change
+            if (req.user && (req.user as any).role === "coordinator") {
+                const admins = await storage.getUsersByRole("admin" as any);
+                for (const admin of admins) {
+                    await storage.createNotification({
+                        userId: admin.id,
+                        title: "Account Updated",
+                        message: `Coordinator ${(req.user as any).firstName} updated the account for ${user.firstName} ${user.lastName}.`
+                    });
+                }
+            }
+
             const { password, ...userWithoutPassword } = user;
             res.status(200).json(userWithoutPassword);
         } catch (error) {

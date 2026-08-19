@@ -235,6 +235,14 @@ SOLUTION: Another program is using that port:
    1. Restart your computer
    2. Try the installation again
 
+PROBLEM: "db:push" fails or Database Connection Error
+SOLUTION: The website cannot talk to the database. This usually means:
+   1. The PostgreSQL password in your .env file doesn't match your actual password.
+      Fix: Open the .env file in Notepad and change DB_PASSWORD to match.
+   2. The PostgreSQL service isn't running.
+      Fix: Search Windows for "Services", find "postgresql", and click Start.
+   3. Once fixed, manually run "npm run db:push" in the APMS folder.
+
 PROBLEM: Can't find the file
 SOLUTION: Make sure you:
    1. Unzipped the project folder completely

@@ -5,6 +5,7 @@ import {
   users, projectTopics, studentProjects, studentGroups, projectAssessments, notifications, projectMilestones, studentGroupMembers
 } from "@shared/schema";
 import { db } from "./db";
+import { notifyUser } from "./websocket";
 import { eq, and, desc, sql, inArray, not, ne, aliasedTable, SQL } from "drizzle-orm";
 import connectPg from "connect-pg-simple";
 import session from "express-session";
@@ -156,6 +157,26 @@ export class DBStorage {
       .set({ status: "approved", feedback })
       .where(eq(projectTopics.id, id))
       .returning();
+
+    if (topic) {
+      // Notify the teacher who submitted it
+      await this.createNotification({
+        userId: topic.submittedById,
+        title: "Topic Approved",
+        message: `Your topic "${topic.title}" has been approved.`
+      });
+
+      // Notify all admins
+      const admins = await this.getUsersByRole("admin" as any);
+      for (const admin of admins) {
+        await this.createNotification({
+          userId: admin.id,
+          title: "Topic Approved by Coordinator",
+          message: `Topic "${topic.title}" was approved.`
+        });
+      }
+    }
+
     return topic as ProjectTopic | undefined;
   }
 
@@ -279,6 +300,15 @@ export class DBStorage {
       }
     }
 
+    // Notify the assigned faculty member (Teacher)
+    if (newGroup.facultyId) {
+      await this.createNotification({
+        userId: newGroup.facultyId,
+        title: "New Student Group Assigned",
+        message: `You have been assigned as the faculty mentor for the group "${newGroup.name}".`
+      });
+    }
+
     return newGroup as StudentGroup;
   }
 
@@ -368,7 +398,12 @@ export class DBStorage {
 
   async createNotification(notification: InsertNotification): Promise<Notification> {
     const [n] = await db.insert(notifications).values(notification).returning();
-    return n as Notification;
+    const createdNotification = n as Notification;
+    // Broadcast via WebSocket
+    if (createdNotification.userId) {
+      notifyUser(createdNotification.userId, createdNotification);
+    }
+    return createdNotification;
   }
 
   async markNotificationAsRead(id: number): Promise<Notification | undefined> {

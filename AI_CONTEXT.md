@@ -60,7 +60,18 @@ The application relies on several core tables defined in `shared/schema.ts`:
 
 ---
 
-## 5. Architectural Patterns & Guidelines
+## 5. Real-Time Notification System & Routing Logic
+APMS includes a robust real-time notification system powered by WebSockets.
+- **Infrastructure**: A `WebSocketServer` runs on the same HTTP port (path `/ws`). Clients connect and pass their `userId`. The system broadcasts `NOTIFICATION` events strictly to the target user's active socket connections.
+- **Frontend Integration**: The `useNotifications` hook in `client/src/App.tsx` establishes the connection. When a notification is received, it triggers a UI `toast()` popup ("notification blob") and automatically invalidates the `["/api/notifications"]` TanStack Query cache to instantly refresh the notification drawer.
+- **Routing Rules**:
+  - *Faculty Allocation*: When a Teacher is assigned to a Student Group, only the assigned Teacher and the specific group's Students are notified.
+  - *Topic Approvals*: When a Coordinator approves a topic, the Teacher who proposed it and all Admins receive notifications. Students are not notified.
+  - *Account Changes*: If a Coordinator creates or modifies an account, all Admins are instantly notified.
+
+---
+
+## 6. Architectural Patterns & Guidelines
 1. **API Communication**: The frontend uses TanStack Query (`@tanstack/react-query`) for data fetching, caching, and state synchronization with the Express backend.
 2. **Routing**: The application uses `wouter` for lightweight client-side routing.
 3. **Styling**: Tailwind CSS is used extensively alongside Radix UI primitives encapsulated in `shadcn/ui` components.

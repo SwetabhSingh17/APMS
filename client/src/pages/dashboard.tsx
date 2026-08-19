@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { UserRole, ProjectTopic, User } from "@shared/schema";
 import { useState } from "react";
 import Modal from "@/components/ui/modal";
@@ -52,6 +52,7 @@ interface PendingTopic extends ProjectTopic {
 }
 
 export default function Dashboard() {
+  const [, setLocation] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
   const [selectedTopic, setSelectedTopic] = useState<PendingTopic | null>(null);
@@ -225,6 +226,7 @@ export default function Dashboard() {
                 iconBgColor="bg-primary/10"
                 borderColor="primary"
                 change={{ value: `${stats?.totalProjects || 0}`, label: "active projects", positive: true }}
+                onClick={() => setLocation("/projects")}
               />
               <StatsCard
                 title="Approved Topics"
@@ -233,6 +235,7 @@ export default function Dashboard() {
                 iconBgColor="bg-secondary/10"
                 borderColor="secondary"
                 change={{ value: `${stats?.pendingTopics || 0}`, label: "pending approval", positive: false }}
+                onClick={() => setLocation(user?.role === UserRole.STUDENT ? "/student-topics" : user?.role === UserRole.TEACHER ? "/topics" : "/approve-topics")}
               />
               <StatsCard
                 title="Average Progress"
@@ -241,6 +244,7 @@ export default function Dashboard() {
                 iconBgColor="bg-accent/10"
                 borderColor="accent"
                 change={{ value: "Overall", label: "project completion", positive: true }}
+                onClick={() => setLocation("/track-progress")}
               />
               <StatsCard
                 title="Unassigned Students"
@@ -248,6 +252,7 @@ export default function Dashboard() {
                 icon={<AlertTriangle className="w-6 h-6 text-destructive" />}
                 iconBgColor="bg-destructive/10"
                 borderColor="destructive"
+                onClick={() => setLocation("/user-management")}
                 change={{ value: "Action required", label: "", positive: false }}
               />
             </>

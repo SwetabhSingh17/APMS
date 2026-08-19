@@ -21,6 +21,7 @@ import { DBStorage } from "./db-storage";
 import passport from "passport";
 import { createServer } from "http";
 import { setupAuth } from "./auth";
+import { setupWebSocket } from "./websocket";
 
 // Initialize core express application instance
 const app = express();
@@ -90,6 +91,9 @@ async function startServer(): Promise<void> {
 
     // 2. Initialize bound physical web server
     const server = createServer(app);
+
+    // 2.5 Initialize WebSocket Server
+    setupWebSocket(server);
 
     // 3. Mount assets dynamically based on environment
     if (process.env.NODE_ENV === "development") {

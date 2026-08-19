@@ -5,6 +5,8 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import { ProtectedRoute } from "./lib/protected-route";
+import { useAuth } from "./hooks/use-auth";
+import { useNotifications } from "./hooks/use-notifications";
 import { AuthProvider } from "@/hooks/use-auth";
 import { UserRole } from "@shared/schema";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -36,6 +38,7 @@ function PageLoader() {
 }
 
 function Router() {
+  useNotifications();
   return (
     <Suspense fallback={<PageLoader />}>
       <Switch>

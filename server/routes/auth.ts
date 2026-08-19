@@ -39,6 +39,18 @@ export function registerAuthRoutes(router: Router, storage: DBStorage) {
                 email
             } as any);
 
+            // If a Coordinator is creating this account, notify Admins
+            if (req.user && (req.user as any).role === "coordinator") {
+                const admins = await storage.getUsersByRole("admin" as any);
+                for (const admin of admins) {
+                    await storage.createNotification({
+                        userId: admin.id,
+                        title: "New Account Created",
+                        message: `Coordinator ${(req.user as any).firstName} created a new ${role} account for ${firstName} ${lastName}.`
+                    });
+                }
+            }
+
             res.status(201).json({ message: "Registration successful", user });
         } catch (error) {
             if (error instanceof Error && error.message.includes("duplicate key")) {

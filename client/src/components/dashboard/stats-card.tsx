@@ -13,6 +13,7 @@ type StatsCardProps = {
     label: string;
     positive?: boolean;
   };
+  onClick?: () => void;
 };
 
 export default function StatsCard({
@@ -22,6 +23,7 @@ export default function StatsCard({
   iconBgColor,
   borderColor,
   change,
+  onClick,
 }: StatsCardProps) {
   const getBorderColorClass = (color: string) => {
     switch (color) {
@@ -39,7 +41,14 @@ export default function StatsCard({
   };
 
   return (
-    <Card className={cn("p-4 border-l-4", getBorderColorClass(borderColor))}>
+    <Card 
+      className={cn(
+        "p-4 border-l-4", 
+        getBorderColorClass(borderColor),
+        onClick && "cursor-pointer hover:shadow-md transition-shadow duration-200 hover:opacity-90"
+      )}
+      onClick={onClick}
+    >
       <div className="flex justify-between items-start">
         <div>
           <p className="text-muted-foreground text-sm">{title}</p>
@@ -52,8 +61,7 @@ export default function StatsCard({
       {change && (
         <div className="mt-2">
           <span className={cn(
-            "text-sm",
-            change.positive ? "text-secondary" : "text-accent"
+            "text-sm text-muted-foreground"
           )}>
             <span className="font-medium">{change.value}</span> {change.label}
           </span>
