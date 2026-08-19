@@ -112,8 +112,8 @@ export class DBStorage {
     return { ...(topic as ProjectTopic), submittedBy: submitter as any };
   }
 
-  async getTopicsByTeacher(teacherId: number): Promise<ProjectTopic[]> {
-    return (await db.select().from(projectTopics).where(eq(projectTopics.submittedById, teacherId))) as ProjectTopic[];
+  async getTopicsBySupervisor(supervisorId: number): Promise<ProjectTopic[]> {
+    return (await db.select().from(projectTopics).where(eq(projectTopics.submittedById, supervisorId))) as ProjectTopic[];
   }
 
   async getPendingTopics(): Promise<ProjectTopic[]> {
@@ -159,7 +159,7 @@ export class DBStorage {
       .returning();
 
     if (topic) {
-      // Notify the teacher who submitted it
+      // Notify the supervisor who submitted it
       await this.createNotification({
         userId: topic.submittedById,
         title: "Topic Approved",
@@ -300,12 +300,12 @@ export class DBStorage {
       }
     }
 
-    // Notify the assigned faculty member (Teacher)
-    if (newGroup.facultyId) {
+    // Notify the assigned supervisor
+    if (newGroup.supervisorId) {
       await this.createNotification({
-        userId: newGroup.facultyId,
-        title: "New Student Group Assigned",
-        message: `You have been assigned as the faculty mentor for the group "${newGroup.name}".`
+        userId: newGroup.supervisorId,
+        title: "Assigned to New Group",
+        message: `You have been assigned as the supervisor for the group "${newGroup.name}".`
       });
     }
 
@@ -418,10 +418,10 @@ export class DBStorage {
     return pa as ProjectAssessment;
   }
 
-  async getProjectAssessment(projectId: number, facultyId: number): Promise<ProjectAssessment | undefined> {
-    const [pa] = await db.select().from(projectAssessments)
-      .where(and(eq(projectAssessments.projectId, projectId), eq(projectAssessments.facultyId, facultyId)));
-    return pa as ProjectAssessment | undefined;
+  async getProjectAssessment(projectId: number, supervisorId: number): Promise<ProjectAssessment | undefined> {
+    const [assessment] = await db.select().from(projectAssessments)
+      .where(and(eq(projectAssessments.projectId, projectId), eq(projectAssessments.supervisorId, supervisorId)));
+    return assessment as ProjectAssessment | undefined;
   }
 
   async updateProjectAssessment(id: number, data: InsertProjectAssessment): Promise<ProjectAssessment> {
@@ -440,7 +440,7 @@ export class DBStorage {
   // Search and report operations
   async searchProjects(criteria: {
     projectName?: string;
-    facultyName?: string;
+    supervisorName?: string;
     studentName?: string;
     enrollmentNumber?: string;
     department?: string;
@@ -621,12 +621,12 @@ export class DBStorage {
       const totalMarks = assessments.reduce((sum, a) => sum + (a.score || 0), 0);
       const avgMarks = assessments.length > 0 ? (totalMarks / assessments.length).toFixed(2) : 'N/A';
 
-      // Get faculty who assessed
-      const facultyNames = assessments.length > 0
-        ? await Promise.all(assessments.map(async (a) => {
-          if (!a.facultyId) return 'Not Assigned';
-          const faculty = await this.getUser(a.facultyId);
-          return `${faculty?.firstName} ${faculty?.lastName}`;
+      // Get supervisor who assessed
+      const supervisorNames = assessments.length > 0
+        ? await Promise.all(assessments.map(async a => {
+          if (!a.supervisorId) return 'Not Assigned';
+          const supervisor = await this.getUser(a.supervisorId);
+          return `${supervisor?.firstName} ${supervisor?.lastName}`;
         }))
         : ['Not Assigned'];
 
@@ -641,7 +641,7 @@ export class DBStorage {
         'Progress (%)': project.progress,
         'Status': project.status || 'In Progress',
         'Average Marks': avgMarks,
-        'Faculty Assigned': facultyNames.join(', '),
+        'Supervisor Assigned': supervisorNames.join(', '),
         'Submission Status': project.progress >= 100 ? 'Completed' : project.progress >= 75 ? 'On Track' : 'At Risk',
       };
     }));

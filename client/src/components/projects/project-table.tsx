@@ -7,7 +7,7 @@ type ProjectTableProps = {
   projects: (StudentProject & {
     topic: ProjectTopic | null,
     student?: User,
-    teacher?: User
+    supervisor?: User
   })[];
   onViewDetails?: (id: number) => void;
 };

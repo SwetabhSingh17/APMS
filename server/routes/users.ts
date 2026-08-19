@@ -52,14 +52,14 @@ export function registerUserRoutes(router: Router, storage: DBStorage) {
         }
     });
 
-    // Get all teachers
-    router.get("/api/teachers", async (req: Request, res: Response) => {
+    // Get all supervisors
+    router.get("/api/supervisors", async (req: Request, res: Response) => {
         try {
-            const teachers = await storage.getUsersByRole(UserRole.TEACHER);
-            res.json(teachers);
+            const supervisors = await storage.getUsersByRole(UserRole.SUPERVISOR);
+            res.json(supervisors);
         } catch (error) {
-            console.error("Error fetching teachers:", error);
-            res.status(500).json({ message: "Failed to fetch teachers" });
+            console.error("Error fetching supervisors:", error);
+            res.status(500).json({ message: "Failed to fetch supervisors" });
         }
     });
 }

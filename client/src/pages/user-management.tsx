@@ -27,7 +27,7 @@ function getRoleBadgeClasses(role: string): string {
       return "bg-red-100 text-red-800";
     case UserRole.COORDINATOR:
       return "bg-purple-100 text-purple-800";
-    case UserRole.TEACHER:
+    case UserRole.SUPERVISOR:
       return "bg-blue-100 text-blue-800";
     case UserRole.STUDENT:
       return "bg-green-100 text-green-800";
@@ -42,8 +42,8 @@ function getRoleDisplay(role: string): string {
       return "Admin";
     case UserRole.COORDINATOR:
       return "Coordinator";
-    case UserRole.TEACHER:
-      return "Teacher";
+    case UserRole.SUPERVISOR:
+      return "Supervisor";
     case UserRole.STUDENT:
       return "Student";
     default:
@@ -360,7 +360,7 @@ export default function UserManagement() {
                   <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value={UserRole.ADMIN}>Admin</SelectItem>
                   <SelectItem value={UserRole.COORDINATOR}>Coordinator</SelectItem>
-                  <SelectItem value={UserRole.TEACHER}>Teacher</SelectItem>
+                  <SelectItem value={UserRole.SUPERVISOR}>Supervisor</SelectItem>
                   <SelectItem value={UserRole.STUDENT}>Student</SelectItem>
                 </SelectContent>
               </Select>
@@ -370,7 +370,7 @@ export default function UserManagement() {
           <Tabs defaultValue="all-users">
             <TabsList className="mb-4">
               <TabsTrigger value="all-users">All Users</TabsTrigger>
-              <TabsTrigger value="teachers">Teachers</TabsTrigger>
+              <TabsTrigger value="supervisors">Supervisors</TabsTrigger>
               <TabsTrigger value="students">Students</TabsTrigger>
               <TabsTrigger value="coordinators">Coordinators</TabsTrigger>
             </TabsList>
@@ -448,7 +448,7 @@ export default function UserManagement() {
               )}
             </TabsContent>
 
-            <TabsContent value="teachers">
+            <TabsContent value="supervisors">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -461,7 +461,7 @@ export default function UserManagement() {
                   </TableHeader>
                   <TableBody>
                     {filteredUsers && filteredUsers
-                      .filter(user => user.role === UserRole.TEACHER)
+                      .filter(user => user.role === UserRole.SUPERVISOR)
                       .map((user) => (
                         <TableRow key={user.id} className="hover:bg-muted/50">
                           <TableCell>
@@ -739,7 +739,7 @@ export default function UserManagement() {
                         <SelectContent>
                           <SelectItem value={UserRole.ADMIN}>Admin</SelectItem>
                           <SelectItem value={UserRole.COORDINATOR}>Coordinator</SelectItem>
-                          <SelectItem value={UserRole.TEACHER}>Teacher</SelectItem>
+                          <SelectItem value={UserRole.SUPERVISOR}>Supervisor</SelectItem>
                           <SelectItem value={UserRole.STUDENT}>Student</SelectItem>
                         </SelectContent>
                       </Select>
@@ -873,7 +873,7 @@ export default function UserManagement() {
                       <SelectContent>
                         <SelectItem value={UserRole.ADMIN}>Admin</SelectItem>
                         <SelectItem value={UserRole.COORDINATOR}>Coordinator</SelectItem>
-                        <SelectItem value={UserRole.TEACHER}>Teacher</SelectItem>
+                        <SelectItem value={UserRole.SUPERVISOR}>Supervisor</SelectItem>
                         <SelectItem value={UserRole.STUDENT}>Student</SelectItem>
                       </SelectContent>
                     </Select>

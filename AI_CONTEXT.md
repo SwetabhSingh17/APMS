@@ -6,12 +6,12 @@ This document provides comprehensive context about the APMS project. It is inten
 ---
 
 ## 1. Project Overview
-APMS is a comprehensive web-based project management system for educational institutions. It streamlines project topic approval, student group formation, faculty mentoring, and progress tracking.
+APMS is a comprehensive web-based project management system for educational institutions. It streamlines project topic approval, student group formation, supervisor mentoring, and progress tracking.
 
 ### Core Workflows:
-1. **Topic Proposals**: Teachers submit project topics. Coordinators review and either approve or reject them.
+1. **Topic Proposals**: Supervisors submit project topics. Coordinators review and either approve or reject them.
 2. **Student Groups**: Students form groups (default max size: 5), invite peers, and select approved topics.
-3. **Mentorship & Tracking**: Faculty mentors evaluate group progress, grade milestones, and provide final assessments.
+3. **Mentorship & Tracking**: Supervisor mentors evaluate group progress, grade milestones, and provide final assessments.
 4. **Administration**: Admins manage users, generate Excel reports, and oversee system settings (including database backups/resets).
 
 ---
@@ -48,12 +48,12 @@ The repository is structured as a monorepo-style full-stack application:
 
 ## 4. Database Schema (drizzle)
 The application relies on several core tables defined in `shared/schema.ts`:
-- **users**: Stores all accounts with role-based access (`admin`, `coordinator`, `teacher`, `student`).
-- **student_groups**: Student project groups containing `facultyId`, `maxSize`, and `createdById`.
+- **users**: Stores all accounts with role-based access (`admin`, `coordinator`, `supervisor`, `student`).
+- **student_groups**: Student project groups containing `supervisorId`, `maxSize`, and `createdById`.
 - **student_group_members**: Manages group memberships and invitation statuses.
-- **project_topics**: Topics proposed by teachers with a `status` (pending/approved/rejected).
+- **project_topics**: Topics proposed by supervisors with a `status` (pending/approved/rejected).
 - **student_projects**: Maps groups/students to topics with progress tracking.
-- **project_assessments**: Grades and feedback provided by faculty.
+- **project_assessments**: Grades and feedback provided by supervisor.
 - **project_milestones**: Distinct checkpoints for student projects.
 - **notifications**: In-app notifications for users.
 - **sessions**: Session storage for `express-session`.
@@ -65,8 +65,8 @@ APMS includes a robust real-time notification system powered by WebSockets.
 - **Infrastructure**: A `WebSocketServer` runs on the same HTTP port (path `/ws`). Clients connect and pass their `userId`. The system broadcasts `NOTIFICATION` events strictly to the target user's active socket connections.
 - **Frontend Integration**: The `useNotifications` hook in `client/src/App.tsx` establishes the connection. When a notification is received, it triggers a UI `toast()` popup ("notification blob") and automatically invalidates the `["/api/notifications"]` TanStack Query cache to instantly refresh the notification drawer.
 - **Routing Rules**:
-  - *Faculty Allocation*: When a Teacher is assigned to a Student Group, only the assigned Teacher and the specific group's Students are notified.
-  - *Topic Approvals*: When a Coordinator approves a topic, the Teacher who proposed it and all Admins receive notifications. Students are not notified.
+  - *Supervisor Allocation*: When a Supervisor is assigned to a Student Group, only the assigned Supervisor and the specific group's Students are notified.
+  - *Topic Approvals*: When a Coordinator approves a topic, the Supervisor who proposed it and all Admins receive notifications. Students are not notified.
   - *Account Changes*: If a Coordinator creates or modifies an account, all Admins are instantly notified.
 
 ---
@@ -82,7 +82,7 @@ APMS includes a robust real-time notification system powered by WebSockets.
 
 ## 6. Access Control (RBAC)
 - **Student**: Can browse topics, form groups, invite members, submit milestones.
-- **Teacher**: Can propose topics, evaluate assigned groups, and grade milestones.
+- **Supervisor**: Can propose topics, evaluate assigned groups, and grade milestones.
 - **Coordinator**: Can approve/reject topic proposals, oversee all projects, view department stats.
 - **Admin**: Has full access, can perform destructive actions (DB resets) and manage all users.
 

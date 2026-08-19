@@ -25,7 +25,7 @@ export const studentGroups = pgTable("student_groups", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  facultyId: integer("faculty_id"),
+  supervisorId: integer("supervisor_id"),
   createdById: integer("created_by_id"),
   maxSize: integer("max_size").notNull().default(5),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -110,7 +110,7 @@ export const insertStudentProjectSchema = createInsertSchema(studentProjects).om
 export const projectAssessments = pgTable("project_assessments", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").references(() => studentProjects.id),
-  facultyId: integer("faculty_id").references(() => users.id),
+  supervisorId: integer("supervisor_id").references(() => users.id),
   score: integer("score").notNull(),
   feedback: text("feedback"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -212,7 +212,7 @@ export type InsertProjectTopic = z.infer<typeof insertProjectTopicSchema>;
 export type StudentProject = typeof studentProjects.$inferSelect & {
   topic?: ProjectTopic;
   student?: User;
-  teacher?: User;
+  supervisor?: User;
 };
 export type InsertStudentProject = z.infer<typeof insertStudentProjectSchema>;
 
@@ -231,7 +231,7 @@ export type InsertProjectAssessment = z.infer<typeof insertProjectAssessmentSche
 export enum UserRole {
   ADMIN = "admin",
   COORDINATOR = "coordinator",
-  TEACHER = "teacher",
+  SUPERVISOR = "supervisor",
   STUDENT = "student",
 }
 

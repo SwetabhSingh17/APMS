@@ -35,10 +35,10 @@ export default function Topics() {
     }
   }, []);
 
-  // Fetch all topics submitted by the teacher
+  // Fetch all topics submitted by the supervisor
   const { data: myTopics = [], isLoading: isLoadingMyTopics } = useQuery<ProjectTopic[]>({
     queryKey: ["/api/topics/my"],
-    enabled: !!user && user.role === UserRole.TEACHER
+    enabled: !!user && user.role === UserRole.SUPERVISOR
   });
 
   // Form schema

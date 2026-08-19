@@ -73,15 +73,15 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
         }
     });
 
-    // Get topics submitted by current teacher
-    router.get("/api/topics/my", requireRole([UserRole.TEACHER]), async (req: Request, res: Response) => {
+    // Get topics submitted by current supervisor
+    router.get("/api/topics/my", requireRole([UserRole.SUPERVISOR]), async (req: Request, res: Response) => {
         if (!isAuthenticatedRequest(req)) {
             return res.status(401).json({ message: "Unauthorized" });
         }
 
         try {
-            console.log("Fetching topics for teacher:", req.user.id);
-            const topics = await storage.getTopicsByTeacher(req.user.id);
+            console.log("Fetching topics for supervisor:", req.user.id);
+            const topics = await storage.getTopicsBySupervisor(req.user.id);
             console.log("Found topics:", topics);
             res.json(topics);
         } catch (error) {
@@ -91,7 +91,7 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
     });
 
     // Submit new topic
-    router.post("/api/topics", requireRole([UserRole.TEACHER]), async (req: Request, res: Response) => {
+    router.post("/api/topics", requireRole([UserRole.SUPERVISOR]), async (req: Request, res: Response) => {
         console.log("POST /api/topics called");
 
         if (!isAuthenticatedRequest(req)) {
@@ -148,7 +148,7 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
     });
 
     // Update topic
-    router.put("/api/topics/:id", requireRole([UserRole.TEACHER]), async (req: Request, res: Response) => {
+    router.put("/api/topics/:id", requireRole([UserRole.SUPERVISOR]), async (req: Request, res: Response) => {
         if (!isAuthenticatedRequest(req)) {
             return res.status(401).json({ message: "Unauthorized" });
         }

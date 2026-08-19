@@ -25,7 +25,7 @@ import { Loader2, UserPlus, Users, UserX, Info, Check, X } from "lucide-react";
 const createGroupSchema = z.object({
   name: z.string().min(3, "Group name must be at least 3 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
-  facultyId: z.number(),
+  supervisorId: z.number(),
   enrollmentNumbers: z.array(z.string().min(1, "Enrollment number is required"))
     .min(2, "You need at least 2 other students to form a group")
     .max(4, "Maximum 4 other students can be added"),
@@ -47,12 +47,12 @@ export default function StudentGroups() {
   const [enrollmentNumber, setEnrollmentNumber] = useState("");
   const [enrollmentNumbers, setEnrollmentNumbers] = useState<string[]>([]);
 
-  // Fetch teachers for faculty selection
-  const { data: teachers, isLoading: isLoadingTeachers } = useQuery({
-    queryKey: ["/api/teachers"],
+  // Fetch supervisors for supervisor selection
+  const { data: supervisors, isLoading: isLoadingTeachers } = useQuery({
+    queryKey: ["/api/supervisors"],
     queryFn: async () => {
-      const res = await fetch("/api/teachers");
-      if (!res.ok) throw new Error("Failed to fetch teachers");
+      const res = await fetch("/api/supervisors");
+      if (!res.ok) throw new Error("Failed to fetch supervisors");
       return res.json();
     },
     enabled: !!user,
@@ -181,7 +181,7 @@ export default function StudentGroups() {
     defaultValues: {
       name: "",
       description: "",
-      facultyId: 0,
+      supervisorId: 0,
       enrollmentNumbers: [],
     },
   });
@@ -239,15 +239,15 @@ export default function StudentGroups() {
               <div className="flex items-center gap-4 p-4 border rounded-lg">
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                   <span className="font-semibold text-lg text-primary">
-                    {userGroup.faculty?.firstName[0]}{userGroup.faculty?.lastName[0]}
+                    {userGroup.supervisor?.firstName[0]}{userGroup.supervisor?.lastName[0]}
                   </span>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Proposed Project Mentor</p>
                   <p className="font-semibold text-lg">
-                    {userGroup.faculty?.firstName} {userGroup.faculty?.lastName}
+                    {userGroup.supervisor?.firstName} {userGroup.supervisor?.lastName}
                   </p>
-                  {/* <p className="text-sm text-muted-foreground">{userGroup.faculty?.department}</p> */}
+                  {/* <p className="text-sm text-muted-foreground">{userGroup.supervisor?.department}</p> */}
                 </div>
               </div>
 
@@ -371,15 +371,15 @@ export default function StudentGroups() {
                             <div className="flex items-center gap-4 p-4 border rounded-lg">
                               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                                 <span className="font-semibold">
-                                  {group.faculty?.firstName[0]}{group.faculty?.lastName[0]}
+                                  {group.supervisor?.firstName[0]}{group.supervisor?.lastName[0]}
                                 </span>
                               </div>
                               <div>
                                 <p className="font-medium">
-                                  {group.faculty?.firstName} {group.faculty?.lastName}
+                                  {group.supervisor?.firstName} {group.supervisor?.lastName}
                                 </p>
                                 <p className="text-sm text-muted-foreground">
-                                  {/* {group.faculty?.department} */}
+                                  {/* {group.supervisor?.department} */}
                                 </p>
                               </div>
                             </div>
@@ -446,7 +446,7 @@ export default function StudentGroups() {
 
                   <Separator />
 
-                  {/* Faculty Mentor Section */}
+                  {/* Supervisor Section */}
                   <div>
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                       <UserPlus className="h-5 w-5" />
@@ -456,18 +456,18 @@ export default function StudentGroups() {
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
                           <span className="font-semibold text-primary">
-                            {userGroup.faculty?.firstName[0]}{userGroup.faculty?.lastName[0]}
+                            {userGroup.supervisor?.firstName[0]}{userGroup.supervisor?.lastName[0]}
                           </span>
                         </div>
                         <div>
                           <p className="font-semibold text-lg">
-                            {userGroup.faculty?.firstName} {userGroup.faculty?.lastName}
+                            {userGroup.supervisor?.firstName} {userGroup.supervisor?.lastName}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            {userGroup.faculty?.department}
+                            {userGroup.supervisor?.department}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            {userGroup.faculty?.email}
+                            {userGroup.supervisor?.email}
                           </p>
                         </div>
                       </div>
@@ -513,7 +513,7 @@ export default function StudentGroups() {
                 <CardTitle>Create New Group</CardTitle>
                 <CardDescription>
                   Create a new student group with a minimum of 3 and maximum of 5 members.
-                  A faculty member will be assigned as your project mentor.
+                  A supervisor member will be assigned as your project mentor.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -549,20 +549,20 @@ export default function StudentGroups() {
 
                     <FormField
                       control={createGroupForm.control}
-                      name="facultyId"
+                      name="supervisorId"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Project Mentor</FormLabel>
                           <Select onValueChange={(value) => field.onChange(Number(value))}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select a faculty member" />
+                                <SelectValue placeholder="Select a supervisor member" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {teachers?.map((teacher: User) => (
-                                <SelectItem key={teacher.id} value={teacher.id.toString()}>
-                                  {teacher.firstName} {teacher.lastName}
+                              {supervisors?.map((supervisor: User) => (
+                                <SelectItem key={supervisor.id} value={supervisor.id.toString()}>
+                                  {supervisor.firstName} {supervisor.lastName}
                                 </SelectItem>
                               ))}
                             </SelectContent>

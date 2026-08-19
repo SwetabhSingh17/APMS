@@ -24,9 +24,9 @@ const createUser = async (username, password, role, enrollmentNumber = null) => 
 };
 
 const createUsers = async () => {
-  // Create teacher accounts
+  // Create supervisor accounts
   for (let i = 1; i <= 5; i++) {
-    await createUser(`teacher${i}`, 'teacher123', 'teacher');
+    await createUser(`supervisor${i}`, 'supervisor123', 'supervisor');
   }
 
   // Create student accounts

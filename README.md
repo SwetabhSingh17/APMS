@@ -1,7 +1,7 @@
 <p align="center">
   <h1 align="center">🎓 APMS (Academic Project Management System)</h1>
   <p align="center">
-    A comprehensive project management system for educational institutions — streamlining project topic approval, student group formation, faculty mentoring, and progress tracking.
+    A comprehensive project management system for educational institutions — streamlining project topic approval, student group formation, supervisor mentoring, and progress tracking.
   </p>
 </p>
 
@@ -20,11 +20,11 @@
 
 ## ✨ Key Features
 
-- **Role-Based Access Control** — Four distinct roles: Admin, Coordinator, Teacher, Student  
-- **Project Topic Workflow** — Teachers submit topics → Coordinators approve/reject → Students select  
-- **Student Group Management** — Create groups, invite members, assign faculty mentors  
+- **Role-Based Access Control** — Four distinct roles: Admin, Coordinator, Supervisor, Student  
+- **Project Topic Workflow** — Supervisors submit topics → Coordinators approve/reject → Students select  
+- **Student Group Management** — Create groups, invite members, assign supervisor mentors  
 - **Progress Tracking** — Real-time dashboards with charts and department statistics  
-- **Project Assessments** — Faculty grading with score and feedback  
+- **Project Assessments** — Supervisor grading with score and feedback  
 - **User Management** — Admin panel for bulk user operations, role changes, password resets  
 - **System Management** — Database export/import, Excel reports, full reset capabilities  
 - **Security Hardened** — Helmet HTTP headers, rate-limited auth endpoints, soft-delete data retention  
@@ -50,7 +50,7 @@ graph TD
     A[Student]:::user -->|Submit Topic| B(Topic Proposal)
     A -->|Form Group| C(Student Group)
     
-    D[Teacher]:::user -->|Evaluate| E(Project Milestone)
+    D[Supervisor]:::user -->|Evaluate| E(Project Milestone)
     D -->|Grade| F[Final Assessment]:::output
     
     G[Coordinator/Admin]:::user -->|Approve| B
@@ -214,7 +214,7 @@ All configuration is managed through environment variables in a `.env` file at t
 |------|-------------|
 | **Admin** | Full system access, user management, database operations, Excel reports |
 | **Coordinator** | Approve/reject topics, track progress, manage users, view statistics |
-| **Teacher** | Submit project topics, evaluate assigned projects, view student progress |
+| **Supervisor** | Submit project topics, evaluate assigned projects, view student progress |
 | **Student** | Browse & select topics, form groups, invite members, track own progress |
 
 ---

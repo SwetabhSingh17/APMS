@@ -12,7 +12,7 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
         }
 
         try {
-            const { name, description, facultyId, enrollmentNumbers } = req.body;
+            const { name, description, supervisorId, enrollmentNumbers } = req.body;
 
             // Validate that the user is not already in a group
             const existingGroup = await storage.getUserGroup(req.user.id);
@@ -20,10 +20,10 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
                 return res.status(400).json({ message: "You are already in a group" });
             }
 
-            // Validate faculty exists
-            const faculty = await storage.getUser(facultyId);
-            if (!faculty || faculty.role !== UserRole.TEACHER) {
-                return res.status(400).json({ message: "Invalid faculty mentor" });
+            // Validate supervisor exists
+            const supervisor = await storage.getUser(supervisorId);
+            if (!supervisor || supervisor.role !== UserRole.SUPERVISOR) {
+                return res.status(400).json({ message: "Invalid supervisor mentor" });
             }
 
             // Validate all enrollment numbers exist and are students
@@ -51,7 +51,7 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
             const group = await storage.createStudentGroup({
                 name,
                 description,
-                facultyId,
+                supervisorId,
                 maxSize: 5,
             } as any, req.user.id, enrollmentNumbers);
 
@@ -110,11 +110,11 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
 
             const { group, status } = membership;
 
-            // Get group members and faculty details
+            // Get group members and supervisor details
             const members = await storage.getStudentGroupMembers(group.id);
-            const faculty = group.facultyId ? await storage.getUser(group.facultyId) : null;
+            const supervisor = group.supervisorId ? await storage.getUser(group.supervisorId) : null;
 
-            // Return the complete group data with members and faculty
+            // Return the complete group data with members and supervisor
             res.json({
                 ...group,
                 myStatus: status,
@@ -126,12 +126,12 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
                     enrollmentNumber: member.enrollmentNumber,
                     role: member.role
                 })),
-                faculty: faculty ? {
-                    id: faculty.id,
-                    firstName: faculty.firstName,
-                    lastName: faculty.lastName,
-                    email: faculty.email,
-                    role: faculty.role
+                supervisor: supervisor ? {
+                    id: supervisor.id,
+                    firstName: supervisor.firstName,
+                    lastName: supervisor.lastName,
+                    email: supervisor.email,
+                    role: supervisor.role
                 } : null
             });
         } catch (error) {

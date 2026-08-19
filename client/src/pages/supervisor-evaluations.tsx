@@ -44,7 +44,7 @@ interface StudentProject {
   updatedAt: string;
 }
 
-export default function TeacherEvaluations() {
+export default function SupervisorEvaluations() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
@@ -53,15 +53,15 @@ export default function TeacherEvaluations() {
   const [marks, setMarks] = useState("");
   const [feedback, setFeedback] = useState("");
 
-  // Fetch projects assigned to the teacher
-  const { data: projects = [], isLoading } = useQuery<StudentProject[]>({
-    queryKey: ["/api/projects/teacher"],
-    enabled: !!user && user.role === UserRole.TEACHER,
+  // Fetch projects assigned to the supervisor
+  const { data: projects = [], isLoading, refetch } = useQuery<StudentProject[]>({
+    queryKey: ["/api/projects/supervisor"],
+    enabled: !!user && user.role === UserRole.SUPERVISOR,
     queryFn: async () => {
-      console.log('Fetching teacher projects for user:', user);
-      const response = await apiRequest("GET", "/api/projects/teacher");
+      console.log('Fetching supervisor projects for user:', user);
+      const response = await apiRequest("GET", "/api/projects/supervisor");
       const data = await response.json();
-      console.log('Received teacher projects:', data);
+      console.log('Received supervisor projects:', data);
       return data;
     }
   });
@@ -86,7 +86,7 @@ export default function TeacherEvaluations() {
       setSelectedProject(null);
       setMarks("");
       setFeedback("");
-      queryClient.invalidateQueries({ queryKey: ["/api/projects/teacher"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects/supervisor"] });
     },
     onError: (error: Error) => {
       toast({
@@ -138,7 +138,7 @@ export default function TeacherEvaluations() {
     });
   }, [projects, searchQuery]);
 
-  if (!user || user.role !== UserRole.TEACHER) {
+  if (!user || user.role !== UserRole.SUPERVISOR) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-full">
@@ -151,7 +151,7 @@ export default function TeacherEvaluations() {
             </CardHeader>
             <CardContent>
               <p className="text-center text-muted-foreground">
-                This page is only accessible to teachers.
+                This page is only accessible to supervisors.
               </p>
             </CardContent>
           </Card>

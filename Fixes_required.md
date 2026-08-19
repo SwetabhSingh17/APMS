@@ -20,6 +20,19 @@ This document outlines suggested architectural, security, and maintenance improv
 
 ---
 
+## ✅ Completed (v1.1.2)
+
+### UX & Feature Enhancements
+- [x] **Real-Time Notifications** — Added real-time notifications via WebSockets. Replaced polling mechanism with instant updates. Implemented role-based routing (e.g. students don't see topic approvals; admins see coordinator modifications).
+- [x] **Interactive Dashboard Widgets** — StatsCards are now clickable, routing users directly to respective detail pages with hover animations.
+- [x] **UI & Theming Revamp** — Overhauled the color palette for AAA high-contrast standards. Created a unified slate-based color scheme across Light and Dark themes.
+
+### Terminology & Deployment
+- [x] **Terminology Refactoring** — Renamed "Faculty" and "Teacher" keywords to "Supervisor" throughout the entire system (DB columns, roles, UI components, API endpoints).
+- [x] **Windows Server Deployment** — Created `start_server.bat` for one-click production deployments on Windows.
+
+---
+
 ## 🔴 Remaining / New Improvements
 
 ### 1. Authentication Modernization
@@ -58,7 +71,6 @@ This document outlines suggested architectural, security, and maintenance improv
 - **Docker Support**: Add a `Dockerfile` and `docker-compose.yml` for containerized development and deployment with PostgreSQL.
 
 ### 7. UX & Feature Gaps
-- **Notification System Enhancement**: Add real-time notifications via WebSockets (the `ws` dependency is already installed but appears unused) instead of relying on polling.
 - **Email Notifications**: Integrate an email service (e.g., `nodemailer` + SMTP or a transactional email API) for critical events like group invitations and topic approval/rejection.
 - **File Uploads**: Allow students to upload project reports/documents attached to milestones.
 - **Audit Log**: Maintain a system-wide audit trail recording who performed what action and when, especially for admin operations like database resets and user deletions.

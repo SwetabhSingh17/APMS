@@ -51,9 +51,9 @@ const PASSWORDS = {
 const USERS: Record<string, any> = {
     admin: { username: 'admin', password: PASSWORDS.ADMIN, role: 'admin', firstName: 'System', lastName: 'Admin', email: 'admin_email' },
     coord: { username: 'coordinator', password: PASSWORDS.COORD, role: 'coordinator', firstName: 'Project', lastName: 'Coordinator', email: 'coord_email', enrollmentNumber: 'COORD01' },
-    fac_a: { username: 'faculty_a', password: PASSWORDS.DEFAULT, role: 'teacher', firstName: 'Faculty', lastName: 'A', email: 'fac_a_email', enrollmentNumber: 'FACA' },
-    fac_b: { username: 'faculty_b', password: PASSWORDS.DEFAULT, role: 'teacher', firstName: 'Faculty', lastName: 'B', email: 'fac_b_email', enrollmentNumber: 'FACB' },
-    fac_c: { username: 'faculty_c', password: PASSWORDS.DEFAULT, role: 'teacher', firstName: 'Faculty', lastName: 'C', email: 'fac_c_email', enrollmentNumber: 'FACC' },
+    fac_a: { username: 'faculty_a', password: PASSWORDS.DEFAULT, role: 'supervisor', firstName: 'Faculty', lastName: 'A', email: 'fac_a_email', enrollmentNumber: 'FACA' },
+    fac_b: { username: 'faculty_b', password: PASSWORDS.DEFAULT, role: 'supervisor', firstName: 'Faculty', lastName: 'B', email: 'fac_b_email', enrollmentNumber: 'FACB' },
+    fac_c: { username: 'faculty_c', password: PASSWORDS.DEFAULT, role: 'supervisor', firstName: 'Faculty', lastName: 'C', email: 'fac_c_email', enrollmentNumber: 'FACC' },
 };
 
 // Students E001-E009

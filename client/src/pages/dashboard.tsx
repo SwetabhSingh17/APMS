@@ -156,7 +156,7 @@ export default function Dashboard() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Faculty Mentor</CardTitle>
+                    <CardTitle className="text-lg">Supervisor</CardTitle>
                   </CardHeader>
                   <CardContent className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">
@@ -186,7 +186,7 @@ export default function Dashboard() {
       );
     }
 
-    // Admin/Coordinator/Teacher View
+    // Admin/Coordinator/Supervisor View
     return (
       <>
         {/* Welcome Section */}
@@ -196,7 +196,7 @@ export default function Dashboard() {
               <h1 className="text-2xl font-bold text-foreground mb-1">Welcome back, {user.firstName}!</h1>
               <p className="text-muted-foreground">Here's what's happening with projects today.</p>
             </div>
-            {user.role === UserRole.TEACHER && (
+            {user.role === UserRole.SUPERVISOR && (
               <Button onClick={() => {
                 // Use the same state as in Topics page
                 window.location.href = '/topics?action=submit';
@@ -235,7 +235,7 @@ export default function Dashboard() {
                 iconBgColor="bg-secondary/10"
                 borderColor="secondary"
                 change={{ value: `${stats?.pendingTopics || 0}`, label: "pending approval", positive: false }}
-                onClick={() => setLocation(user?.role === UserRole.STUDENT ? "/student-topics" : user?.role === UserRole.TEACHER ? "/topics" : "/approve-topics")}
+                onClick={() => setLocation(user?.role === UserRole.STUDENT ? "/student-topics" : user?.role === UserRole.SUPERVISOR ? "/topics" : "/approve-topics")}
               />
               <StatsCard
                 title="Average Progress"

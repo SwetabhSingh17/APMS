@@ -7,6 +7,7 @@
 3. **Interactive Dashboard Widgets**: Dashboard StatsCards are now clickable, routing users directly to respective detail pages with hover animations.
 4. **Windows Server Setup**: Created `start_server.bat` for one-click production deployments on Windows Servers.
 5. **UI & Theming Revamp**: Overhauled the color palette to ensure AAA high-contrast standards for users with poor eyesight. Removed the `shadcn-theme-json` plugin and manually implemented a unified slate-based color scheme across both Light and Dark themes to ensure perfect visual consistency.
+6. **Terminology Refactoring**: System-wide renaming of "Faculty" and "Teacher" keywords to "Supervisor" to align with project management conventions. All roles, database columns, and frontend UI components now consistently use "Supervisor".
 
 ## Version 1.1.1
 

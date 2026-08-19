@@ -42,8 +42,8 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?
         return "Admin";
       case UserRole.COORDINATOR:
         return "Coordinator";
-      case UserRole.TEACHER:
-        return "Teacher";
+      case UserRole.SUPERVISOR:
+        return "Supervisor";
       case UserRole.STUDENT:
         return "Student";
       default:
@@ -112,14 +112,14 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?
           </>
         )}
 
-        {user?.role === UserRole.TEACHER && (
+        {user?.role === UserRole.SUPERVISOR && (
           <>
             <Link href="/topics" onClick={isMobile ? onClose : undefined} className={linkClass("/topics")}>
               <FileText className="w-5 h-5" />
               <span>Topics</span>
             </Link>
-            <Link href="/teacher-evaluations" onClick={isMobile ? onClose : undefined} className={linkClass("/teacher-evaluations")}>
-              <ClipboardCheck className="w-5 h-5" />
+            <Link href="/supervisor-evaluations" onClick={isMobile ? onClose : undefined} className={linkClass("/supervisor-evaluations")}>
+              <ClipboardCheck className="mr-3 h-5 w-5" />
               <span>Evaluations</span>
             </Link>
           </>

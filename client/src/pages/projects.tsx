@@ -41,13 +41,13 @@ export default function Projects() {
 
   const { data: myTopics = [], isLoading: isLoadingMyTopics } = useQuery<ProjectTopic[]>({
     queryKey: ["/api/topics/my"],
-    enabled: !!user && user.role === UserRole.TEACHER
+    enabled: !!user && user.role === UserRole.SUPERVISOR
   });
 
   type StudentProjectWithTopic = StudentProject & {
     topic: ProjectTopic | null;
     student: User;
-    teacher?: User;
+    supervisor?: User;
   };
 
   const { data: myProjects = [], isLoading: isLoadingMyProjects } = useQuery<StudentProjectWithTopic[]>({
@@ -70,7 +70,7 @@ export default function Projects() {
       console.log('All projects loaded:', data);
       return data;
     },
-    enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN || user.role === UserRole.TEACHER)
+    enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN || user.role === UserRole.SUPERVISOR)
   });
 
   // Define form schema with additional validation
@@ -186,8 +186,8 @@ export default function Projects() {
       project.student.firstName.toLowerCase().includes(query) ||
       project.student.lastName.toLowerCase().includes(query) ||
       project.student.email.toLowerCase().includes(query) ||
-      (project.teacher?.firstName.toLowerCase().includes(query) || false) ||
-      (project.teacher?.lastName.toLowerCase().includes(query) || false)
+      (project.supervisor?.firstName.toLowerCase().includes(query) || false) ||
+      (project.supervisor?.lastName.toLowerCase().includes(query) || false)
     );
   };
 
@@ -195,7 +195,7 @@ export default function Projects() {
     console.log("All Projects:", allProjects);
     console.log("Current User:", user);
 
-    const teacherProjects = allProjects.filter(project => {
+    const supervisorProjects = allProjects.filter(project => {
       console.log("Checking project:", {
         projectId: project.id,
         topicId: project.topic?.id,
@@ -206,9 +206,9 @@ export default function Projects() {
       return project.topic?.submittedById === user?.id;
     });
 
-    console.log("Filtered Teacher Projects:", teacherProjects);
+    console.log("Filtered Supervisor Projects:", supervisorProjects);
 
-    const filteredProjects = filterProjects(teacherProjects);
+    const filteredProjects = filterProjects(supervisorProjects);
 
     return (
       <>
@@ -315,7 +315,7 @@ export default function Projects() {
           </Card>
           <Card className="bg-card/50 backdrop-blur-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Faculty Mentor</CardTitle>
+              <CardTitle className="text-base">Supervisor Mentor</CardTitle>
             </CardHeader>
             <CardContent className="flex items-center space-x-3">
               <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
@@ -350,7 +350,7 @@ export default function Projects() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
-              placeholder="Search projects by title, student, teacher, technology..."
+              placeholder="Search projects by title, student, supervisor, technology..."
               className="pl-10"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -376,7 +376,7 @@ export default function Projects() {
 
   return (
     <MainLayout>
-      {user?.role === UserRole.TEACHER && renderTeacherContent()}
+      {user?.role === UserRole.SUPERVISOR && renderTeacherContent()}
       {user?.role === UserRole.STUDENT && renderStudentContent()}
       {(user?.role === UserRole.COORDINATOR || user?.role === UserRole.ADMIN) && renderCoordinatorContent()}
 

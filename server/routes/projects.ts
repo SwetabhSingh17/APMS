@@ -105,8 +105,8 @@ export function registerProjectRoutes(router: Router, storage: DBStorage) {
         }
     });
 
-    // Get all projects (for coordinators, admins, and teachers)
-    router.get("/api/projects", requireRole([UserRole.COORDINATOR, UserRole.ADMIN, UserRole.TEACHER]), async (req: Request, res: Response) => {
+    // Get all projects (for coordinators, admins, and supervisors)
+    router.get("/api/projects", requireRole([UserRole.COORDINATOR, UserRole.ADMIN, UserRole.SUPERVISOR]), async (req: Request, res: Response) => {
         try {
             const projects = await storage.getAllProjects();
             console.log('Projects from storage:', projects);
@@ -116,8 +116,8 @@ export function registerProjectRoutes(router: Router, storage: DBStorage) {
         }
     });
 
-    // Get projects for teacher
-    router.get("/api/projects/teacher", requireRole([UserRole.TEACHER]), async (req: Request, res: Response) => {
+    // Get projects for supervisor
+    router.get("/api/projects/supervisor", requireRole([UserRole.SUPERVISOR]), async (req: Request, res: Response) => {
         if (!isAuthenticatedRequest(req)) {
             return res.status(401).json({ message: "Unauthorized" });
         }
@@ -126,19 +126,19 @@ export function registerProjectRoutes(router: Router, storage: DBStorage) {
             const allProjects = await storage.getAllProjects();
             console.log('All projects:', allProjects);
 
-            const teacherProjects = allProjects.filter(project => {
+            const supervisorProjects = allProjects.filter(project => {
                 return project.topic?.submittedById === req.user.id;
             });
 
-            res.json(teacherProjects);
+            res.json(supervisorProjects);
         } catch (error) {
-            console.error('Error fetching teacher projects:', error);
-            res.status(500).json({ message: "Failed to fetch teacher projects" });
+            console.error('Error fetching supervisor projects:', error);
+            res.status(500).json({ message: "Failed to fetch supervisor projects" });
         }
     });
 
     // Create or update assessment
-    router.post("/api/projects/:id/assess", requireRole([UserRole.TEACHER, UserRole.COORDINATOR]), async (req: Request, res: Response) => {
+    router.post("/api/projects/:id/assess", requireRole([UserRole.SUPERVISOR, UserRole.COORDINATOR]), async (req: Request, res: Response) => {
         if (!isAuthenticatedRequest(req)) {
             return res.status(401).json({ message: "Unauthorized" });
         }
@@ -150,7 +150,7 @@ export function registerProjectRoutes(router: Router, storage: DBStorage) {
             const validatedData = insertProjectAssessmentSchema.parse({
                 ...req.body,
                 projectId,
-                facultyId: req.user.id
+                supervisorId: req.user.id
             });
 
             // Check if project exists
@@ -202,7 +202,7 @@ export function registerProjectRoutes(router: Router, storage: DBStorage) {
             const isAuthorized =
                 req.user.role === UserRole.ADMIN ||
                 req.user.role === UserRole.COORDINATOR ||
-                (req.user.role === UserRole.TEACHER && topic && req.user.id === topic.submittedById) ||
+                (req.user.role === UserRole.SUPERVISOR && topic && req.user.id === topic.submittedById) ||
                 (req.user.role === UserRole.STUDENT && req.user.id === project.studentId);
 
             if (!isAuthorized) {
@@ -221,7 +221,7 @@ export function registerProjectRoutes(router: Router, storage: DBStorage) {
         try {
             const {
                 projectName,
-                facultyName,
+                supervisorName,
                 studentName,
                 enrollmentNumber,
                 department,
@@ -230,7 +230,7 @@ export function registerProjectRoutes(router: Router, storage: DBStorage) {
 
             const projects = await storage.searchProjects({
                 projectName: projectName as string,
-                facultyName: facultyName as string,
+                supervisorName: supervisorName as string,
                 studentName: studentName as string,
                 enrollmentNumber: enrollmentNumber as string,
                 department: department as string,
@@ -244,7 +244,7 @@ export function registerProjectRoutes(router: Router, storage: DBStorage) {
     });
 
     // Generate a detailed project report for a specific project
-    router.get("/api/reports/projects/:id", requireRole([UserRole.COORDINATOR, UserRole.ADMIN, UserRole.TEACHER]), async (req: Request, res: Response) => {
+    router.get("/api/reports/projects/:id", requireRole([UserRole.COORDINATOR, UserRole.ADMIN, UserRole.SUPERVISOR]), async (req: Request, res: Response) => {
         try {
             const projectId = parseInt(req.params.id);
 
@@ -263,8 +263,8 @@ export function registerProjectRoutes(router: Router, storage: DBStorage) {
                 return res.status(404).json({ message: "Student not found" });
             }
 
-            // Get faculty details
-            const faculty = topic ? await storage.getUser(topic.submittedById) : null;
+            // Get supervisor details
+            const supervisor = topic ? await storage.getUser(topic.submittedById) : null;
 
             // Get milestones
             const milestones = await storage.getProjectMilestones(projectId);
@@ -274,14 +274,14 @@ export function registerProjectRoutes(router: Router, storage: DBStorage) {
 
             // Sanitize sensitive information
             const { password: studentPassword, ...studentData } = student;
-            const { password: facultyPassword, ...facultyData } = faculty || {};
+            const { password: supervisorPassword, ...supervisorData } = supervisor || {};
 
             // Compile report
             const report = {
                 project,
                 topic,
                 student: studentData,
-                faculty: facultyData,
+                supervisor: supervisorData,
                 milestones,
                 assessments,
                 generatedAt: new Date(),

@@ -136,7 +136,7 @@ If you are on a Windows Server (which lacks the Microsoft Store for automated in
 
 ## 💾 Step 2: Loading a Saved Game! (Optional)
 
-*Wait! Did your teacher or friend already build a cabinet and give you the saved game file?*
+*Wait! Did your supervisor or friend already build a cabinet and give you the saved game file?*
 
 If they gave you a backup file (ending in `.sql`):
 1. Put the file inside the folder named `database/backups`.

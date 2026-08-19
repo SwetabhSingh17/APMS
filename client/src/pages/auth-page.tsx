@@ -251,7 +251,7 @@ export default function AuthPage() {
                             </FormControl>
                             <SelectContent>
                               <SelectItem value={UserRole.STUDENT}>Student</SelectItem>
-                              <SelectItem value={UserRole.TEACHER}>Teacher</SelectItem>
+                              <SelectItem value={UserRole.SUPERVISOR}>Supervisor</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />

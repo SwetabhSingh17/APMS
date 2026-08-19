@@ -24,7 +24,7 @@ const TrackProgress = lazy(() => import("@/pages/track-progress"));
 const UserManagement = lazy(() => import("@/pages/user-management"));
 const Settings = lazy(() => import("@/pages/settings"));
 const Notifications = lazy(() => import("@/pages/notifications"));
-const TeacherEvaluations = lazy(() => import("@/pages/teacher-evaluations"));
+const SupervisorEvaluations = lazy(() => import("@/pages/supervisor-evaluations"));
 const StudentGroups = lazy(() => import("@/pages/student-groups"));
 const SystemManagement = lazy(() => import("@/pages/system-management"));
 const CreatorInfoPage = lazy(() => import("@/pages/creator-info"));
@@ -47,7 +47,7 @@ function Router() {
         <ProtectedRoute
           path="/topics"
           component={Topics}
-          allowedRoles={[UserRole.TEACHER]}
+          allowedRoles={[UserRole.SUPERVISOR]}
         />
         <ProtectedRoute
           path="/student-topics"
@@ -70,9 +70,9 @@ function Router() {
           allowedRoles={[UserRole.ADMIN, UserRole.COORDINATOR]}
         />
         <ProtectedRoute
-          path="/teacher-evaluations"
-          component={TeacherEvaluations}
-          allowedRoles={[UserRole.TEACHER]}
+          path="/supervisor-evaluations"
+          component={SupervisorEvaluations}
+          allowedRoles={[UserRole.SUPERVISOR]}
         />
         <ProtectedRoute
           path="/student-groups"

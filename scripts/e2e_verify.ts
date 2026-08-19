@@ -39,9 +39,9 @@ async function request(method: string, path: string, body?: any, asUser?: string
 const USERS = {
     admin: { username: 'admin', password: 'Admin@123', role: 'admin', firstName: 'Admin', lastName: 'User', email: 'admin@test.com', department: 'Admin', enrollmentNumber: 'ADMIN001' },
     coord: { username: 'coord', password: 'password', role: 'coordinator', firstName: 'Coord', lastName: 'One', email: 'coord@test.com', department: 'CS', enrollmentNumber: 'COORD001' },
-    fac_1: { username: 'fac_1', password: 'password', role: 'teacher', firstName: 'Fac', lastName: 'One', email: 'fac1@test.com', department: 'CS', enrollmentNumber: 'FAC001' },
-    fac_2: { username: 'fac_2', password: 'password', role: 'teacher', firstName: 'Fac', lastName: 'Two', email: 'fac2@test.com', department: 'CS', enrollmentNumber: 'FAC002' },
-    fac_3: { username: 'fac_3', password: 'password', role: 'teacher', firstName: 'Fac', lastName: 'Three', email: 'fac3@test.com', department: 'CS', enrollmentNumber: 'FAC003' },
+    fac_1: { username: 'fac_1', password: 'password', role: 'supervisor', firstName: 'Fac', lastName: 'One', email: 'fac1@test.com', department: 'CS', enrollmentNumber: 'FAC001' },
+    fac_2: { username: 'fac_2', password: 'password', role: 'supervisor', firstName: 'Fac', lastName: 'Two', email: 'fac2@test.com', department: 'CS', enrollmentNumber: 'FAC002' },
+    fac_3: { username: 'fac_3', password: 'password', role: 'supervisor', firstName: 'Fac', lastName: 'Three', email: 'fac3@test.com', department: 'CS', enrollmentNumber: 'FAC003' },
 };
 
 // Students 1-9
