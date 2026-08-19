@@ -6,6 +6,7 @@
 2. **Notification Routing Rules**: Advanced logic applied so only relevant stakeholders receive notifications (e.g. students don't see topic approvals; admins see coordinator modifications).
 3. **Interactive Dashboard Widgets**: Dashboard StatsCards are now clickable, routing users directly to respective detail pages with hover animations.
 4. **Windows Server Setup**: Created `start_server.bat` for one-click production deployments on Windows Servers.
+5. **UI & Theming Revamp**: Overhauled the color palette to ensure AAA high-contrast standards for users with poor eyesight. Removed the `shadcn-theme-json` plugin and manually implemented a unified slate-based color scheme across both Light and Dark themes to ensure perfect visual consistency.
 
 ## Version 1.1.1
 
