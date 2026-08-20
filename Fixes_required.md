@@ -78,6 +78,14 @@ This document outlines suggested architectural, security, and maintenance improv
 
 ---
 
+## ✅ Completed (v1.4.1) Hotfixes
+
+### Bug Fixes
+- [x] **Frontend Array Mapping Crash (`.map is not a function`)**: Fixed a downstream bug caused by v1.4.0 server-side pagination. Frontend tables (`projects.tsx`, `user-management.tsx`, `track-progress.tsx`, etc.) were expecting arrays but received `PaginatedResponse` objects. Updated the React Query `queryFn` extractors to safely parse `.data || data`.
+- [x] **Vite Build Configuration Error**: Fixed a build failure caused by `react-router-dom` missing from dependencies despite being included in `vite.config.ts` manual chunks. Replaced with `wouter` to match the project's actual router.
+
+---
+
 ## 🔴 Remaining / New Improvements
 
 ### 1. Authentication Modernization
