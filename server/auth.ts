@@ -64,7 +64,7 @@ export function setupAuth(app: Express, storage: DBStorage) {
     store: storage.sessionStore,
     rolling: true, // Extend session on every request (inactivity timeout)
     cookie: {
-      maxAge: 5 * 60 * 1000, // 5 minutes inactivity limit
+      maxAge: 15 * 60 * 1000, // 15 minutes inactivity limit
     }
   };
 
