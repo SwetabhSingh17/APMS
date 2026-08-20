@@ -21,7 +21,9 @@
 ## ✨ Key Features
 
 - **Role-Based Access Control** — Four distinct roles: Admin, Coordinator, Supervisor, Student  
-- **Project Topic Workflow** — Supervisors submit topics → Coordinators approve/reject → Students select  
+- **Project Topic Workflows** — Dynamic selection paths based on student course:
+  - **BCA**: Supervisors submit topics → Coordinators approve → Students select.
+  - **MCA**: Coordinators assign Supervisors → Students suggest topics → Supervisors endorse → Coordinators approve.
 - **Course Segregation (BCA / MCA)** — Strict isolation of student accounts, project topics, and project teams based on their registered course.
 - **Project Team Management** — Create project teams, invite members, assign supervisor mentors. Constraints strictly enforced (BCA: 2-5 members, MCA: 1-2 members). Admins & Coordinators have exclusive ability to manage team members directly and form single-member BCA teams.
 - **Manage Project** — Admins & Coordinators can view all project teams and manually reassign supervisors  
@@ -50,13 +52,17 @@ graph TD
     classDef output fill:#be185d,stroke:#fbcfe8,stroke-width:2px,color:#fff;
 
     %% Nodes
-    A[Student]:::user -->|Submit Topic| B(Topic Proposal)
+    A[Student]:::user -->|Submit Topic (MCA)| B(Topic Proposal)
+    A -->|Select Topic (BCA)| B
     A -->|Form Team| C(Project Team)
     
-    D[Supervisor]:::user -->|Evaluate| E(Project Milestone)
+    D[Supervisor]:::user -->|Submit Topic (BCA)| B
+    D -->|Endorse Topic (MCA)| B
+    D -->|Evaluate| E(Project Milestone)
     D -->|Grade| F[Final Assessment]:::output
     
     G[Coordinator/Admin]:::user -->|Approve| B
+    G -->|Assign Supervisor (MCA)| C
     G -->|Monitor| H(Progress Tracking)
     
     B -->|Verified| I{Core Database}:::core
