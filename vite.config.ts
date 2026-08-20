@@ -30,7 +30,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-react': ['react', 'react-dom', 'wouter'],
           'vendor-ui': ['lucide-react', 'framer-motion', 'recharts'],
           'vendor-utils': ['date-fns', 'xlsx', 'mermaid']
         }

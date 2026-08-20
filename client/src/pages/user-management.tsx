@@ -78,7 +78,12 @@ export default function UserManagement() {
 
   const { data: users, isLoading } = useQuery<UserData[]>({
     queryKey: [`/api/users${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
-    enabled: !!user && (user.role === UserRole.ADMIN || user.role === UserRole.COORDINATOR)
+    enabled: !!user && (user.role === UserRole.ADMIN || user.role === UserRole.COORDINATOR),
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/users${getCourseQuery() ? `?${getCourseQuery()}` : ''}`);
+      const data = await response.json();
+      return data.data || data;
+    }
   });
 
   // Define form schema

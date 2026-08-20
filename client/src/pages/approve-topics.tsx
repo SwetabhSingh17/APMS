@@ -42,6 +42,11 @@ export default function ApproveTopics() {
   const { data: approvedTopics = [], isLoading: isLoadingApproved } = useQuery<ProjectTopic[]>({
     queryKey: [`/api/topics/approved${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
     enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN),
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/topics/approved${getCourseQuery() ? `?${getCourseQuery()}` : ''}`);
+      const data = await response.json();
+      return data.data || data;
+    },
     onSuccess: (data: ProjectTopic[]) => {
       console.log('Received approved topics:', data);
     }

@@ -70,7 +70,7 @@ export default function Projects() {
       const response = await apiRequest("GET", `/api/projects${getCourseQuery() ? `?${getCourseQuery()}` : ''}`);
       const data = await response.json();
       console.log('All projects loaded:', data);
-      return data;
+      return data.data || data;
     },
     enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN || user.role === UserRole.SUPERVISOR)
   });

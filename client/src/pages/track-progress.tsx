@@ -39,8 +39,8 @@ export default function TrackProgress() {
     queryKey: [`/api/projects${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
     enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN),
     queryFn: async () => {
-      const res: AxiosResponse<ProjectWithMilestones[]> = await axios.get(`/api/projects${getCourseQuery() ? `?${getCourseQuery()}` : ''}`);
-      return res.data;
+      const res: AxiosResponse<any> = await axios.get(`/api/projects${getCourseQuery() ? `?${getCourseQuery()}` : ''}`);
+      return res.data?.data || res.data;
     }
   });
 

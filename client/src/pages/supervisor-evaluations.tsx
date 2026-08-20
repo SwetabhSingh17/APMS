@@ -65,7 +65,7 @@ export default function SupervisorEvaluations() {
       const response = await apiRequest("GET", `/api/projects/supervisor${getCourseQuery() ? `?${getCourseQuery()}` : ''}`);
       const data = await response.json();
       console.log('Received supervisor projects:', data);
-      return data;
+      return data.data || data;
     }
   });
 
