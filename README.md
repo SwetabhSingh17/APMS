@@ -52,17 +52,17 @@ graph TD
     classDef output fill:#be185d,stroke:#fbcfe8,stroke-width:2px,color:#fff;
 
     %% Nodes
-    A[Student]:::user -->|Submit Topic (MCA)| B(Topic Proposal)
-    A -->|Select Topic (BCA)| B
+    A[Student]:::user -->|Submit Topic - MCA| B(Topic Proposal)
+    A -->|Select Topic - BCA| B
     A -->|Form Team| C(Project Team)
     
-    D[Supervisor]:::user -->|Submit Topic (BCA)| B
-    D -->|Endorse Topic (MCA)| B
+    D[Supervisor]:::user -->|Submit Topic - BCA| B
+    D -->|Endorse Topic - MCA| B
     D -->|Evaluate| E(Project Milestone)
     D -->|Grade| F[Final Assessment]:::output
     
     G[Coordinator/Admin]:::user -->|Approve| B
-    G -->|Assign Supervisor (MCA)| C
+    G -->|Assign Supervisor - MCA| C
     G -->|Monitor| H(Progress Tracking)
     
     B -->|Verified| I{Core Database}:::core
