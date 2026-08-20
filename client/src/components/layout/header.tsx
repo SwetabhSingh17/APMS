@@ -8,6 +8,7 @@ import { NotificationDropdown } from "@/components/notifications/notification-dr
 import { useCourseFilter } from "@/hooks/course-filter-context";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserRole } from "@shared/schema";
+import { ContextPill } from "./context-pill";
 
 type HeaderProps = {
   onToggleSidebar: () => void;
@@ -74,8 +75,11 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
             <h2 className="text-xl font-semibold text-foreground">{title}</h2>
           </div>
         </div>
+        <div className="flex-1 flex justify-center pointer-events-none absolute left-0 right-0 top-3">
+          <ContextPill />
+        </div>
         
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 relative z-10">
           {user && [UserRole.ADMIN, UserRole.COORDINATOR, UserRole.SUPERVISOR].includes(user.role as UserRole) && (
             <div className="mr-2">
               <Select value={courseFilter} onValueChange={(v: any) => setCourseFilter(v)}>

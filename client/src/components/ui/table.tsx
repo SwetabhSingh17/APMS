@@ -1,4 +1,5 @@
 import * as React from "react"
+import { motion } from "framer-motion"
 
 import { cn } from "@/lib/utils"
 
@@ -54,16 +55,25 @@ TableFooter.displayName = "TableFooter"
 const TableRow = React.forwardRef<
   HTMLTableRowElement,
   React.HTMLAttributes<HTMLTableRowElement>
->(({ className, ...props }, ref) => (
-  <tr
-    ref={ref}
-    className={cn(
-      "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
-      className
-    )}
-    {...props}
-  />
-))
+>(({ className, ...props }, ref) => {
+  const MotionTr = motion.create("tr");
+  return (
+    <MotionTr
+      ref={ref}
+      whileHover={{ 
+        scale: 1.005, 
+        backgroundColor: "hsl(var(--primary) / 0.05)",
+        boxShadow: "inset 0 0 15px hsl(var(--primary) / 0.1), 0 4px 12px rgba(0,0,0,0.05)",
+        transition: { type: "spring", stiffness: 400, damping: 25 } 
+      }}
+      className={cn(
+        "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted relative z-0 hover:z-10",
+        className
+      )}
+      {...(props as any)}
+    />
+  )
+})
 TableRow.displayName = "TableRow"
 
 const TableHead = React.forwardRef<
