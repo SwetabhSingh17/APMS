@@ -1,15 +1,24 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useIsFetching, useIsMutating } from "@tanstack/react-query";
-import { Loader2, Bell, CheckCircle2 } from "lucide-react";
+import { Loader2, Bell, CheckCircle2, AlertCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export function ContextPill() {
   const isFetching = useIsFetching();
   const isMutating = useIsMutating();
-  const [status, setStatus] = useState<"idle" | "syncing" | "notification" | "success">("idle");
+  const [status, setStatus] = useState<"idle" | "syncing" | "notification" | "success" | "toast">("idle");
   const [message, setMessage] = useState("");
+  const { toasts } = useToast();
+  const currentToast = toasts[0];
   
   useEffect(() => {
+    if (currentToast) {
+      setStatus("toast");
+      setMessage(String(currentToast.title || currentToast.description || "Notification"));
+      return;
+    }
+
     if (isFetching > 0 || isMutating > 0) {
       setStatus("syncing");
       setMessage("Syncing State...");
@@ -21,10 +30,11 @@ export function ContextPill() {
         setStatus("idle");
       }, 2000);
       return () => clearTimeout(timer);
+    } else if (status === "toast") {
+      setStatus("idle");
     }
-  }, [isFetching, isMutating]);
+  }, [isFetching, isMutating, currentToast]);
 
-  // Simulate a random incoming notification for demonstration of the Spatial OS feel
   useEffect(() => {
     const interval = setInterval(() => {
       if (status === "idle" && Math.random() > 0.7) {
@@ -73,7 +83,17 @@ export function ContextPill() {
                   <span className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-destructive rounded-full animate-pulse" />
                 </div>
               )}
-              <span className="text-xs font-medium text-foreground tracking-wide">
+              {status === "toast" && currentToast && (
+                currentToast.variant === "destructive" ? (
+                  <AlertCircle className="w-3.5 h-3.5 text-destructive" />
+                ) : (
+                  <div className="relative">
+                    <Bell className="w-3.5 h-3.5 text-primary" />
+                    <span className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                  </div>
+                )
+              )}
+              <span className="text-xs font-medium text-foreground tracking-wide truncate max-w-[300px]">
                 {message}
               </span>
             </motion.div>

@@ -109,7 +109,6 @@ function App() {
           <AuthProvider>
             <CourseFilterProvider>
               <Router />
-              <Toaster />
             </CourseFilterProvider>
           </AuthProvider>
         </ThemeProvider>
