@@ -64,7 +64,7 @@ const TableRow = React.forwardRef<
         scale: 1.005, 
         backgroundColor: "hsl(var(--primary) / 0.05)",
         boxShadow: "inset 0 0 15px hsl(var(--primary) / 0.1), 0 4px 12px rgba(0,0,0,0.05)",
-        transition: { type: "spring", stiffness: 400, damping: 25 } 
+        transition: { type: "spring", stiffness: 100, damping: 20 } 
       }}
       className={cn(
         "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted relative z-0 hover:z-10",

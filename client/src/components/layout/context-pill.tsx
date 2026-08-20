@@ -50,7 +50,7 @@ export function ContextPill() {
           paddingRight: status === "idle" ? 0 : 16,
           opacity: status === "idle" ? 0.3 : 1,
         }}
-        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        transition={{ type: "spring", stiffness: 100, damping: 25 }}
         className={`flex items-center justify-center overflow-hidden backdrop-blur-xl shadow-[0_4px_12px_rgba(0,0,0,0.1)] border border-white/20 
           ${status === "idle" ? "bg-foreground" : "bg-background/80 dark:bg-black/60"}
         `}

@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext } from "react";
+import { createContext, ReactNode, useContext, useState } from "react";
 import {
   useQuery,
   useMutation,
@@ -7,6 +7,7 @@ import {
 import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { AuthSplash } from "@/components/layout/auth-splash";
 
 type AuthContextType = {
   user: SelectUser | null;
@@ -23,6 +24,9 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
+  const [splashState, setSplashState] = useState<"idle" | "login" | "logout">("idle");
+  const [splashUser, setSplashUser] = useState<string>("");
+  
   const {
     data: user,
     error,
@@ -38,11 +42,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return await res.json();
     },
     onSuccess: (user: SelectUser) => {
+      setSplashUser(user.username);
+      setSplashState("login");
       queryClient.setQueryData(["/api/user"], user);
       toast({
         title: "Login successful",
         description: `Welcome back, ${user.firstName}!`,
       });
+      setTimeout(() => setSplashState("idle"), 2500);
     },
     onError: (error: Error) => {
       toast({
@@ -76,6 +83,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
+      setSplashState("logout");
+      await new Promise(resolve => setTimeout(resolve, 1500));
       await apiRequest("POST", "/api/logout");
     },
     onSuccess: () => {
@@ -83,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       toast({
         title: "Logged out successfully",
       });
+      setTimeout(() => setSplashState("idle"), 500);
     },
     onError: (error: Error) => {
       toast({
@@ -104,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         registerMutation,
       }}
     >
+      <AuthSplash isVisible={splashState !== "idle"} type={splashState} username={splashUser} />
       {children}
     </AuthContext.Provider>
   );
