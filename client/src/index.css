@@ -86,4 +86,41 @@
   body {
     @apply font-sans antialiased bg-background text-foreground transition-colors duration-300;
   }
+
+  .mesh-bg {
+    background-color: hsl(var(--background));
+    background-image: 
+      radial-gradient(at 40% 20%, hsla(250, 100%, 70%, 0.4) 0px, transparent 50%),
+      radial-gradient(at 80% 0%, hsla(320, 100%, 70%, 0.4) 0px, transparent 50%),
+      radial-gradient(at 0% 50%, hsla(190, 100%, 70%, 0.4) 0px, transparent 50%),
+      radial-gradient(at 80% 50%, hsla(40, 100%, 70%, 0.3) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, hsla(10, 100%, 70%, 0.3) 0px, transparent 50%),
+      radial-gradient(at 80% 100%, hsla(250, 100%, 70%, 0.4) 0px, transparent 50%),
+      radial-gradient(at 0% 0%, hsla(190, 100%, 70%, 0.3) 0px, transparent 50%);
+    background-size: 200% 200%;
+    animation: mesh-movement 15s ease infinite alternate;
+  }
+
+  .dark .mesh-bg {
+    background-image: 
+      radial-gradient(at 40% 20%, hsla(217, 91%, 65%, 0.15) 0px, transparent 50%),
+      radial-gradient(at 80% 0%, hsla(160, 60%, 45%, 0.15) 0px, transparent 50%),
+      radial-gradient(at 0% 50%, hsla(30, 80%, 55%, 0.1) 0px, transparent 50%),
+      radial-gradient(at 80% 50%, hsla(280, 65%, 60%, 0.15) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, hsla(340, 75%, 55%, 0.1) 0px, transparent 50%),
+      radial-gradient(at 80% 100%, hsla(217, 91%, 65%, 0.15) 0px, transparent 50%),
+      radial-gradient(at 0% 0%, hsla(160, 60%, 45%, 0.1) 0px, transparent 50%);
+  }
+
+  @keyframes mesh-movement {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
 }

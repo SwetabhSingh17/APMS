@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { FileText, CheckCircle, Clock, AlertTriangle, CheckSquare, Users, Bell, AlertCircle, Download, Trash2, Database } from "lucide-react";
 import MainLayout from "@/components/layout/main-layout";
 import StatsCard from "@/components/dashboard/stats-card";
-import ProgressBar from "@/components/dashboard/progress-bar";
+import Progress3D from "@/components/dashboard/progress-3d";
 import ActivityItem from "@/components/dashboard/activity-item";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -367,28 +367,7 @@ export default function Dashboard() {
               </TabsContent>
 
               <TabsContent value="projectProgress" className="p-4">
-                <div className="space-y-4">
-                  <ProgressBar
-                    label="Topic Selection Phase"
-                    percentage={stats?.projectPhases?.topicSelection || 0}
-                    color="bg-secondary"
-                  />
-                  <ProgressBar
-                    label="Research & Planning"
-                    percentage={stats?.projectPhases?.research || 0}
-                    color="bg-primary"
-                  />
-                  <ProgressBar
-                    label="Implementation"
-                    percentage={stats?.projectPhases?.implementation || 0}
-                    color="bg-accent"
-                  />
-                  <ProgressBar
-                    label="Testing & Documentation"
-                    percentage={stats?.projectPhases?.testing || 0}
-                    color="bg-destructive"
-                  />
-                </div>
+                  <Progress3D stats={stats?.projectPhases as any} />
 
 
 
@@ -413,28 +392,7 @@ export default function Dashboard() {
               <CardTitle className="text-lg font-semibold">Project Status Overview</CardTitle>
             </CardHeader>
             <CardContent className="p-4">
-              <div className="space-y-4">
-                <ProgressBar
-                  label="Topic Selection Phase"
-                  percentage={stats?.projectPhases?.topicSelection || 0}
-                  color="bg-secondary"
-                />
-                <ProgressBar
-                  label="Research & Planning"
-                  percentage={stats?.projectPhases?.research || 0}
-                  color="bg-primary"
-                />
-                <ProgressBar
-                  label="Implementation"
-                  percentage={stats?.projectPhases?.implementation || 0}
-                  color="bg-accent"
-                />
-                <ProgressBar
-                  label="Testing & Documentation"
-                  percentage={stats?.projectPhases?.testing || 0}
-                  color="bg-destructive"
-                />
-              </div>
+                <Progress3D stats={stats?.projectPhases as any} />
 
 
             </CardContent>
