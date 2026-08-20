@@ -58,6 +58,22 @@ This document outlines suggested architectural, security, and maintenance improv
 
 ---
 
+---
+
+## ✅ Completed (v1.4.0)
+
+### MCA Topic Selection Workflow
+- [x] **MCA Student Suggestions** — MCA students can now propose multiple topics directly to their assigned supervisor.
+- [x] **Supervisor Endorsement** — Supervisors have a dedicated tab to review, endorse, or reject topics proposed by their MCA students.
+- [x] **Auto-Project Assignment** — When a Coordinator or Admin approves an endorsed MCA topic, the system automatically transitions the project status to active.
+
+### Performance
+- [x] **Server-Side Pagination** — Implemented for large list endpoints to reduce payload size.
+- [x] **API Response Caching** — Added `Cache-Control` headers for read-heavy endpoints like `/api/topics/approved`.
+- [x] **Bundle Size Optimization** — Audited and optimized client bundle dependencies.
+
+---
+
 ## 🔴 Remaining / New Improvements
 
 ### 1. Authentication Modernization
@@ -83,9 +99,6 @@ This document outlines suggested architectural, security, and maintenance improv
 - **Form Validation UX**: Ensure all forms display inline validation errors as the user types (not just on submit), using `react-hook-form`'s `mode: 'onBlur'` or `mode: 'onChange'`.
 
 ### 5. Performance
-- [x] **Server-Side Pagination**: Large list endpoints (`getAllUsers`, `getAllTopics`, `getAllProjects`) currently return the entire dataset. Implement cursor-based or offset pagination to reduce payload size and improve response times.
-- [x] **API Response Caching**: Add cache headers (`Cache-Control`, `ETag`) for read-heavy endpoints like `/api/topics/approved` to reduce redundant database queries.
-- [x] **Bundle Size Optimization**: Audit the client bundle with `npx vite-bundle-visualizer`. Consider lazy-loading heavier dependencies like `recharts`, `xlsx`, and `mermaid` only on the pages that need them.
 - **Image Optimization**: If profile pictures or file uploads are added in the future, implement server-side compression and responsive image serving.
 
 ### 6. DevOps & Deployment

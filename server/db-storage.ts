@@ -124,6 +124,28 @@ export class DBStorage {
     return (await db.select().from(projectTopics).where(eq(projectTopics.submittedById, supervisorId))) as ProjectTopic[];
   }
 
+  async getTopicsForSupervisorApproval(supervisorId: number): Promise<ProjectTopic[]> {
+    const rows = await db.select({
+      topic: projectTopics,
+      submitter: users,
+      group: studentGroups
+    })
+    .from(projectTopics)
+    .innerJoin(users, eq(projectTopics.submittedById, users.id))
+    .innerJoin(studentGroups, eq(users.groupId, studentGroups.id))
+    .where(and(
+       eq(projectTopics.status, "pending_supervisor"), 
+       eq(projectTopics.isDeleted, false),
+       eq(studentGroups.supervisorId, supervisorId)
+    ));
+
+    return rows.map(r => ({
+      ...r.topic,
+      submittedBy: r.submitter as any,
+      groupName: r.group.name
+    })) as ProjectTopic[];
+  }
+
   async getPendingTopics(): Promise<ProjectTopic[]> {
     const rows = await db.select({
       topic: projectTopics,
@@ -189,7 +211,7 @@ export class DBStorage {
       for (const admin of admins) {
         await this.createNotification({
           userId: admin.id,
-          title: "Topic Approved by Coordinator",
+          title: "Topic Approved by Coordinator/Admin",
           message: `Topic "${topic.title}" was approved.`
         });
       }
@@ -208,6 +230,14 @@ export class DBStorage {
 
   async updateProjectTopic(id: number, data: InsertProjectTopic): Promise<ProjectTopic> {
     const [topic] = await db.update(projectTopics).set(data).where(eq(projectTopics.id, id)).returning();
+    return topic as ProjectTopic;
+  }
+
+  async updateProjectTopicStatus(id: number, status: string, feedback?: string): Promise<ProjectTopic> {
+    const [topic] = await db.update(projectTopics)
+      .set({ status, feedback })
+      .where(eq(projectTopics.id, id))
+      .returning();
     return topic as ProjectTopic;
   }
 

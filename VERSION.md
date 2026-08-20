@@ -1,6 +1,18 @@
 # Version History
 
-## Version 1.3.0 (Current)
+## Version 1.4.0 (Current)
+### MCA Topic Selection Workflow
+1. **Dynamic Workflows by Course**: Introduced distinct topic selection workflows for BCA and MCA students.
+2. **MCA Student Suggestions**: MCA students can now propose multiple topics directly to their assigned supervisor.
+3. **Supervisor Endorsement**: Supervisors have a dedicated "Student Suggestions" tab to review, endorse, or reject topics proposed by their MCA students.
+4. **Auto-Project Assignment**: When a Coordinator or Admin approves an endorsed MCA topic, the system automatically transitions the project status to active, assigning it to the student.
+5. **Real-Time Notifications**: Integrated WebSocket notifications to instantly alert supervisors of new student suggestions, and students of endorsement/approval decisions.
+
+### Performance & Accessibility Enhancements
+1. **API Response Caching**: Added cache headers for read-heavy endpoints to reduce database queries.
+2. **Accessibility Audit**: Ensured proper ARIA labels, keyboard navigation, and WCAG compliance across the application.
+
+## Version 1.3.0
 ### Course Segregation (BCA / MCA)
 1. **Schema Update**: Added mandatory `course` field (BCA or MCA) to `users` (Student roles) and `project_topics` schema.
 2. **Context-Aware Filtering**: Built a global `CourseFilterContext` accessible via a UI dropdown switch for Admins, Coordinators, and Supervisors to toggle the entire application view between BCA and MCA context.

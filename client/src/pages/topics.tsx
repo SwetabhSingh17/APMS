@@ -44,6 +44,12 @@ export default function Topics() {
     enabled: !!user && user.role === UserRole.SUPERVISOR
   });
 
+  // Fetch topics suggested by students for supervisor approval
+  const { data: studentSuggestions = [], isLoading: isLoadingSuggestions } = useQuery<ProjectTopic[]>({
+    queryKey: ["/api/topics/supervisor-pending"],
+    enabled: !!user && user.role === UserRole.SUPERVISOR
+  });
+
   // Form schema
   const topicFormSchema = insertProjectTopicSchema.extend({
     technology: z.string().min(1, "Technology is required"),
@@ -149,6 +155,31 @@ export default function Topics() {
     }
   });
 
+  const supervisorActionMutation = useMutation({
+    mutationFn: async ({ id, action }: { id: number, action: 'endorse' | 'reject' }) => {
+        const res = await apiRequest("PATCH", `/api/topics/${id}/supervisor-action`, { action });
+        const data = await res.json();
+        if (!res.ok) {
+           throw new Error(data.message || "Failed to update action");
+        }
+        return data;
+    },
+    onSuccess: () => {
+        toast({
+            title: "Action successful",
+            description: "The topic suggestion has been updated.",
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/topics/supervisor-pending"] });
+    },
+    onError: (error: Error) => {
+        toast({
+            title: "Action failed",
+            description: error.message,
+            variant: "destructive",
+        });
+    }
+  });
+
   const handleDeleteTopic = (id: number) => {
     if (window.confirm("Are you sure you want to delete this topic? This action cannot be undone.")) {
       deleteTopicMutation.mutate(id);
@@ -203,6 +234,7 @@ export default function Topics() {
           <TabsTrigger value="pending">Pending ({pendingTopics.length})</TabsTrigger>
           <TabsTrigger value="approved">Approved ({approvedTopics.length})</TabsTrigger>
           <TabsTrigger value="rejected">Rejected ({rejectedTopics.length})</TabsTrigger>
+          <TabsTrigger value="student-suggestions">Student Suggestions ({studentSuggestions.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
@@ -259,6 +291,31 @@ export default function Topics() {
               />
             ))}
           </div>
+        </TabsContent>
+
+        <TabsContent value="student-suggestions" className="space-y-4">
+          {isLoadingSuggestions ? (
+            <TopicsSkeleton />
+          ) : studentSuggestions.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6 pb-6 text-center text-muted-foreground">
+                No student suggestions pending for your review.
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {studentSuggestions.map(topic => (
+                <TopicCard
+                  key={topic.id}
+                  topic={topic}
+                  onDelete={handleDeleteTopic}
+                  onEndorse={() => supervisorActionMutation.mutate({ id: topic.id, action: 'endorse' })}
+                  onReject={() => supervisorActionMutation.mutate({ id: topic.id, action: 'reject' })}
+                  isSuggestion={true}
+                />
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
@@ -519,9 +576,12 @@ type TopicCardProps = {
   topic: ProjectTopic;
   onEdit?: () => void;
   onDelete: (id: number) => void;
+  onEndorse?: () => void;
+  onReject?: () => void;
+  isSuggestion?: boolean;
 };
 
-function TopicCard({ topic, onEdit, onDelete }: TopicCardProps) {
+function TopicCard({ topic, onEdit, onDelete, onEndorse, onReject, isSuggestion }: TopicCardProps) {
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="pb-3">
@@ -537,6 +597,9 @@ function TopicCard({ topic, onEdit, onDelete }: TopicCardProps) {
           <div>
             <p className="text-muted-foreground">Status</p>
             <div>
+              {topic.status === 'pending_supervisor' && (
+                <span className="px-2 py-1 bg-blue-500/20 text-blue-600 text-xs rounded-full">Pending Your Review</span>
+              )}
               {topic.status === 'pending' && (
                 <span className="px-2 py-1 bg-accent/20 text-accent-foreground text-xs rounded-full">Pending</span>
               )}
@@ -560,24 +623,47 @@ function TopicCard({ topic, onEdit, onDelete }: TopicCardProps) {
           )}
         </div>
         <div className="mt-4 space-y-2">
-          {topic.status === 'pending' && onEdit && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={onEdit}
-            >
-              Edit Topic
-            </Button>
+          {isSuggestion && topic.status === 'pending_supervisor' ? (
+             <div className="flex gap-2">
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="w-full"
+                  onClick={onEndorse}
+                >
+                  Endorse
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="w-full"
+                  onClick={onReject}
+                >
+                  Reject
+                </Button>
+             </div>
+          ) : (
+            <>
+              {topic.status === 'pending' && onEdit && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={onEdit}
+                >
+                  Edit Topic
+                </Button>
+              )}
+              <Button
+                variant="destructive"
+                size="sm"
+                className="w-full"
+                onClick={() => onDelete(topic.id)}
+              >
+                Delete Topic
+              </Button>
+            </>
           )}
-          <Button
-            variant="destructive"
-            size="sm"
-            className="w-full"
-            onClick={() => onDelete(topic.id)}
-          >
-            Delete Topic
-          </Button>
         </div>
       </CardContent>
     </Card>
