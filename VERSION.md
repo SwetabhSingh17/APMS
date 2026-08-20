@@ -1,6 +1,14 @@
 # Version History
 
-## Version 1.4.0 (Current)
+## Version 1.5.0 (Current)
+### Cybertruck Spatial UI Enhancements
+1. **Spatial / Glassmorphic UI**: Overhauled the design system with dynamic backdrop filters, glassmorphism, and fluid micro-animations for a modern Spatial OS feel.
+2. **Animated Auth Splash Screens**: Added professional, cinematic splash screens (e.g., "WELCOME_ [USERNAME]") that intercept login and logout events with a 2.5s delay.
+3. **Dynamic Context Pill**: Replaced traditional bottom-toast notifications with a floating, iOS Dynamic Island-inspired context pill at the top of the UI that expands to display incoming notifications and global toasts.
+4. **Holographic Data Grids**: Upgraded standard data tables to holographic grids featuring perspective tilting via Framer Motion 3D transforms when hovered.
+5. **Physics-Based Micro-Interactions**: Integrated advanced physics-based spring animations for button presses, hover states, and modal interactions to make the interface feel heavy and responsive.
+
+## Version 1.4.1
 ### MCA Topic Selection Workflow
 1. **Dynamic Workflows by Course**: Introduced distinct topic selection workflows for BCA and MCA students.
 2. **MCA Student Suggestions**: MCA students can now propose multiple topics directly to their assigned supervisor.

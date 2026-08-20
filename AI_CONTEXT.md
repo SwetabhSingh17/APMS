@@ -82,6 +82,7 @@ APMS includes a robust real-time notification system powered by WebSockets.
 3. **Styling**: Tailwind CSS is used extensively alongside Radix UI primitives encapsulated in `shadcn/ui` components.
 4. **Form Handling & Validation**: `react-hook-form` is used in combination with `@hookform/resolvers/zod`. Zod schemas defined in `shared/schema.ts` act as the single source of truth for both frontend form validation and backend request validation.
 5. **Database Queries**: All database interactions should go through the Drizzle ORM. Raw SQL is discouraged. Data access logic is encapsulated in `server/db-storage.ts`. Soft deletes are implemented via the `isDeleted` column across major tables, so queries must filter `eq(table.isDeleted, false)`.
+6. **UI Design System (Spatial OS)**: The application features a highly premium, Cybertruck/Spatial OS-inspired aesthetic utilizing intense glassmorphism, dynamic backdrop filters, holographic data grids, and physics-based spring animations via `framer-motion`. Notifications are routed through a dynamic floating Context Pill rather than traditional bottom toasts, and authentication events feature cinematic splash screens with delayed transitions.
 
 ---
 

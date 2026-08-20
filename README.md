@@ -34,6 +34,7 @@
 - **System Management** — Database export/import, Excel reports, full reset capabilities  
 - **Security Hardened** — Helmet HTTP headers, rate-limited auth endpoints, soft-delete data retention  
 - **Error Resilient** — Global React Error Boundaries with graceful fallback UI  
+- **Cybertruck Spatial UI** — Glassmorphism, dynamic context pill (iOS-style), holographic data grids, physics-based micro-interactions, and animated cinematic splash screens
 - **Dark/Light Theme** — System-aware with manual toggle  
 - **Responsive Design** — Mobile-friendly layouts with collapsible sidebar  
 
