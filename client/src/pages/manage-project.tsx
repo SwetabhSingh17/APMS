@@ -11,14 +11,17 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { User, UserRole } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Users, Search, ArrowRightLeft } from "lucide-react";
+import { Loader2, Users, Search, ArrowRightLeft, UserPlus } from "lucide-react";
 import { useCourseFilter } from "@/hooks/course-filter-context";
+import { CreateTeamDialog } from "@/components/create-team-dialog";
+import { ManageMembersDialog } from "@/components/manage-members-dialog";
 
 export default function ManageProject() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [changeSupervisorGroupId, setChangeSupervisorGroupId] = useState<number | null>(null);
+  const [manageMembersGroupId, setManageMembersGroupId] = useState<number | null>(null);
   const [selectedSupervisorId, setSelectedSupervisorId] = useState<string>("");
   const { courseFilter, getCourseQuery } = useCourseFilter();
 
@@ -93,6 +96,7 @@ export default function ManageProject() {
             <h1 className="text-3xl font-bold text-foreground">Manage Project</h1>
             <p className="text-muted-foreground mt-1">Manage and reassign supervisors to student project teams</p>
           </div>
+          <CreateTeamDialog />
         </div>
 
         {/* Search */}
@@ -235,7 +239,17 @@ export default function ManageProject() {
 
                   {/* Members List */}
                   <div>
-                    <p className="text-sm font-medium mb-2 text-muted-foreground">Team Members</p>
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="text-sm font-medium text-muted-foreground">Team Members</p>
+                      <Button variant="outline" size="sm" className="gap-2" onClick={() => setManageMembersGroupId(group.id)}>
+                        <UserPlus className="h-4 w-4" /> Manage Members
+                      </Button>
+                    </div>
+                    <ManageMembersDialog 
+                      group={group} 
+                      open={manageMembersGroupId === group.id} 
+                      onOpenChange={(open) => setManageMembersGroupId(open ? group.id : null)} 
+                    />
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
                       {group.members?.map((member: any) => (
                         <div key={member.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50 text-sm">

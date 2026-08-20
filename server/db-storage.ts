@@ -271,21 +271,26 @@ export class DBStorage {
 
 
   // Student Group operations
-  async createStudentGroup(group: InsertStudentGroup, creatorId: number, invitedEnrollmentNumbers: string[]): Promise<StudentGroup> {
+  async createStudentGroup(group: InsertStudentGroup, creatorId: number, invitedEnrollmentNumbers: string[], autoAccept: boolean = false): Promise<StudentGroup> {
     const [newGroup] = await db.insert(studentGroups).values({
       ...group,
       createdById: creatorId
     }).returning();
 
-    // Add creator as accepted member
-    await db.insert(studentGroupMembers).values({
-      userId: creatorId,
-      groupId: newGroup.id,
-      status: 'accepted'
-    });
+    const creator = await this.getUser(creatorId);
+    const isStudent = creator?.role === UserRole.STUDENT;
 
-    // Update creator's groupId in users table
-    await db.update(users).set({ groupId: newGroup.id }).where(eq(users.id, creatorId));
+    // Add creator as accepted member only if they are a student
+    if (isStudent) {
+      await db.insert(studentGroupMembers).values({
+        userId: creatorId,
+        groupId: newGroup.id,
+        status: 'accepted'
+      });
+
+      // Update creator's groupId in users table
+      await db.update(users).set({ groupId: newGroup.id }).where(eq(users.id, creatorId));
+    }
 
     // Handle invites
     if (invitedEnrollmentNumbers.length > 0) {
@@ -293,11 +298,11 @@ export class DBStorage {
 
       for (const invitedUser of invitedUsers) {
         if (invitedUser.id !== creatorId) {
-          // Add as pending member
+          // Add as pending or accepted member
           await db.insert(studentGroupMembers).values({
             userId: invitedUser.id,
             groupId: newGroup.id,
-            status: 'pending'
+            status: autoAccept ? 'accepted' : 'pending'
           });
           // Update user's groupId
           await db.update(users).set({ groupId: newGroup.id }).where(eq(users.id, invitedUser.id));
@@ -305,8 +310,10 @@ export class DBStorage {
           // Create notification
           await this.createNotification({
             userId: invitedUser.id,
-            title: "Group Invitation",
-            message: `You have been invited to join group "${newGroup.name}".`
+            title: autoAccept ? "Added to Project Team" : "Project Team Invitation",
+            message: autoAccept 
+              ? `You have been added to the project team "${newGroup.name}".`
+              : `You have been invited to join project team "${newGroup.name}".`
           });
         }
       }
@@ -334,6 +341,48 @@ export class DBStorage {
     if (!user || !user.groupId) return undefined;
 
     return this.getGroup(user.groupId);
+  }
+
+  async updateStudentGroupMembers(groupId: number, newEnrollmentNumbers: string[]): Promise<void> {
+    const group = await this.getGroup(groupId);
+    if (!group) throw new Error("Group not found");
+
+    // Fetch current members
+    const currentMembers = await this.getStudentGroupMembers(groupId);
+    const currentEnrollmentNumbers = currentMembers.map((m: any) => m.enrollmentNumber);
+
+    // Identify added and removed students
+    const addedEnrollmentNumbers = newEnrollmentNumbers.filter(en => !currentEnrollmentNumbers.includes(en));
+    const removedEnrollmentNumbers = currentEnrollmentNumbers.filter((en: string) => !newEnrollmentNumbers.includes(en));
+
+    if (removedEnrollmentNumbers.length > 0) {
+      const removedUsers = await db.select().from(users).where(inArray(users.enrollmentNumber, removedEnrollmentNumbers));
+      for (const removedUser of removedUsers) {
+        await this.removeStudentFromGroup(removedUser.id, groupId);
+        await this.createNotification({
+          userId: removedUser.id,
+          title: "Removed from Project Team",
+          message: `You have been removed from the project team "${group.name}".`
+        });
+      }
+    }
+
+    if (addedEnrollmentNumbers.length > 0) {
+      const addedUsers = await db.select().from(users).where(inArray(users.enrollmentNumber, addedEnrollmentNumbers));
+      for (const addedUser of addedUsers) {
+        await db.insert(studentGroupMembers).values({
+          userId: addedUser.id,
+          groupId: groupId,
+          status: 'accepted'
+        });
+        await db.update(users).set({ groupId: groupId }).where(eq(users.id, addedUser.id));
+        await this.createNotification({
+          userId: addedUser.id,
+          title: "Added to Project Team",
+          message: `You have been added to the project team "${group.name}".`
+        });
+      }
+    }
   }
 
   async getStudentGroupMembers(groupId: number): Promise<User[]> {

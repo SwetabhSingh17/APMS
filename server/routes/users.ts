@@ -62,4 +62,29 @@ export function registerUserRoutes(router: Router, storage: DBStorage) {
             res.status(500).json({ message: "Failed to fetch supervisors" });
         }
     });
+
+    // Get all students
+    router.get("/api/students", async (req: Request, res: Response) => {
+        if (!isAuthenticatedRequest(req)) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+        try {
+            const course = req.query.course as string | undefined;
+            let students = await storage.getUsersByRole(UserRole.STUDENT);
+            
+            if (course) {
+                students = students.filter(s => s.course === course);
+            }
+
+            // Return stripped down data for safety
+            const safeStudents = students.map(({ id, firstName, lastName, enrollmentNumber, course, department }) => ({
+                id, firstName, lastName, enrollmentNumber, course, department
+            }));
+
+            res.json(safeStudents);
+        } catch (error) {
+            console.error("Error fetching students:", error);
+            res.status(500).json({ message: "Failed to fetch students" });
+        }
+    });
 }

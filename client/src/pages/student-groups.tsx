@@ -44,7 +44,6 @@ export default function StudentGroups() {
   const { toast } = useToast();
   const [openLeaveDialog, setOpenLeaveDialog] = useState(false);
   const [openInfoDialog, setOpenInfoDialog] = useState(false);
-  const [enrollmentNumber, setEnrollmentNumber] = useState("");
   const [enrollmentNumbers, setEnrollmentNumbers] = useState<string[]>([]);
 
   // Fetch supervisors for supervisor selection
@@ -199,16 +198,7 @@ export default function StudentGroups() {
     leaveGroupMutation.mutate();
   };
 
-  const addEnrollmentNumber = () => {
-    if (enrollmentNumber && !enrollmentNumbers.includes(enrollmentNumber)) {
-      setEnrollmentNumbers([...enrollmentNumbers, enrollmentNumber]);
-      setEnrollmentNumber("");
-    }
-  };
 
-  const removeEnrollmentNumber = (number: string) => {
-    setEnrollmentNumbers(enrollmentNumbers.filter(n => n !== number));
-  };
 
 
   // --- Student View ---
@@ -576,38 +566,14 @@ export default function StudentGroups() {
 
                     <div className="space-y-4">
                       <FormLabel>Add Team Members</FormLabel>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Enter enrollment number"
-                          value={enrollmentNumber}
-                          onChange={(e) => setEnrollmentNumber(e.target.value)}
-                        />
-                        <Button type="button" onClick={addEnrollmentNumber}>
-                          Add
-                        </Button>
-                      </div>
+                      <StudentSelect
+                        selectedEnrollments={enrollmentNumbers}
+                        onChange={setEnrollmentNumbers}
+                        courseFilter={user?.course}
+                        maxSelections={user?.course === "BCA" ? 4 : (user?.course === "MCA" ? 1 : 4)}
+                      />
+                    </div>
 
-                      {enrollmentNumbers.length > 0 && (
-                        <div className="space-y-2">
-                          <p className="text-sm text-muted-foreground">
-                            Added members ({enrollmentNumbers.length}/4)
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            {enrollmentNumbers.map((number) => (
-                              <Badge key={number} variant="secondary" className="flex items-center gap-1">
-                                {number}
-                                <button
-                                  type="button"
-                                  onClick={() => removeEnrollmentNumber(number)}
-                                  className="ml-1 hover:text-destructive"
-                                >
-                                  <UserX className="h-3 w-3" />
-                                </button>
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
 
                     <Button type="submit" className="w-full">

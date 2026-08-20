@@ -23,7 +23,7 @@
 - **Role-Based Access Control** — Four distinct roles: Admin, Coordinator, Supervisor, Student  
 - **Project Topic Workflow** — Supervisors submit topics → Coordinators approve/reject → Students select  
 - **Course Segregation (BCA / MCA)** — Strict isolation of student accounts, project topics, and project teams based on their registered course.
-- **Project Team Management** — Create project teams, invite members, assign supervisor mentors  
+- **Project Team Management** — Create project teams, invite members, assign supervisor mentors. Constraints strictly enforced (BCA: 2-5 members, MCA: 1-2 members). Admins & Coordinators have exclusive ability to manage team members directly and form single-member BCA teams.
 - **Manage Project** — Admins & Coordinators can view all project teams and manually reassign supervisors  
 - **Progress Tracking** — Real-time dashboards with charts and department statistics  
 - **Project Assessments** — Supervisor grading with score and feedback  

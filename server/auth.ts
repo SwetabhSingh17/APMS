@@ -10,11 +10,11 @@ import { User as SelectUser, UserRole } from "@shared/schema";
 
 /**
  * Rate limiter for authentication endpoints (login, register).
- * Limits each IP to 5 requests per 15-minute window.
+ * Limits each IP to 1000 requests per 15-minute window.
  */
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5,
+  max: 1000,
   message: { message: "Too many attempts. Please try again after 15 minutes." },
   standardHeaders: true,
   legacyHeaders: false,

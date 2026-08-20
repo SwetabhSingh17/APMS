@@ -8,6 +8,13 @@
 4. **UI Indicators**: Added prominent Course Badges to User Management, Approve Topics, Dashboard tables, Manage Projects, and Track Progress pages to ensure clear attribution.
 5. **Registration Constraint**: Account creation (signup and admin manual creation) now strictly enforces the selection of a course for Student roles.
 
+### Project Team Management
+1. **Terminology Update**: Renamed "Group" to "Project Team" across the entire application for consistency.
+2. **Team Creation Constraints**: Implemented strict backend constraints ensuring BCA student teams must have 2 to 5 members and MCA student teams must have 1 to 2 members. Students can only team up with members in their own course.
+3. **Special Management Provision**: Admins and Coordinators are granted the exclusive ability to form a BCA team with a single student (size of 1).
+4. **Member Search & Editing**: Provided Admins and Coordinators with a powerful autocomplete member search and the ability to add, edit, or remove members in a team from the `/manage-project` page. Supervisors can edit members exclusively for teams they supervise.
+5. **Team Edit Notifications**: Integrated automated real-time notifications to Admins, Coordinators, and the relevant Supervisor whenever a team's members are modified.
+
 ## Version 1.2.0 (Current)
 ### Manual Supervisor Allotment & Manage Project
 1. **Manage Project Page**: New dedicated page (`/manage-project`) for Admins and Coordinators to view all project teams, their members, and assigned supervisors in one place.

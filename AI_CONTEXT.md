@@ -10,7 +10,7 @@ APMS is a comprehensive web-based project management system for educational inst
 
 ### Core Workflows:
 1. **Topic Proposals**: Supervisors submit project topics. Coordinators review and either approve or reject them.
-2. **Project Teams**: Students form groups (default max size: 5), invite peers, and select approved topics.
+2. **Project Teams**: Students form groups, invite peers, and select approved topics. Strict course-based size limits are enforced: BCA teams must have 2 to 5 members, while MCA teams must have 1 to 2 members. Admins and Coordinators have the exclusive privilege to create single-member BCA teams and manage team members globally.
 3. **Mentorship & Tracking**: Supervisor mentors evaluate group progress, grade milestones, and provide final assessments.
 4. **Manage Project (Supervisor Allotment)**: Admins and Coordinators can view all project teams and manually reassign their supervisors via the dedicated `/manage-project` page.
 5. **Course Segregation**: The system strictly segregates operations based on the Student's course (BCA or MCA). Students are isolated to their course context, while Admins, Coordinators, and Supervisors use a global UI toggle to switch contexts.
