@@ -41,9 +41,6 @@ export default defineConfig({
     host: '0.0.0.0', // Explicitly bind to all network interfaces
     port: 5173,
     strictPort: false,
-    hmr: {
-      protocol: 'ws',
-      host: 'localhost', // Clients will use their connection host
-    },
+    allowedHosts: true,
   },
 });
