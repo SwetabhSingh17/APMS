@@ -356,16 +356,6 @@ export default function AuthPage() {
       </Card>
 
 
-      {/* Creator Info Button */}
-      <Button
-        variant="outline"
-        size="icon"
-        className="fixed bottom-4 right-4 h-10 w-10 get-started-btn rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
-        aria-label="About us"
-        onClick={() => setLocation("/about")}
-      >
-        <Info className="h-6 w-6 text-primary" />
-      </Button>
     </div >
   );
 }

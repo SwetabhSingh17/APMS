@@ -374,20 +374,35 @@ export default function CreatorInfoPage() {
                 </div>
             </div>
 
-            {/* Sarcastic LinkedIn Footer */}
-            <div className="fixed bottom-8 right-8 z-30 pointer-events-auto">
+            {/* Sarcastic Socials Footer */}
+            <div className="fixed bottom-4 md:bottom-8 right-4 md:right-8 z-30 pointer-events-auto flex flex-col sm:flex-row gap-4">
+                <a
+                    href="https://swetabhsingh17.github.io"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group bg-white/5 hover:bg-white/10 backdrop-blur-md border border-white/10 px-4 md:px-6 py-3 md:py-4 rounded-2xl flex items-center gap-4 transition-all duration-300 hover:scale-105 hover:border-white/30 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+                >
+                    <div className="bg-purple-500/20 p-2 rounded-lg group-hover:bg-purple-500/30 transition-colors">
+                        <ExternalLink className="h-5 w-5 md:h-6 md:w-6 text-purple-400" />
+                    </div>
+                    <div className="flex flex-col text-left">
+                        <span className="text-white/60 text-[10px] md:text-xs uppercase tracking-widest font-medium group-hover:text-white/80">My Portfolio</span>
+                        <span className="text-white font-light text-xs md:text-sm">See my actual work</span>
+                    </div>
+                </a>
+
                 <a
                     href="https://www.linkedin.com/in/swetabhsingh17"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group bg-white/5 hover:bg-white/10 backdrop-blur-md border border-white/10 px-6 py-4 rounded-2xl flex items-center gap-4 transition-all duration-300 hover:scale-105 hover:border-white/30 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+                    className="group bg-white/5 hover:bg-white/10 backdrop-blur-md border border-white/10 px-4 md:px-6 py-3 md:py-4 rounded-2xl flex items-center gap-4 transition-all duration-300 hover:scale-105 hover:border-white/30 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)]"
                 >
                     <div className="bg-cyan-500/20 p-2 rounded-lg group-hover:bg-cyan-500/30 transition-colors">
-                        <Linkedin className="h-6 w-6 text-cyan-400" />
+                        <Linkedin className="h-5 w-5 md:h-6 md:w-6 text-cyan-400" />
                     </div>
-                    <div className="flex flex-col text-right">
-                        <span className="text-white/60 text-xs uppercase tracking-widest font-medium group-hover:text-white/80">Connect or Regret</span>
-                        <span className="text-white font-light text-sm">Validate my impostor syndrome <ExternalLink className="inline h-3 w-3 ml-1 opacity-50" /></span>
+                    <div className="flex flex-col text-left">
+                        <span className="text-white/60 text-[10px] md:text-xs uppercase tracking-widest font-medium group-hover:text-white/80">Connect or Regret</span>
+                        <span className="text-white font-light text-xs md:text-sm">Validate my impostor syndrome</span>
                     </div>
                 </a>
             </div>
