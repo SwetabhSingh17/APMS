@@ -91,7 +91,7 @@ export default function ManageProject() {
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Manage Project</h1>
-            <p className="text-muted-foreground mt-1">Manage and reassign supervisors to student groups</p>
+            <p className="text-muted-foreground mt-1">Manage and reassign supervisors to student project teams</p>
           </div>
         </div>
 
@@ -100,7 +100,7 @@ export default function ManageProject() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
-              placeholder="Search by group name, supervisor, student name or enrollment..."
+              placeholder="Search by team name, supervisor, student name or enrollment..."
               className="pl-10"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -111,13 +111,13 @@ export default function ManageProject() {
         {isLoadingAllGroups ? (
           <div className="flex justify-center items-center min-h-[40vh]">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <span className="ml-2">Loading groups...</span>
+            <span className="ml-2">Loading project teams...</span>
           </div>
         ) : filteredGroups.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <Users className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground">No student groups found.</p>
+              <p className="text-muted-foreground">No student project teams found.</p>
             </CardContent>
           </Card>
         ) : (
@@ -178,7 +178,7 @@ export default function ManageProject() {
                         <DialogHeader>
                           <DialogTitle>Change Supervisor for "{group.name}"</DialogTitle>
                           <DialogDescription>
-                            Select a new supervisor to assign to this group. Both the new and previous supervisor will be notified.
+                            Select a new supervisor to assign to this project team. Both the new and previous supervisor will be notified.
                           </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
@@ -235,7 +235,7 @@ export default function ManageProject() {
 
                   {/* Members List */}
                   <div>
-                    <p className="text-sm font-medium mb-2 text-muted-foreground">Group Members</p>
+                    <p className="text-sm font-medium mb-2 text-muted-foreground">Team Members</p>
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
                       {group.members?.map((member: any) => (
                         <div key={member.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50 text-sm">

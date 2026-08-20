@@ -92,7 +92,7 @@ export default function StudentGroups() {
     onSuccess: () => {
       toast({
         title: "Group created",
-        description: "Your student group has been created successfully!",
+        description: "Your project team has been created successfully!",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/student-groups/my-group"] });
       setEnrollmentNumbers([]);
@@ -217,7 +217,7 @@ export default function StudentGroups() {
       <MainLayout>
         <div className="flex justify-center items-center min-h-[60vh]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="ml-2">Loading group information...</span>
+          <span className="ml-2">Loading project team information...</span>
         </div>
       </MainLayout>
     );
@@ -232,7 +232,7 @@ export default function StudentGroups() {
             <CardHeader className="bg-primary/5">
               <div className="flex items-center gap-2 text-primary">
                 <Info className="h-5 w-5" />
-                <span className="font-semibold">Group Invitation</span>
+                <span className="font-semibold">Team Invitation</span>
               </div>
               <CardTitle className="text-2xl mt-4">You have been invited to join "{userGroup.name}"</CardTitle>
               <CardDescription>{userGroup.description}</CardDescription>
@@ -302,9 +302,9 @@ export default function StudentGroups() {
     <MainLayout>
       <div className="container mx-auto py-6">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Student Groups</h1>
+          <h1 className="text-3xl font-bold">Project Teams</h1>
 
-          {/* Info Dialog for Available Groups */}
+          {/* Info Dialog for Available Project Teams */}
           <Dialog open={openInfoDialog} onOpenChange={setOpenInfoDialog}>
             <DialogTrigger asChild>
               <Button
@@ -312,14 +312,14 @@ export default function StudentGroups() {
                 className="gap-2"
               >
                 <Info className="h-4 w-4" />
-                Available Groups Info
+                Available Project Teams Info
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Available Groups</DialogTitle>
+                <DialogTitle>Available Project Teams</DialogTitle>
                 <DialogDescription>
-                  View details about existing student groups and their members
+                  View details about existing project teams and their members
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-6 py-4">
@@ -342,7 +342,7 @@ export default function StudentGroups() {
                       <CardContent>
                         <div className="space-y-6">
                           <div>
-                            <h3 className="font-semibold mb-4">Group Members</h3>
+                            <h3 className="font-semibold mb-4">Team Members</h3>
                             <div className="grid gap-4">
                               {group.members?.map((member: User) => (
                                 <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
@@ -392,7 +392,7 @@ export default function StudentGroups() {
                   ))
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
-                    No groups available at the moment
+                    No project teams available at the moment
                   </div>
                 )}
               </div>
@@ -414,11 +414,11 @@ export default function StudentGroups() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-8">
-                  {/* Group Members Section */}
+                  {/* Team Members Section */}
                   <div>
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                       <Users className="h-5 w-5" />
-                      Group Members
+                      Team Members
                     </h3>
                     <div className="grid md:grid-cols-2 gap-4">
                       {userGroup.members?.map((member: User) => (
@@ -479,22 +479,22 @@ export default function StudentGroups() {
               </CardContent>
               <CardFooter className="justify-between border-t p-6">
                 <div className="text-sm text-muted-foreground">
-                  Project Group ID: #{userGroup.id}
+                  Project Team ID: #{userGroup.id}
                 </div>
                 <AlertDialog open={openLeaveDialog} onOpenChange={setOpenLeaveDialog}>
                   <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm">Leave Group</Button>
+                    <Button variant="destructive" size="sm">Leave Project Team</Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This action cannot be undone. You will be removed from the group.
+                        This action cannot be undone. You will be removed from the project team.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleLeaveGroup}>Leave Group</AlertDialogAction>
+                      <AlertDialogAction onClick={handleLeaveGroup}>Leave Project Team</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
@@ -506,15 +506,15 @@ export default function StudentGroups() {
             <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 text-center">
               <p className="text-yellow-600 font-medium flex items-center justify-center gap-2">
                 <Info className="h-5 w-5" />
-                Create a Group to View group Info
+                Create a Project Team to View group Info
               </p>
             </div>
 
             <Card>
               <CardHeader>
-                <CardTitle>Create New Group</CardTitle>
+                <CardTitle>Create New Project Team</CardTitle>
                 <CardDescription>
-                  Create a new student group with a minimum of 3 and maximum of 5 members.
+                  Create a new project team with a minimum of 3 and maximum of 5 members.
                   A supervisor member will be assigned as your project mentor.
                 </CardDescription>
               </CardHeader>
@@ -526,7 +526,7 @@ export default function StudentGroups() {
                       name="name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Group Name</FormLabel>
+                          <FormLabel>Team Name</FormLabel>
                           <FormControl>
                             <Input placeholder="Enter group name" {...field} />
                           </FormControl>
@@ -575,7 +575,7 @@ export default function StudentGroups() {
                     />
 
                     <div className="space-y-4">
-                      <FormLabel>Add Group Members</FormLabel>
+                      <FormLabel>Add Team Members</FormLabel>
                       <div className="flex gap-2">
                         <Input
                           placeholder="Enter enrollment number"
@@ -611,7 +611,7 @@ export default function StudentGroups() {
                     </div>
 
                     <Button type="submit" className="w-full">
-                      Create Group
+                      Create Project Team
                     </Button>
                   </form>
                 </Form>

@@ -33,11 +33,11 @@ export default function StudentTopics() {
   const { toast } = useToast();
   const [allottedAlertOpen, setAllottedAlertOpen] = useState(false);
 
-  // Fetch current user's group to check permission
+  // Fetch current user's team to check permission
   const { data: userGroup } = useQuery<StudentGroup & { myStatus: string }>({
     queryKey: ["/api/student-groups/my-group"],
     enabled: !!user,
-    retry: false, // Don't retry if 404 (not in group)
+    retry: false, // Don't retry if 404 (not in team)
   });
 
   // Fetch approved topics with categorization
@@ -57,10 +57,10 @@ export default function StudentTopics() {
   if (isGroupMember) {
     if (!isAcceptedMember) {
       canSelect = false;
-      reason = "You must accept the group invite to select a topic.";
+      reason = "You must accept the project team invite to select a topic.";
     } else if (!isCreator) {
       canSelect = false;
-      reason = "Only the group creator can select a project topic.";
+      reason = "Only the project team creator can select a project topic.";
     }
   }
 

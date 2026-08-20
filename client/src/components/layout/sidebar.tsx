@@ -108,7 +108,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?
             </Link>
             <Link href="/student-groups" onClick={isMobile ? onClose : undefined} className={linkClass("/student-groups")}>
               <Users className="w-5 h-5" />
-              <span>Groups</span>
+              <span>Project Teams</span>
             </Link>
           </>
         )}

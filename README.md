@@ -22,9 +22,9 @@
 
 - **Role-Based Access Control** — Four distinct roles: Admin, Coordinator, Supervisor, Student  
 - **Project Topic Workflow** — Supervisors submit topics → Coordinators approve/reject → Students select  
-- **Course Segregation (BCA / MCA)** — Strict isolation of student accounts, project topics, and groups based on their registered course.
-- **Student Group Management** — Create groups, invite members, assign supervisor mentors  
-- **Manage Project** — Admins & Coordinators can view all groups and manually reassign supervisors  
+- **Course Segregation (BCA / MCA)** — Strict isolation of student accounts, project topics, and project teams based on their registered course.
+- **Project Team Management** — Create project teams, invite members, assign supervisor mentors  
+- **Manage Project** — Admins & Coordinators can view all project teams and manually reassign supervisors  
 - **Progress Tracking** — Real-time dashboards with charts and department statistics  
 - **Project Assessments** — Supervisor grading with score and feedback  
 - **Real-Time Notifications** — WebSocket-powered instant notifications with role-based routing  
@@ -51,7 +51,7 @@ graph TD
 
     %% Nodes
     A[Student]:::user -->|Submit Topic| B(Topic Proposal)
-    A -->|Form Group| C(Student Group)
+    A -->|Form Team| C(Project Team)
     
     D[Supervisor]:::user -->|Evaluate| E(Project Milestone)
     D -->|Grade| F[Final Assessment]:::output
@@ -218,7 +218,7 @@ All configuration is managed through environment variables in a `.env` file at t
 | **Admin** | Full system access, user management, database operations, Excel reports, supervisor reassignment |
 | **Coordinator** | Approve/reject topics, track progress, manage users, view statistics, reassign supervisors, filter by course context |
 | **Supervisor** | Submit project topics (tied to specific course), evaluate assigned projects, view student progress |
-| **Student** | Browse & select topics specific to their course, form groups within their course, invite members, track own progress |
+| **Student** | Browse & select topics specific to their course, form project teams within their course, invite members, track own progress |
 
 ---
 

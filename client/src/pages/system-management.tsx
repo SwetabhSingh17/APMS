@@ -208,7 +208,7 @@ export default function SystemManagement() {
                     </CardHeader>
                     <CardContent>
                         <p className="text-sm text-muted-foreground mb-4">
-                            Export a detailed Excel spreadsheet with student info, projects, marks, groups, and submission status.
+                            Export a detailed Excel spreadsheet with student info, projects, marks, project teams, and submission status.
                         </p>
                         <Button className="w-full gap-2" variant="secondary" onClick={() => exportExcelMutation.mutate()} disabled={exportExcelMutation.isPending}>
                             <FileDown className="h-4 w-4" />

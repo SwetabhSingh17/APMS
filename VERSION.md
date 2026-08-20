@@ -10,11 +10,11 @@
 
 ## Version 1.2.0 (Current)
 ### Manual Supervisor Allotment & Manage Project
-1. **Manage Project Page**: New dedicated page (`/manage-project`) for Admins and Coordinators to view all student groups, their members, and assigned supervisors in one place.
-2. **Manual Supervisor Reassignment**: Admins and Coordinators can now seamlessly change the supervisor assigned to any student group via a "Change Supervisor" dialog with a searchable dropdown.
+1. **Manage Project Page**: New dedicated page (`/manage-project`) for Admins and Coordinators to view all project teams, their members, and assigned supervisors in one place.
+2. **Manual Supervisor Reassignment**: Admins and Coordinators can now seamlessly change the supervisor assigned to any project team via a "Change Supervisor" dialog with a searchable dropdown.
 3. **Notification on Reassignment**: When a supervisor is changed, both the newly assigned and previously assigned supervisors receive real-time notifications.
 4. **Sidebar Navigation Update**: "Manage Project" link added under Main Navigation for Admin and Coordinator roles, with a `FolderCog` icon.
-5. **Backend APIs**: Added `GET /api/student-groups` (list all groups with members/supervisor) and `PATCH /api/student-groups/:groupId/supervisor` (change supervisor allotment), both restricted to Admin/Coordinator roles.
+5. **Backend APIs**: Added `GET /api/student-project teams` (list all project teams with members/supervisor) and `PATCH /api/student-project teams/:groupId/supervisor` (change supervisor allotment), both restricted to Admin/Coordinator roles.
 6. **Storage Layer**: Added `getAllStudentGroups()` and `updateStudentGroupSupervisor()` methods to `db-storage.ts`.
 
 ## Version 1.1.2
@@ -65,16 +65,16 @@
 4. Added proper error handling and return types
 
 ### UI/UX Enhancements
-1. Updated Student Groups page layout and styling
+1. Updated Project Teams page layout and styling
    - Added MainLayout component integration
    - Improved card styling and consistency
    - Enhanced form layouts and input handling
    - Added proper loading states and error handling
    - Implemented proper spacing and typography
 
-2. Added Group Information Feature
-   - Implemented "Group Info" button for users not in groups
-   - Added dialog showing available groups
+2. Added Project Team Information Feature
+   - Implemented "Team Info" button for users not in project teams
+   - Added dialog showing available project teams
    - Included detailed group information display:
      * Group name and description
      * Member count
