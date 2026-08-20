@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link, useLocation } from "wouter";
 import { UserRole, ProjectTopic, User } from "@shared/schema";
+import { useCourseFilter } from "@/hooks/course-filter-context";
 import { useState } from "react";
 import Modal from "@/components/ui/modal";
 import { Textarea } from "@/components/ui/textarea";
@@ -60,15 +61,16 @@ export default function Dashboard() {
   const [feedback, setFeedback] = useState("");
 
 
+  const { courseFilter, getCourseQuery } = useCourseFilter();
 
   const { data: stats, isLoading: isLoadingStats } = useQuery<DashboardStats>({
-    queryKey: ["/api/stats"],
+    queryKey: [`/api/stats${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
     enabled: !!user,
     refetchInterval: 30000 // Refresh every 30 seconds
   });
 
   const { data: pendingTopics = [], isLoading: isLoadingTopics } = useQuery<PendingTopic[]>({
-    queryKey: ["/api/topics/pending"],
+    queryKey: [`/api/topics/pending${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
     enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN)
   });
 
@@ -292,6 +294,7 @@ export default function Dashboard() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Topic</TableHead>
+                          <TableHead>Course</TableHead>
                           <TableHead>Submitted By</TableHead>
 
                           <TableHead>Date</TableHead>
@@ -307,6 +310,11 @@ export default function Dashboard() {
                                   <p className="font-medium text-foreground">{topic.title}</p>
                                   <p className="text-sm text-muted-foreground">{(topic.description || "").substring(0, 60)}...</p>
                                 </div>
+                              </TableCell>
+                              <TableCell>
+                                <span className="px-2 py-1 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">
+                                  {topic.course}
+                                </span>
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center space-x-2">

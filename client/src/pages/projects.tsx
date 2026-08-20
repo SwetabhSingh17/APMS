@@ -23,6 +23,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertProjectTopicSchema } from "@shared/schema";
 import { z } from "zod";
 import { Search } from "lucide-react";
+import { useCourseFilter } from "@/hooks/course-filter-context";
 
 export default function Projects() {
   const { user } = useAuth();
@@ -60,12 +61,13 @@ export default function Projects() {
     },
     enabled: !!user && user.role === UserRole.STUDENT
   });
+  const { courseFilter, getCourseQuery } = useCourseFilter();
 
   // Add new query for coordinator to fetch all projects
   const { data: allProjects = [], isLoading: isLoadingAllProjects } = useQuery<StudentProjectWithTopic[]>({
-    queryKey: ["/api/projects/all"],
+    queryKey: [`/api/projects/all${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/projects");
+      const response = await apiRequest("GET", `/api/projects${getCourseQuery() ? `?${getCourseQuery()}` : ''}`);
       const data = await response.json();
       console.log('All projects loaded:', data);
       return data;

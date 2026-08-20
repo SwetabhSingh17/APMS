@@ -5,6 +5,9 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationDropdown } from "@/components/notifications/notification-dropdown";
+import { useCourseFilter } from "@/hooks/course-filter-context";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { UserRole } from "@shared/schema";
 
 type HeaderProps = {
   onToggleSidebar: () => void;
@@ -14,6 +17,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
   const { user } = useAuth();
   const [location] = useLocation();
   const [title, setTitle] = useState("Dashboard");
+  const { courseFilter, setCourseFilter } = useCourseFilter();
 
   useEffect(() => {
     // Set title based on current path
@@ -72,6 +76,21 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
         </div>
         
         <div className="flex items-center space-x-2">
+          {user && [UserRole.ADMIN, UserRole.COORDINATOR, UserRole.SUPERVISOR].includes(user.role as UserRole) && (
+            <div className="mr-2">
+              <Select value={courseFilter} onValueChange={(v: any) => setCourseFilter(v)}>
+                <SelectTrigger className="w-[120px] h-8 text-xs">
+                  <SelectValue placeholder="Course" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Courses</SelectItem>
+                  <SelectItem value="BCA">BCA</SelectItem>
+                  <SelectItem value="MCA">MCA</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          
           <ThemeToggle />
           <NotificationDropdown />
           

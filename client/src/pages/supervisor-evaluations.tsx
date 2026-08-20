@@ -13,6 +13,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { UserRole } from "@shared/schema";
 import Modal from "@/components/ui/modal";
 import { Search } from "lucide-react";
+import { useCourseFilter } from "@/hooks/course-filter-context";
 
 interface StudentProject {
   id: number;
@@ -53,13 +54,15 @@ export default function SupervisorEvaluations() {
   const [marks, setMarks] = useState("");
   const [feedback, setFeedback] = useState("");
 
+  const { courseFilter, getCourseQuery } = useCourseFilter();
+
   // Fetch projects assigned to the supervisor
   const { data: projects = [], isLoading, refetch } = useQuery<StudentProject[]>({
-    queryKey: ["/api/projects/supervisor"],
+    queryKey: [`/api/projects/supervisor${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
     enabled: !!user && user.role === UserRole.SUPERVISOR,
     queryFn: async () => {
       console.log('Fetching supervisor projects for user:', user);
-      const response = await apiRequest("GET", "/api/projects/supervisor");
+      const response = await apiRequest("GET", `/api/projects/supervisor${getCourseQuery() ? `?${getCourseQuery()}` : ''}`);
       const data = await response.json();
       console.log('Received supervisor projects:', data);
       return data;

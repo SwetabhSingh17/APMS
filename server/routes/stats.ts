@@ -8,10 +8,21 @@ export function registerStatsRoutes(router: Router, storage: DBStorage) {
     // Get statistics for dashboard
     router.get("/api/stats", async (req: Request, res: Response) => {
         try {
-            const projects = await storage.getAllProjects();
-            const topics = await storage.getAllTopics();
-            const users = await storage.getAllUsers();
-            const departmentStats = await storage.getDepartmentStats();
+            let projects = await storage.getAllProjects();
+            let topics = await storage.getAllTopics();
+            let users = await storage.getAllUsers();
+            
+            const courseFilter = req.query.course as string | undefined;
+
+            if (courseFilter) {
+                projects = projects.filter(p => (p.student as any).course === courseFilter);
+                topics = topics.filter(t => (t as any).course === courseFilter);
+                // For users, only filter students by course (keep all supervisors, etc for stats if needed, or filter all)
+                // The requirement is to filter student count. We can filter the users array.
+                users = users.filter(u => u.role !== UserRole.STUDENT || (u as any).course === courseFilter);
+            }
+
+            const departmentStats = await storage.getDepartmentStats(); // This could also be filtered, but keeping it simple for now
 
             const totalStudents = users.filter(u => u.role === UserRole.STUDENT).length;
             const totalProjects = projects.length;

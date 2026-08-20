@@ -19,6 +19,7 @@ import { insertUserSchema } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
+import { useCourseFilter } from "@/hooks/course-filter-context";
 
 // Helper functions for displaying user roles 
 function getRoleBadgeClasses(role: string): string {
@@ -73,8 +74,10 @@ export default function UserManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterRole, setFilterRole] = useState("all");
 
+  const { courseFilter, getCourseQuery } = useCourseFilter();
+
   const { data: users, isLoading } = useQuery<UserData[]>({
-    queryKey: ["/api/users"],
+    queryKey: [`/api/users${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
     enabled: !!user && (user.role === UserRole.ADMIN || user.role === UserRole.COORDINATOR)
   });
 
@@ -89,10 +92,18 @@ export default function UserManagement() {
     if (data.role === UserRole.STUDENT && !data.enrollmentNumber) {
       return false;
     }
-    return true;
   }, {
     message: "Enrollment number is required for student registration",
     path: ["enrollmentNumber"]
+  }).refine((data) => {
+    // Course is required for student accounts
+    if (data.role === UserRole.STUDENT && !data.course) {
+      return false;
+    }
+    return true;
+  }, {
+    message: "Course selection is required for students",
+    path: ["course"]
   });
 
   type UserFormValues = z.infer<typeof userFormSchema>;
@@ -108,6 +119,7 @@ export default function UserManagement() {
       email: "",
       role: UserRole.STUDENT,
       enrollmentNumber: "",
+      course: "BCA",
     }
   });
 
@@ -140,6 +152,7 @@ export default function UserManagement() {
       enrollmentNumber: null,
       password: "",
       confirmPassword: "",
+      course: "BCA",
     }
   });
 
@@ -248,6 +261,8 @@ export default function UserManagement() {
       lastName: user.lastName,
       email: user.email,
       role: user.role,
+      enrollmentNumber: user.enrollmentNumber || null,
+      course: user.course || "BCA",
     });
     setIsEditUserOpen(true);
   };
@@ -749,24 +764,50 @@ export default function UserManagement() {
                 />
               </div>
 
-              {/* Show enrollment number field for students */}
+              {/* Show enrollment number and course field for students */}
               {form.watch("role") === UserRole.STUDENT && (
-                <FormField
-                  control={form.control}
-                  name="enrollmentNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Enrollment Number</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter enrollment number" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                      <FormDescription>
-                        Required for student registration
-                      </FormDescription>
-                    </FormItem>
-                  )}
-                />
+                <>
+                  <FormField
+                    control={form.control}
+                    name="course"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Course</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value || "BCA"}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select course" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="BCA">BCA</SelectItem>
+                            <SelectItem value="MCA">MCA</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="enrollmentNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Enrollment Number</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter enrollment number" {...field} value={field.value || ''} />
+                        </FormControl>
+                        <FormMessage />
+                        <FormDescription>
+                          Required for student registration
+                        </FormDescription>
+                      </FormItem>
+                    )}
+                  />
+                </>
               )}
 
               <DialogFooter className="pt-4">
@@ -881,6 +922,48 @@ export default function UserManagement() {
                   </FormItem>
                 )}
               />
+
+              {editForm.watch("role") === UserRole.STUDENT && (
+                <>
+                  <FormField
+                    control={editForm.control}
+                    name="course"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Course</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value || "BCA"}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select course" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="BCA">BCA</SelectItem>
+                            <SelectItem value="MCA">MCA</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={editForm.control}
+                    name="enrollmentNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Enrollment Number</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter enrollment number" {...field} value={field.value || ''} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
 
 
 

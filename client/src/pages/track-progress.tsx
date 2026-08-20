@@ -17,6 +17,7 @@ import axios, { AxiosResponse } from "axios";
 import * as XLSX from 'xlsx';
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useCourseFilter } from "@/hooks/course-filter-context";
 
 interface ProjectWithMilestones extends StudentProject {
   topic: ProjectTopic;
@@ -32,17 +33,19 @@ export default function TrackProgress() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectWithMilestones | null>(null);
 
+  const { courseFilter, getCourseQuery } = useCourseFilter();
+
   const { data: projects, isLoading } = useQuery<ProjectWithMilestones[]>({
-    queryKey: ['/api/projects'],
+    queryKey: [`/api/projects${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
     enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN),
     queryFn: async () => {
-      const res: AxiosResponse<ProjectWithMilestones[]> = await axios.get('/api/projects');
+      const res: AxiosResponse<ProjectWithMilestones[]> = await axios.get(`/api/projects${getCourseQuery() ? `?${getCourseQuery()}` : ''}`);
       return res.data;
     }
   });
 
   const { data: stats, isLoading: isLoadingStats } = useQuery<any>({
-    queryKey: ["/api/stats"],
+    queryKey: [`/api/stats${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
     enabled: !!user
   });
 
@@ -276,6 +279,7 @@ export default function TrackProgress() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Project Topic</TableHead>
+                        <TableHead>Course</TableHead>
                         <TableHead>Student</TableHead>
                         <TableHead>Enrollment #</TableHead>
                         <TableHead>Progress</TableHead>
@@ -288,6 +292,11 @@ export default function TrackProgress() {
                         filteredProjects.map((project) => (
                           <TableRow key={project.id} className="hover:bg-muted/50">
                             <TableCell className="font-medium">{project.topic.title}</TableCell>
+                            <TableCell>
+                              <span className="px-2 py-1 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">
+                                {project.student.course}
+                              </span>
+                            </TableCell>
                             <TableCell>
                               <div className="flex items-center space-x-2">
                                 <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -346,6 +355,7 @@ export default function TrackProgress() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Project Topic</TableHead>
+                      <TableHead>Course</TableHead>
                       <TableHead>Student</TableHead>
                       <TableHead>Enrollment #</TableHead>
                       <TableHead>Progress</TableHead>
@@ -360,6 +370,11 @@ export default function TrackProgress() {
                         .map((project) => (
                           <TableRow key={project.id} className="hover:bg-muted/50">
                             <TableCell className="font-medium">{project.topic.title}</TableCell>
+                            <TableCell>
+                              <span className="px-2 py-1 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">
+                                {project.student.course}
+                              </span>
+                            </TableCell>
                             <TableCell>
                               <div className="flex items-center space-x-2">
                                 <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -415,6 +430,7 @@ export default function TrackProgress() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Project Topic</TableHead>
+                      <TableHead>Course</TableHead>
                       <TableHead>Student</TableHead>
                       <TableHead>Enrollment #</TableHead>
                       <TableHead>Progress</TableHead>
@@ -429,6 +445,11 @@ export default function TrackProgress() {
                         .map((project) => (
                           <TableRow key={project.id} className="hover:bg-muted/50">
                             <TableCell className="font-medium">{project.topic.title}</TableCell>
+                            <TableCell>
+                              <span className="px-2 py-1 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">
+                                {project.student.course}
+                              </span>
+                            </TableCell>
                             <TableCell>
                               <div className="flex items-center space-x-2">
                                 <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -484,6 +505,7 @@ export default function TrackProgress() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Project Topic</TableHead>
+                      <TableHead>Course</TableHead>
                       <TableHead>Student</TableHead>
                       <TableHead>Enrollment #</TableHead>
                       <TableHead>Progress</TableHead>
@@ -498,6 +520,11 @@ export default function TrackProgress() {
                         .map((project) => (
                           <TableRow key={project.id} className="hover:bg-muted/50">
                             <TableCell className="font-medium">{project.topic.title}</TableCell>
+                            <TableCell>
+                              <span className="px-2 py-1 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">
+                                {project.student.course}
+                              </span>
+                            </TableCell>
                             <TableCell>
                               <div className="flex items-center space-x-2">
                                 <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">

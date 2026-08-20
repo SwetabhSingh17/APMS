@@ -10,8 +10,9 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
     router.get("/api/topics/pending", requireRole([UserRole.COORDINATOR, UserRole.ADMIN]), async (req: Request, res: Response) => {
         try {
             const topics = await storage.getPendingTopics();
-            console.log('Pending topics with submitter info:', topics);
-            res.json(topics);
+            const courseFilter = req.query.course as string | undefined;
+            const filtered = courseFilter ? topics.filter(t => (t as any).course === courseFilter) : topics;
+            res.json(filtered);
         } catch (error) {
             res.status(500).json({ message: "Failed to fetch pending topics" });
         }
@@ -20,12 +21,18 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
     // Get all approved topics (with categorization for students)
     router.get("/api/topics/approved", async (req: Request, res: Response) => {
         try {
-            const topics = await storage.getApprovedTopics();
-            console.log('Approved topics with submitter info:', topics);
+            let topics = await storage.getApprovedTopics();
+            const courseFilter = req.query.course as string | undefined;
 
-            // If the user is a student, categorize topics
+            // If the user is a student, auto-filter by their course
             if (isAuthenticatedRequest(req) && req.user?.role === UserRole.STUDENT) {
                 const studentId = req.user.id;
+                const studentCourse = (req.user as any).course;
+
+                // Only show topics matching the student's course
+                if (studentCourse) {
+                    topics = topics.filter(t => (t as any).course === studentCourse);
+                }
 
                 // Check if student has selected a topic (has a project)
                 const studentProjects = await storage.getStudentProjects(studentId);
@@ -35,7 +42,7 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
                 // Get all projects to identify taken topics
                 const allProjects = await storage.getAllProjects();
                 const takenTopicIds = allProjects
-                    .filter(p => p.topicId !== myTopicId) // Exclude student's own topic
+                    .filter(p => p.topicId !== myTopicId)
                     .map(p => p.topicId);
 
                 // Categorize topics
@@ -55,7 +62,10 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
                 });
             }
 
-            // For non-students, return all approved topics as before
+            // For non-students, apply course filter if provided
+            if (courseFilter) {
+                topics = topics.filter(t => (t as any).course === courseFilter);
+            }
             res.json(topics);
         } catch (error) {
             res.status(500).json({ message: "Failed to fetch approved topics" });
@@ -66,8 +76,9 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
     router.get("/api/topics/rejected", requireRole([UserRole.COORDINATOR, UserRole.ADMIN]), async (req: Request, res: Response) => {
         try {
             const topics = await storage.getRejectedTopics();
-            console.log('Rejected topics with submitter info:', topics);
-            res.json(topics);
+            const courseFilter = req.query.course as string | undefined;
+            const filtered = courseFilter ? topics.filter(t => (t as any).course === courseFilter) : topics;
+            res.json(filtered);
         } catch (error) {
             res.status(500).json({ message: "Failed to fetch rejected topics" });
         }
@@ -82,8 +93,10 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
         try {
             console.log("Fetching topics for supervisor:", req.user.id);
             const topics = await storage.getTopicsBySupervisor(req.user.id);
-            console.log("Found topics:", topics);
-            res.json(topics);
+            const courseFilter = req.query.course as string | undefined;
+            const filtered = courseFilter ? topics.filter(t => (t as any).course === courseFilter) : topics;
+            console.log("Found topics:", filtered);
+            res.json(filtered);
         } catch (error) {
             console.error("Error fetching topics:", error);
             res.status(500).json({ message: "Failed to fetch your topics" });
@@ -103,11 +116,17 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
             console.log("Received topic data:", req.body);
 
             // Validate required fields
-            const { title, description, technology, projectType } = req.body;
+            const { title, description, technology, projectType, course } = req.body;
 
-            if (!title || !technology || !projectType) {
+            if (!title || !technology || !projectType || !course) {
                 return res.status(400).json({
-                    message: "Missing required fields: title, technology, and projectType are required"
+                    message: "Missing required fields: title, technology, projectType, and course are required"
+                });
+            }
+
+            if (!["BCA", "MCA"].includes(course)) {
+                return res.status(400).json({
+                    message: "Course must be either BCA or MCA"
                 });
             }
 
@@ -117,6 +136,7 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
                 description,
                 technology,
                 projectType,
+                course,
                 submittedById: req.user.id,
             };
 

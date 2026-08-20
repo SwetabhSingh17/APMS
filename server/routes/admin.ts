@@ -9,7 +9,8 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
     // User Management
     router.get("/api/users", requireRole([UserRole.ADMIN, UserRole.COORDINATOR]), async (req: Request, res: Response) => {
         try {
-            const users = await storage.getAllUsers();
+            const course = req.query.course as string | undefined;
+            const users = await storage.getAllUsers(course);
             // Remove passwords from response
             const usersWithoutPasswords = users.map(({ password, ...user }) => user);
             res.json(usersWithoutPasswords);
@@ -113,6 +114,16 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
         try {
             const userId = parseInt(req.params.id);
             const updateData = { ...req.body };
+
+            // Validate course if role is being updated to student or if user is a student
+            if (updateData.role === "student") {
+                if (updateData.course && !["BCA", "MCA"].includes(updateData.course)) {
+                    return res.status(400).json({ message: "Course must be either BCA or MCA" });
+                }
+            } else if (updateData.role && updateData.role !== "student") {
+                // Clear course if role is changed to non-student
+                updateData.course = null;
+            }
 
             // If password is being updated, hash it first
             if (updateData.password) {

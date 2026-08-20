@@ -89,7 +89,15 @@ export class DBStorage {
     return !!deleted;
   }
 
-  async getAllUsers(): Promise<User[]> {
+  async getAllUsers(course?: string): Promise<User[]> {
+    if (course) {
+      return (await db.select().from(users).where(
+        and(
+          eq(users.isDeleted, false),
+          eq(users.course, course)
+        )
+      )) as User[];
+    }
     return (await db.select().from(users).where(eq(users.isDeleted, false))) as User[];
   }
 
@@ -230,7 +238,7 @@ export class DBStorage {
     return project as StudentProject | undefined;
   }
 
-  async getAllProjects(): Promise<(StudentProject & { topic: ProjectTopic; student: User })[]> {
+  async getAllProjects(course?: string): Promise<(StudentProject & { topic: ProjectTopic; student: User })[]> {
     const projects = await db.select().from(studentProjects);
 
     const detailed = await Promise.all(projects.map(async (p) => {
@@ -249,7 +257,11 @@ export class DBStorage {
       };
     }));
 
-    return detailed as (StudentProject & { topic: ProjectTopic; student: User })[];
+    let results = detailed as (StudentProject & { topic: ProjectTopic; student: User })[];
+    if (course) {
+        results = results.filter(p => p.topic?.course === course);
+    }
+    return results;
   }
 
   async isTopicAllotted(topicId: number): Promise<boolean> {
@@ -386,10 +398,46 @@ export class DBStorage {
     return true;
   }
 
+
+
   async getUsersByRole(role: UserRole): Promise<User[]> {
     return (await db.select().from(users).where(and(eq(users.role, role), eq(users.isDeleted, false)))) as User[];
   }
 
+  async getAllStudentGroups(): Promise<any[]> {
+    const groups = await db.select().from(studentGroups);
+    const result = await Promise.all(groups.map(async (group) => {
+      const members = await this.getStudentGroupMembers(group.id);
+      const supervisor = group.supervisorId ? await this.getUser(group.supervisorId) : null;
+      return {
+        ...group,
+        members: members.map(m => ({
+          id: m.id,
+          firstName: m.firstName,
+          lastName: m.lastName,
+          email: m.email,
+          enrollmentNumber: m.enrollmentNumber,
+          role: m.role,
+        })),
+        supervisor: supervisor ? {
+          id: supervisor.id,
+          firstName: supervisor.firstName,
+          lastName: supervisor.lastName,
+          email: supervisor.email,
+          role: supervisor.role,
+        } : null,
+      };
+    }));
+    return result;
+  }
+
+  async updateStudentGroupSupervisor(groupId: number, supervisorId: number): Promise<StudentGroup | undefined> {
+    const [updated] = await db.update(studentGroups)
+      .set({ supervisorId, updatedAt: new Date() })
+      .where(eq(studentGroups.id, groupId))
+      .returning();
+    return updated as StudentGroup | undefined;
+  }
 
   // Notification operations
   async getUserNotifications(userId: number): Promise<Notification[]> {

@@ -17,6 +17,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { z } from "zod";
+import { useCourseFilter } from "@/hooks/course-filter-context";
 
 export default function Topics() {
   const { user } = useAuth();
@@ -35,9 +36,11 @@ export default function Topics() {
     }
   }, []);
 
+  const { courseFilter, getCourseQuery } = useCourseFilter();
+
   // Fetch all topics submitted by the supervisor
   const { data: myTopics = [], isLoading: isLoadingMyTopics } = useQuery<ProjectTopic[]>({
-    queryKey: ["/api/topics/my"],
+    queryKey: [`/api/topics/my${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
     enabled: !!user && user.role === UserRole.SUPERVISOR
   });
 
@@ -57,6 +60,7 @@ export default function Topics() {
       description: "",
       technology: "",
       projectType: "",
+      course: "BCA",
       submittedById: user?.id || 0,
     }
   });
@@ -68,6 +72,7 @@ export default function Topics() {
       description: "",
       technology: "",
       projectType: "",
+      course: "BCA",
       submittedById: user?.id || 0,
     }
   });
@@ -84,7 +89,7 @@ export default function Topics() {
       });
       form.reset();
       setIsSubmitModalOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/topics/my"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/topics/my${getCourseQuery() ? `?${getCourseQuery()}` : ''}`] });
     },
     onError: (error: Error) => {
       toast({
@@ -109,7 +114,7 @@ export default function Topics() {
       editForm.reset();
       setIsEditModalOpen(false);
       setSelectedTopic(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/topics/my"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/topics/my${getCourseQuery() ? `?${getCourseQuery()}` : ''}`] });
     },
     onError: (error: Error) => {
       toast({
@@ -133,7 +138,7 @@ export default function Topics() {
         title: "Topic deleted successfully",
         description: "The project topic has been deleted.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/topics/my"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/topics/my${getCourseQuery() ? `?${getCourseQuery()}` : ''}`] });
     },
     onError: (error: Error) => {
       toast({
@@ -171,6 +176,7 @@ export default function Topics() {
         description: selectedTopic.description,
         technology: selectedTopic.technology,
         projectType: selectedTopic.projectType,
+        course: selectedTopic.course || "BCA",
         submittedById: user?.id || 0,
       });
     }
@@ -341,6 +347,26 @@ export default function Topics() {
               )}
             />
 
+            <FormField
+              control={form.control}
+              name="course"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Course</FormLabel>
+                  <FormControl>
+                    <select
+                      {...field}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="BCA">BCA</option>
+                      <option value="MCA">MCA</option>
+                    </select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <div className="flex justify-end space-x-3 pt-4">
               <Button
                 type="button"
@@ -447,6 +473,26 @@ export default function Topics() {
               )}
             />
 
+            <FormField
+              control={editForm.control}
+              name="course"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Course</FormLabel>
+                  <FormControl>
+                    <select
+                      {...field}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="BCA">BCA</option>
+                      <option value="MCA">MCA</option>
+                    </select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <div className="flex justify-end space-x-3 pt-4">
               <Button
                 type="button"
@@ -501,6 +547,10 @@ function TopicCard({ topic, onEdit, onDelete }: TopicCardProps) {
                 <span className="px-2 py-1 bg-destructive/20 text-destructive text-xs rounded-full">Rejected</span>
               )}
             </div>
+          </div>
+          <div className="col-span-2">
+            <p className="text-muted-foreground">Course</p>
+            <p className="font-medium">{topic.course}</p>
           </div>
           {topic.feedback && (
             <div className="col-span-2">

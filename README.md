@@ -22,9 +22,12 @@
 
 - **Role-Based Access Control** — Four distinct roles: Admin, Coordinator, Supervisor, Student  
 - **Project Topic Workflow** — Supervisors submit topics → Coordinators approve/reject → Students select  
+- **Course Segregation (BCA / MCA)** — Strict isolation of student accounts, project topics, and groups based on their registered course.
 - **Student Group Management** — Create groups, invite members, assign supervisor mentors  
+- **Manage Project** — Admins & Coordinators can view all groups and manually reassign supervisors  
 - **Progress Tracking** — Real-time dashboards with charts and department statistics  
 - **Project Assessments** — Supervisor grading with score and feedback  
+- **Real-Time Notifications** — WebSocket-powered instant notifications with role-based routing  
 - **User Management** — Admin panel for bulk user operations, role changes, password resets  
 - **System Management** — Database export/import, Excel reports, full reset capabilities  
 - **Security Hardened** — Helmet HTTP headers, rate-limited auth endpoints, soft-delete data retention  
@@ -212,10 +215,10 @@ All configuration is managed through environment variables in a `.env` file at t
 
 | Role | Capabilities |
 |------|-------------|
-| **Admin** | Full system access, user management, database operations, Excel reports |
-| **Coordinator** | Approve/reject topics, track progress, manage users, view statistics |
-| **Supervisor** | Submit project topics, evaluate assigned projects, view student progress |
-| **Student** | Browse & select topics, form groups, invite members, track own progress |
+| **Admin** | Full system access, user management, database operations, Excel reports, supervisor reassignment |
+| **Coordinator** | Approve/reject topics, track progress, manage users, view statistics, reassign supervisors, filter by course context |
+| **Supervisor** | Submit project topics (tied to specific course), evaluate assigned projects, view student progress |
+| **Student** | Browse & select topics specific to their course, form groups within their course, invite members, track own progress |
 
 ---
 

@@ -22,10 +22,17 @@ export function registerAuthRoutes(router: Router, storage: DBStorage) {
 
     router.post("/auth/register", async (req: Request, res: Response) => {
         try {
-            const { username, password, role, enrollmentNumber, firstName, lastName, email, department } = req.body;
+            const { username, password, role, enrollmentNumber, firstName, lastName, email, department, course } = req.body;
 
             if (!username || !password || !role || !enrollmentNumber || !firstName || !lastName || !email || !department) {
                 return res.status(400).json({ message: "Missing required fields" });
+            }
+
+            // Validate course for students
+            if (role === "student") {
+                if (!course || !["BCA", "MCA"].includes(course)) {
+                    return res.status(400).json({ message: "Course (BCA or MCA) is required for student registration" });
+                }
             }
 
             const hashedPassword = await hashPassword(password);
@@ -36,7 +43,8 @@ export function registerAuthRoutes(router: Router, storage: DBStorage) {
                 enrollmentNumber,
                 firstName,
                 lastName,
-                email
+                email,
+                course: role === "student" ? course : null,
             } as any);
 
             // If a Coordinator is creating this account, notify Admins

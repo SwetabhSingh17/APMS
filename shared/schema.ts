@@ -48,6 +48,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   role: text("role").notNull(),
   enrollmentNumber: text("enrollment_number"),
+  course: text("course"),
   groupId: integer("group_id").references(() => studentGroups.id),
   isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -69,6 +70,7 @@ export const projectTopics = pgTable("project_topics", {
   submittedById: integer("submitted_by_id").references(() => users.id).notNull(),
   technology: text("technology").notNull(),
   projectType: text("project_type").notNull(),
+  course: text("course").notNull(),
   estimatedComplexity: text("estimated_complexity").notNull().default("Medium"),
   status: text("status").notNull().default("pending"),
   feedback: text("feedback"),
@@ -238,4 +240,9 @@ export enum UserRole {
 export enum CollaborationType {
   INDIVIDUAL = "individual",
   GROUP = "group",
+}
+
+export enum CourseType {
+  BCA = "BCA",
+  MCA = "MCA",
 }

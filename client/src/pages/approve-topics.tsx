@@ -18,6 +18,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ProjectTopic, UserRole } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
+import { useCourseFilter } from "@/hooks/course-filter-context";
 
 export default function ApproveTopics() {
   const { user } = useAuth();
@@ -28,8 +29,10 @@ export default function ApproveTopics() {
   const [feedback, setFeedback] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
+  const { courseFilter, getCourseQuery } = useCourseFilter();
+
   const { data: pendingTopics = [], isLoading } = useQuery<ProjectTopic[]>({
-    queryKey: ["/api/topics/pending"],
+    queryKey: [`/api/topics/pending${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
     enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN),
     onSuccess: (data: ProjectTopic[]) => {
       console.log('Received pending topics:', data);
@@ -37,7 +40,7 @@ export default function ApproveTopics() {
   } as UseQueryOptions<ProjectTopic[]>);
 
   const { data: approvedTopics = [], isLoading: isLoadingApproved } = useQuery<ProjectTopic[]>({
-    queryKey: ["/api/topics/approved"],
+    queryKey: [`/api/topics/approved${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
     enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN),
     onSuccess: (data: ProjectTopic[]) => {
       console.log('Received approved topics:', data);
@@ -45,7 +48,7 @@ export default function ApproveTopics() {
   } as UseQueryOptions<ProjectTopic[]>);
 
   const { data: rejectedTopics = [], isLoading: isLoadingRejected } = useQuery<ProjectTopic[]>({
-    queryKey: ["/api/topics/rejected"],
+    queryKey: [`/api/topics/rejected${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
     enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN),
     onSuccess: (data: ProjectTopic[]) => {
       console.log('Received rejected topics:', data);
@@ -344,6 +347,7 @@ export default function ApproveTopics() {
                           />
                         </TableHead>
                         <TableHead>Topic</TableHead>
+                        <TableHead>Course</TableHead>
                         <TableHead>Submitted By</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead className="text-right">Action</TableHead>
@@ -364,6 +368,11 @@ export default function ApproveTopics() {
                                 <p className="font-medium text-foreground">{topic.title}</p>
                                 <p className="text-sm text-muted-foreground">{(topic.description || "").substring(0, 60)}...</p>
                               </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className="px-2 py-1 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">
+                                {topic.course}
+                              </span>
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center space-x-2">
@@ -432,6 +441,7 @@ export default function ApproveTopics() {
                           />
                         </TableHead>
                         <TableHead>Topic</TableHead>
+                        <TableHead>Course</TableHead>
                         <TableHead>Submitted By</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Date Approved</TableHead>
@@ -453,6 +463,11 @@ export default function ApproveTopics() {
                                 <p className="font-medium text-foreground">{topic.title}</p>
                                 <p className="text-sm text-muted-foreground">{(topic.description || "").substring(0, 60)}...</p>
                               </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className="px-2 py-1 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">
+                                {topic.course}
+                              </span>
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center space-x-2">
@@ -528,6 +543,7 @@ export default function ApproveTopics() {
                           />
                         </TableHead>
                         <TableHead>Topic</TableHead>
+                        <TableHead>Course</TableHead>
                         <TableHead>Submitted By</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Feedback</TableHead>
@@ -549,6 +565,11 @@ export default function ApproveTopics() {
                                 <p className="font-medium text-foreground">{topic.title}</p>
                                 <p className="text-sm text-muted-foreground">{(topic.description || "").substring(0, 60)}...</p>
                               </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className="px-2 py-1 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">
+                                {topic.course}
+                              </span>
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center space-x-2">

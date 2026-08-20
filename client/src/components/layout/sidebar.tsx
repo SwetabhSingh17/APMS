@@ -13,7 +13,8 @@ import {
   BookOpen,
   Bell,
   ClipboardCheck,
-  Database
+  Database,
+  FolderCog
 } from "lucide-react";
 
 export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?: () => void }) {
@@ -136,6 +137,13 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?
           <Link href="/track-progress" onClick={isMobile ? onClose : undefined} className={linkClass("/track-progress")}>
             <BarChart2 className="w-5 h-5" />
             <span>Track Progress</span>
+          </Link>
+        )}
+
+        {(user?.role === UserRole.COORDINATOR || user?.role === UserRole.ADMIN) && (
+          <Link href="/manage-project" onClick={isMobile ? onClose : undefined} className={linkClass("/manage-project")}>
+            <FolderCog className="w-5 h-5" />
+            <span>Manage Project</span>
           </Link>
         )}
 

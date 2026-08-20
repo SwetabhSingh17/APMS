@@ -12,6 +12,7 @@ import { UserRole } from "@shared/schema";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Loader2 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { CourseFilterProvider } from "@/hooks/course-filter-context";
 
 // Lazy-loaded routes
 const AuthPage = lazy(() => import("@/pages/auth-page"));
@@ -27,6 +28,7 @@ const Notifications = lazy(() => import("@/pages/notifications"));
 const SupervisorEvaluations = lazy(() => import("@/pages/supervisor-evaluations"));
 const StudentGroups = lazy(() => import("@/pages/student-groups"));
 const SystemManagement = lazy(() => import("@/pages/system-management"));
+const ManageProject = lazy(() => import("@/pages/manage-project"));
 const CreatorInfoPage = lazy(() => import("@/pages/creator-info"));
 
 function PageLoader() {
@@ -84,6 +86,11 @@ function Router() {
           component={SystemManagement}
           allowedRoles={[UserRole.ADMIN]}
         />
+        <ProtectedRoute
+          path="/manage-project"
+          component={ManageProject}
+          allowedRoles={[UserRole.COORDINATOR, UserRole.ADMIN]}
+        />
         <ProtectedRoute path="/settings" component={Settings} />
         <ProtectedRoute path="/notifications" component={Notifications} />
         <Route path="/auth" component={AuthPage} />
@@ -100,8 +107,10 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <ThemeProvider defaultTheme="system" storageKey="integral-ui-theme">
           <AuthProvider>
-            <Router />
-            <Toaster />
+            <CourseFilterProvider>
+              <Router />
+              <Toaster />
+            </CourseFilterProvider>
           </AuthProvider>
         </ThemeProvider>
       </QueryClientProvider>

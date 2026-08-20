@@ -33,6 +33,17 @@ This document outlines suggested architectural, security, and maintenance improv
 
 ---
 
+## ✅ Completed (v1.2.0)
+
+### Manage Project & Supervisor Allotment
+- [x] **Manage Project Page** — New standalone page (`/manage-project`) for Admins and Coordinators to view all student groups, their members, and assigned supervisors.
+- [x] **Manual Supervisor Reassignment** — Admins and Coordinators can change the supervisor assigned to any student group via a "Change Supervisor" dialog with a dropdown of all available supervisors.
+- [x] **Reassignment Notifications** — Both the newly assigned and previously assigned supervisors receive real-time notifications when a reassignment occurs.
+- [x] **Backend APIs** — Added `GET /api/student-groups` and `PATCH /api/student-groups/:groupId/supervisor` endpoints (Admin/Coordinator only).
+- [x] **Sidebar Navigation** — Added "Manage Project" link under Main Navigation for Admin/Coordinator roles.
+
+---
+
 ## 🔴 Remaining / New Improvements
 
 ### 1. Authentication Modernization

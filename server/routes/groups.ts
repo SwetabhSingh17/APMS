@@ -26,12 +26,17 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
                 return res.status(400).json({ message: "Invalid supervisor mentor" });
             }
 
-            // Validate all enrollment numbers exist and are students
+            // Validate all enrollment numbers exist, are students, and share the same course
+            const myCourse = (req.user as any).course;
+            
             const students = await Promise.all(
                 enrollmentNumbers.map(async (enrollmentNumber: string) => {
                     const student = await storage.getUserByEnrollmentNumber(enrollmentNumber);
                     if (!student || student.role !== UserRole.STUDENT) {
                         throw new Error(`Invalid student enrollment number: ${enrollmentNumber}`);
+                    }
+                    if (myCourse && student.course && student.course !== myCourse) {
+                        throw new Error(`Student ${student.firstName} ${student.lastName} is in a different course (${student.course}) and cannot be added to your group.`);
                     }
                     return student;
                 })
@@ -167,6 +172,84 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
         } catch (error) {
             console.error("Error leaving group:", error);
             res.status(500).json({ message: "Failed to leave group" });
+        }
+    });
+
+    // Get all student groups (for coordinators and admins)
+    router.get("/api/student-groups", requireRole([UserRole.COORDINATOR, UserRole.ADMIN]), async (req: Request, res: Response) => {
+        try {
+            let groups = await storage.getAllStudentGroups();
+            const courseFilter = req.query.course as string | undefined;
+
+            if (courseFilter) {
+                // Filter groups by the creator's course
+                // Since `groups` already includes a `members` array, we can check the members.
+                // Or we check the first member's course. Since all members must be of the same course now,
+                // any member's course will do.
+                groups = groups.filter(group => {
+                    if (!group.members || group.members.length === 0) return false;
+                    return group.members.some((m: any) => m.course === courseFilter);
+                });
+            }
+
+            res.json(groups);
+        } catch (error) {
+            console.error("Error fetching all student groups:", error);
+            res.status(500).json({ message: "Failed to fetch student groups" });
+        }
+    });
+
+    // Change supervisor allotment for a group (coordinators and admins only)
+    router.patch("/api/student-groups/:groupId/supervisor", requireRole([UserRole.COORDINATOR, UserRole.ADMIN]), async (req: Request, res: Response) => {
+        if (!isAuthenticatedRequest(req)) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        try {
+            const groupId = parseInt(req.params.groupId);
+            const { supervisorId } = req.body;
+
+            if (!supervisorId || typeof supervisorId !== "number") {
+                return res.status(400).json({ message: "A valid supervisorId is required" });
+            }
+
+            // Validate the group exists
+            const group = await storage.getGroup(groupId);
+            if (!group) {
+                return res.status(404).json({ message: "Group not found" });
+            }
+
+            // Validate the target user is a supervisor
+            const supervisor = await storage.getUser(supervisorId);
+            if (!supervisor || supervisor.role !== UserRole.SUPERVISOR) {
+                return res.status(400).json({ message: "The selected user is not a valid supervisor" });
+            }
+
+            const previousSupervisorId = group.supervisorId;
+
+            // Update the group
+            const updatedGroup = await storage.updateStudentGroupSupervisor(groupId, supervisorId);
+
+            // Notify the newly assigned supervisor
+            await storage.createNotification({
+                userId: supervisorId,
+                title: "Supervisor Assignment",
+                message: `You have been assigned as the supervisor for group "${group.name}" by ${req.user.firstName} ${req.user.lastName}.`,
+            });
+
+            // Notify the previous supervisor if there was one and it changed
+            if (previousSupervisorId && previousSupervisorId !== supervisorId) {
+                await storage.createNotification({
+                    userId: previousSupervisorId,
+                    title: "Supervisor Reassignment",
+                    message: `You have been unassigned from group "${group.name}". A new supervisor has been assigned.`,
+                });
+            }
+
+            res.json(updatedGroup);
+        } catch (error) {
+            console.error("Error updating supervisor allotment:", error);
+            res.status(500).json({ message: "Failed to update supervisor allotment" });
         }
     });
 }

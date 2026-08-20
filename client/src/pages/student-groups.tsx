@@ -210,6 +210,8 @@ export default function StudentGroups() {
     setEnrollmentNumbers(enrollmentNumbers.filter(n => n !== number));
   };
 
+
+  // --- Student View ---
   if (isLoadingUserGroup) {
     return (
       <MainLayout>

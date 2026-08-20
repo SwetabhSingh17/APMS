@@ -26,13 +26,22 @@ const registerSchema = insertUserSchema.extend({
   path: ["confirmPassword"],
 }).refine((data) => {
   // Enrollment number is required for student accounts
-  if (data.role === UserRole.STUDENT && !data.enrollmentNumber) {
-    return false;
+  if (data.role === UserRole.STUDENT) {
+    if (!data.enrollmentNumber) return false;
   }
   return true;
 }, {
   message: "Enrollment number is required for student registration",
   path: ["enrollmentNumber"]
+}).refine((data) => {
+  // Course is required for student accounts
+  if (data.role === UserRole.STUDENT) {
+    if (!data.course) return false;
+  }
+  return true;
+}, {
+  message: "Course selection is required for students",
+  path: ["course"]
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -71,6 +80,7 @@ export default function AuthPage() {
       email: "",
       role: UserRole.STUDENT,
       enrollmentNumber: "",
+      course: "BCA",
     },
   });
 
@@ -262,22 +272,48 @@ export default function AuthPage() {
                   </div>
                   {/* Show enrollment number field for students */}
                   {registerForm.watch("role") === UserRole.STUDENT && (
-                    <FormField
-                      control={registerForm.control}
-                      name="enrollmentNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Enrollment Number</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter your enrollment number" {...field} value={field.value || ""} />
-                          </FormControl>
-                          <FormMessage />
-                          <FormDescription>
-                            Required for student registration
-                          </FormDescription>
-                        </FormItem>
-                      )}
-                    />
+                    <>
+                      <FormField
+                        control={registerForm.control}
+                        name="course"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Course</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value || "BCA"}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select course" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="BCA">BCA</SelectItem>
+                                <SelectItem value="MCA">MCA</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="enrollmentNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Enrollment Number</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Enter your enrollment number" {...field} value={field.value || ""} />
+                            </FormControl>
+                            <FormMessage />
+                            <FormDescription>
+                              Required for student registration
+                            </FormDescription>
+                          </FormItem>
+                        )}
+                      />
+                    </>
                   )}
                   <FormField
                     control={registerForm.control}

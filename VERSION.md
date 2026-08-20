@@ -1,6 +1,23 @@
 # Version History
 
-## Version 1.1.2 (Current)
+## Version 1.3.0 (Current)
+### Course Segregation (BCA / MCA)
+1. **Schema Update**: Added mandatory `course` field (BCA or MCA) to `users` (Student roles) and `project_topics` schema.
+2. **Context-Aware Filtering**: Built a global `CourseFilterContext` accessible via a UI dropdown switch for Admins, Coordinators, and Supervisors to toggle the entire application view between BCA and MCA context.
+3. **Strict Student Isolation**: The backend ensures that a BCA student only sees BCA-specific project topics and can only group with BCA students. The same strict isolation applies to MCA students.
+4. **UI Indicators**: Added prominent Course Badges to User Management, Approve Topics, Dashboard tables, Manage Projects, and Track Progress pages to ensure clear attribution.
+5. **Registration Constraint**: Account creation (signup and admin manual creation) now strictly enforces the selection of a course for Student roles.
+
+## Version 1.2.0 (Current)
+### Manual Supervisor Allotment & Manage Project
+1. **Manage Project Page**: New dedicated page (`/manage-project`) for Admins and Coordinators to view all student groups, their members, and assigned supervisors in one place.
+2. **Manual Supervisor Reassignment**: Admins and Coordinators can now seamlessly change the supervisor assigned to any student group via a "Change Supervisor" dialog with a searchable dropdown.
+3. **Notification on Reassignment**: When a supervisor is changed, both the newly assigned and previously assigned supervisors receive real-time notifications.
+4. **Sidebar Navigation Update**: "Manage Project" link added under Main Navigation for Admin and Coordinator roles, with a `FolderCog` icon.
+5. **Backend APIs**: Added `GET /api/student-groups` (list all groups with members/supervisor) and `PATCH /api/student-groups/:groupId/supervisor` (change supervisor allotment), both restricted to Admin/Coordinator roles.
+6. **Storage Layer**: Added `getAllStudentGroups()` and `updateStudentGroupSupervisor()` methods to `db-storage.ts`.
+
+## Version 1.1.2
 ### Notifications & UI
 1. **Real-Time Notifications**: Integrated WebSocket server for instant, zero-polling popups when assignments, approvals, or account modifications occur.
 2. **Notification Routing Rules**: Advanced logic applied so only relevant stakeholders receive notifications (e.g. students don't see topic approvals; admins see coordinator modifications).
@@ -74,8 +91,9 @@
 ## Planned Features
 1. Enhanced group collaboration tools
 2. Advanced project tracking features
-3. Improved notification system
-4. Real-time updates for group activities
+3. Email notification integration
+4. File upload support for milestones
+5. Audit log for admin operations
 
 ## Known Issues
 - None reported in current version

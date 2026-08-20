@@ -46,6 +46,13 @@ export function registerProjectRoutes(router: Router, storage: DBStorage) {
                 return res.status(400).json({ message: "Selected topic is not approved" });
             }
 
+            // Cross-course validation
+            const studentCourse = (user as any).course;
+            const topicCourse = (topic as any).course;
+            if (studentCourse && topicCourse && studentCourse !== topicCourse) {
+                return res.status(400).json({ message: `You are in ${studentCourse} but the selected topic is for ${topicCourse}. You cannot select this topic.` });
+            }
+
             // Check if topic is already allotted
             const isAllotted = await storage.isTopicAllotted(topicId);
             if (isAllotted) {
@@ -108,8 +115,13 @@ export function registerProjectRoutes(router: Router, storage: DBStorage) {
     // Get all projects (for coordinators, admins, and supervisors)
     router.get("/api/projects", requireRole([UserRole.COORDINATOR, UserRole.ADMIN, UserRole.SUPERVISOR]), async (req: Request, res: Response) => {
         try {
-            const projects = await storage.getAllProjects();
-            console.log('Projects from storage:', projects);
+            let projects = await storage.getAllProjects();
+            const courseFilter = req.query.course as string | undefined;
+
+            if (courseFilter) {
+                projects = projects.filter(p => (p.student as any).course === courseFilter);
+            }
+
             res.json(projects);
         } catch (error) {
             res.status(500).json({ message: "Failed to fetch projects" });
@@ -123,7 +135,8 @@ export function registerProjectRoutes(router: Router, storage: DBStorage) {
         }
 
         try {
-            const allProjects = await storage.getAllProjects();
+            const course = req.query.course as string | undefined;
+            const allProjects = await storage.getAllProjects(course);
             console.log('All projects:', allProjects);
 
             const supervisorProjects = allProjects.filter(project => {

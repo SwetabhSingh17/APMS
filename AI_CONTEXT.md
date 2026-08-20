@@ -12,7 +12,9 @@ APMS is a comprehensive web-based project management system for educational inst
 1. **Topic Proposals**: Supervisors submit project topics. Coordinators review and either approve or reject them.
 2. **Student Groups**: Students form groups (default max size: 5), invite peers, and select approved topics.
 3. **Mentorship & Tracking**: Supervisor mentors evaluate group progress, grade milestones, and provide final assessments.
-4. **Administration**: Admins manage users, generate Excel reports, and oversee system settings (including database backups/resets).
+4. **Manage Project (Supervisor Allotment)**: Admins and Coordinators can view all student groups and manually reassign their supervisors via the dedicated `/manage-project` page.
+5. **Course Segregation**: The system strictly segregates operations based on the Student's course (BCA or MCA). Students are isolated to their course context, while Admins, Coordinators, and Supervisors use a global UI toggle to switch contexts.
+6. **Administration**: Admins manage users, generate Excel reports, and oversee system settings (including database backups/resets).
 
 ---
 
@@ -37,9 +39,10 @@ The repository is structured as a monorepo-style full-stack application:
 - `server/`: Backend Express API.
   - `index.ts`: Application entry point.
   - `auth.ts`: Authentication, passport setup, and rate-limiting.
-  - `routes.ts`: Centralized API endpoints and route handlers.
+  - `routes/`: Modular API route files (`auth.ts`, `users.ts`, `projects.ts`, `groups.ts`, `topics.ts`).
   - `db.ts`: Database connection and startup connectivity validation.
   - `db-storage.ts`: Database interaction layer using Drizzle ORM (repository pattern).
+  - `websocket.ts`: WebSocket server for real-time notification delivery.
 - `shared/`: Types and schemas shared between client and server.
   - `schema.ts`: Core Drizzle tables, Zod schemas, and TypeScript interfaces.
 - `scripts/`: DB seeding, backup, restore, and reset scripts.
@@ -48,10 +51,10 @@ The repository is structured as a monorepo-style full-stack application:
 
 ## 4. Database Schema (drizzle)
 The application relies on several core tables defined in `shared/schema.ts`:
-- **users**: Stores all accounts with role-based access (`admin`, `coordinator`, `supervisor`, `student`).
-- **student_groups**: Student project groups containing `supervisorId`, `maxSize`, and `createdById`.
+- **users**: Stores all accounts with role-based access (`admin`, `coordinator`, `supervisor`, `student`). Student roles have a required `course` column (BCA or MCA).
+- **student_groups**: Student project groups containing `course`, `supervisorId`, `maxSize`, and `createdById`.
 - **student_group_members**: Manages group memberships and invitation statuses.
-- **project_topics**: Topics proposed by supervisors with a `status` (pending/approved/rejected).
+- **project_topics**: Topics proposed by supervisors, requiring a `course` property and a `status` (pending/approved/rejected).
 - **student_projects**: Maps groups/students to topics with progress tracking.
 - **project_assessments**: Grades and feedback provided by supervisor.
 - **project_milestones**: Distinct checkpoints for student projects.
@@ -80,9 +83,9 @@ APMS includes a robust real-time notification system powered by WebSockets.
 
 ---
 
-## 6. Access Control (RBAC)
+## 7. Access Control (RBAC)
 - **Student**: Can browse topics, form groups, invite members, submit milestones.
 - **Supervisor**: Can propose topics, evaluate assigned groups, and grade milestones.
-- **Coordinator**: Can approve/reject topic proposals, oversee all projects, view department stats.
-- **Admin**: Has full access, can perform destructive actions (DB resets) and manage all users.
+- **Coordinator**: Can approve/reject topic proposals, oversee all projects, view department stats, and manually reassign supervisors to student groups via the Manage Project page.
+- **Admin**: Has full access, can perform destructive actions (DB resets), manage all users, and reassign supervisors.
 
