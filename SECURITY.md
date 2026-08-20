@@ -6,7 +6,7 @@ Currently, the following versions of this project are actively supported with se
 
 | Version | Supported          |
 | ------- | ------------------ |
-| v1.0.x  | :white_check_mark: |
+| v1.5.x  | :white_check_mark: |
 | < v1.0  | :x:                |
 
 ## Reporting a Vulnerability
