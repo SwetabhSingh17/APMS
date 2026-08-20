@@ -81,7 +81,7 @@ export function NotificationDropdown() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
+        <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
           <Bell className="w-6 h-6" />
           {unreadCount > 0 && (
             <span className="absolute top-0 right-0 w-2 h-2 bg-destructive rounded-full" />

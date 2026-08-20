@@ -280,6 +280,7 @@ export default function ApproveTopics() {
           <Input
             placeholder="Search topics by title or description..."
             className="pl-10"
+            aria-label="Search topics"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />

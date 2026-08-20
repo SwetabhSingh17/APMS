@@ -250,6 +250,7 @@ export default function SystemManagement() {
                                         <Input
                                             ref={fileInputRef}
                                             type="file"
+                                            aria-label="Backup file"
                                             accept=".json"
                                             onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
                                         />
@@ -307,6 +308,7 @@ export default function SystemManagement() {
                                         <Input
                                             type="password"
                                             placeholder="Enter password"
+                                            aria-label="Admin Password"
                                             value={adminPassword}
                                             onChange={(e) => setAdminPassword(e.target.value)}
                                         />

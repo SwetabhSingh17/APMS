@@ -53,6 +53,9 @@ This document outlines suggested architectural, security, and maintenance improv
 - [x] **Management UI Overhaul** — Added a "Create Team" and "Manage Members" Dialog in the `manage-project` page, providing Admins/Coordinators powerful autocomplete search tools for team curation.
 - [x] **Real-Time Edit Notifications** — Added WebSocket notifications to Admins, Coordinators, and the Team Supervisor whenever a team's members are edited.
 
+### Frontend Architecture & Accessibility
+- [x] **Accessibility (a11y)** — Audited the app for WCAG compliance, ensured proper ARIA labels on all interactive elements (icon buttons, search inputs), validated keyboard navigation support, and verified sufficient color contrast ratios.
+
 ---
 
 ## 🔴 Remaining / New Improvements
@@ -78,7 +81,6 @@ This document outlines suggested architectural, security, and maintenance improv
 ### 4. Frontend Architecture
 - **React Suspense for Data**: Leverage React Suspense with TanStack Query's `useSuspenseQuery` for a more declarative loading state approach, reducing boilerplate `isLoading` checks.
 - **Form Validation UX**: Ensure all forms display inline validation errors as the user types (not just on submit), using `react-hook-form`'s `mode: 'onBlur'` or `mode: 'onChange'`.
-- **Accessibility (a11y)**: Audit the app for WCAG compliance — ensure proper ARIA labels on interactive elements, keyboard navigation support, and sufficient color contrast ratios.
 
 ### 5. Performance
 - **Server-Side Pagination**: Large list endpoints (`getAllUsers`, `getAllTopics`, `getAllProjects`) currently return the entire dataset. Implement cursor-based or offset pagination to reduce payload size and improve response times.

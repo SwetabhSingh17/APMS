@@ -121,13 +121,15 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
             }
 
             // Validate all enrollment numbers are students of the same course
-            const teamCourse = group.course;
+            let teamCourse: string | null = null;
             for (const en of enrollmentNumbers) {
                 const student = await storage.getUserByEnrollmentNumber(en);
                 if (!student || student.role !== UserRole.STUDENT) {
                     throw new Error(`Invalid student enrollment number: ${en}`);
                 }
-                if (teamCourse && student.course && student.course !== teamCourse) {
+                if (!teamCourse) {
+                    teamCourse = student.course;
+                } else if (student.course && student.course !== teamCourse) {
                     throw new Error(`Student ${student.firstName} ${student.lastName} is in a different course (${student.course}) and cannot be added to a ${teamCourse} team.`);
                 }
                 

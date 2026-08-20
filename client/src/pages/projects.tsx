@@ -228,6 +228,7 @@ export default function Projects() {
             <Input
               placeholder="Search projects by title, student, technology..."
               className="pl-10"
+              aria-label="Search projects"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -354,6 +355,7 @@ export default function Projects() {
             <Input
               placeholder="Search projects by title, student, supervisor, technology..."
               className="pl-10"
+              aria-label="Search projects"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />

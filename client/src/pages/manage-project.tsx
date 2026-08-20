@@ -106,6 +106,7 @@ export default function ManageProject() {
             <Input
               placeholder="Search by team name, supervisor, student name or enrollment..."
               className="pl-10"
+              aria-label="Search projects"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />

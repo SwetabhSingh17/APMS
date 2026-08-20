@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/hooks/use-auth";
+import { StudentSelect } from "@/components/student-select";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import MainLayout from "@/components/layout/main-layout";
@@ -569,11 +570,9 @@ export default function StudentGroups() {
                       <StudentSelect
                         selectedEnrollments={enrollmentNumbers}
                         onChange={setEnrollmentNumbers}
-                        courseFilter={user?.course}
+                        courseFilter={user?.course || undefined}
                         maxSelections={user?.course === "BCA" ? 4 : (user?.course === "MCA" ? 1 : 4)}
                       />
-                    </div>
-
                     </div>
 
                     <Button type="submit" className="w-full">

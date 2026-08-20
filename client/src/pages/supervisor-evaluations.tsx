@@ -176,6 +176,7 @@ export default function SupervisorEvaluations() {
           <Input
             placeholder="Search by student name, email, or project title..."
             className="pl-10"
+            aria-label="Search evaluations"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />

@@ -244,6 +244,7 @@ export default function TrackProgress() {
                   <Input
                     placeholder="Search projects..."
                     className="pl-10"
+                    aria-label="Search progress reports"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
