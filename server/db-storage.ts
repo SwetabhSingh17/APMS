@@ -30,6 +30,7 @@ export class DBStorage {
   constructor() {
     this.sessionStore = new PostgresSessionStore({
       pool,
+      tableName: 'sessions',
       createTableIfMissing: true,
     });
     this.initializeDefaultUser();
@@ -254,17 +255,29 @@ export class DBStorage {
   }
 
   async getStudentProjects(studentId: number): Promise<(StudentProject & { topic: ProjectTopic | null })[]> {
-    const projects = await db.select().from(studentProjects).where(eq(studentProjects.studentId, studentId));
+    const rows = await db.select({
+      project: studentProjects,
+      topic: projectTopics,
+      submitter: users
+    })
+    .from(studentProjects)
+    .leftJoin(projectTopics, eq(studentProjects.topicId, projectTopics.id))
+    .leftJoin(users, eq(projectTopics.submittedById, users.id))
+    .where(eq(studentProjects.studentId, studentId));
 
-    const detailedProjects = await Promise.all(projects.map(async (p) => {
-      const [topic] = await db.select().from(projectTopics).where(eq(projectTopics.id, p.topicId));
-      if (topic) {
-        const [submitter] = await db.select().from(users).where(eq(users.id, topic.submittedById));
-        (topic as any).submittedBy = submitter;
+    return rows.map(r => {
+      let topic = null;
+      if (r.topic) {
+        topic = {
+          ...r.topic,
+          submittedBy: r.submitter || undefined
+        } as ProjectTopic;
       }
-      return { ...(p as StudentProject), topic: (topic as ProjectTopic) || null };
-    }));
-    return detailedProjects;
+      return {
+        ...r.project,
+        topic
+      } as StudentProject & { topic: ProjectTopic | null };
+    });
   }
 
   async createStudentProject(project: InsertStudentProject): Promise<StudentProject> {

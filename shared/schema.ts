@@ -16,7 +16,7 @@
  *  - notifications        — User notification queue
  *  - sessions             — Express session storage
  */
-import { pgTable, text, serial, integer, boolean, timestamp, varchar, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, varchar, pgEnum, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -53,6 +53,12 @@ export const users = pgTable("users", {
   isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    usernameIdx: index("username_idx").on(table.username),
+    emailIdx: index("email_idx").on(table.email),
+    enrollmentIdx: index("enrollment_idx").on(table.enrollmentNumber),
+  };
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({
@@ -77,6 +83,10 @@ export const projectTopics = pgTable("project_topics", {
   isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    statusIsDeletedIdx: index("status_is_deleted_idx").on(table.status, table.isDeleted),
+  };
 });
 
 export const insertProjectTopicSchema = createInsertSchema(projectTopics).omit({
@@ -179,6 +189,10 @@ export const studentGroupMembers = pgTable("student_group_members", {
   status: text("status").notNull().default("pending"), // 'pending' | 'accepted'
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    userIdGroupIdIdx: index("user_id_group_id_idx").on(table.userId, table.groupId),
+  };
 });
 
 export type Session = typeof sessions.$inferSelect;

@@ -72,6 +72,10 @@ This document outlines suggested architectural, security, and maintenance improv
 - [x] **API Response Caching** — Added `Cache-Control` headers for read-heavy endpoints like `/api/topics/approved`.
 - [x] **Bundle Size Optimization** — Audited and optimized client bundle dependencies.
 
+### Database and ORM
+- [x] **N+1 Query Problem** — Replaced `Promise.all` loops with Drizzle ORM `leftJoin` and `innerJoin` in data access methods (e.g. `getStudentProjects`, `getPendingTopics`).
+- [x] **Database Indexing** — Added single and composite indexes on frequently queried columns (`username`, `email`, `status`+`is_deleted`) to significantly improve read performance.
+
 ---
 
 ## 🔴 Remaining / New Improvements
@@ -87,12 +91,6 @@ This document outlines suggested architectural, security, and maintenance improv
 - **Controller Separation**: Business logic currently lives inside route handler callbacks in `server/auth.ts` and `server/routes.ts`. Extract this into dedicated controller files (e.g., `server/controllers/topicController.ts`, `server/controllers/userController.ts`) for better testability and separation of concerns.
 - **Input Sanitization**: Add server-side sanitization (e.g., `xss` or `DOMPurify` on the server) for user-generated text fields (topic descriptions, feedback, group names) to prevent stored XSS attacks.
 
-### Database and ORM
-- [x] **N+1 Query Problem**: Several methods in `db-storage.ts` (e.g., `getAllProjects`, `getPendingTopics`, `getApprovedTopics`) fetch related data inside `Promise.all(map(...))`, causing N+1 queries. Replace with Drizzle ORM joins or batch lookups for significant performance gains.
-- **Database Indexing**: Add indexes on frequently queried columns:
-  - `users.username`, `users.email`, `users.enrollment_number` (already unique, but ensure index exists)
-  - `project_topics.status` + `project_topics.is_deleted` (composite index for filtered queries)
-  - `student_group_members.user_id` + `student_group_members.group_id`
 
 ### 4. Frontend Architecture
 - **React Suspense for Data**: Leverage React Suspense with TanStack Query's `useSuspenseQuery` for a more declarative loading state approach, reducing boilerplate `isLoading` checks.
