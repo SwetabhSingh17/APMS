@@ -71,21 +71,21 @@ This document outlines suggested architectural, security, and maintenance improv
 - **Controller Separation**: Business logic currently lives inside route handler callbacks in `server/auth.ts` and `server/routes.ts`. Extract this into dedicated controller files (e.g., `server/controllers/topicController.ts`, `server/controllers/userController.ts`) for better testability and separation of concerns.
 - **Input Sanitization**: Add server-side sanitization (e.g., `xss` or `DOMPurify` on the server) for user-generated text fields (topic descriptions, feedback, group names) to prevent stored XSS attacks.
 
-### 3. Database and ORM
+### Database and ORM
+- [x] **N+1 Query Problem**: Several methods in `db-storage.ts` (e.g., `getAllProjects`, `getPendingTopics`, `getApprovedTopics`) fetch related data inside `Promise.all(map(...))`, causing N+1 queries. Replace with Drizzle ORM joins or batch lookups for significant performance gains.
 - **Database Indexing**: Add indexes on frequently queried columns:
   - `users.username`, `users.email`, `users.enrollment_number` (already unique, but ensure index exists)
   - `project_topics.status` + `project_topics.is_deleted` (composite index for filtered queries)
   - `student_group_members.user_id` + `student_group_members.group_id`
-- **N+1 Query Problem**: Several methods in `db-storage.ts` (e.g., `getAllProjects`, `getPendingTopics`, `getApprovedTopics`) fetch related data inside `Promise.all(map(...))`, causing N+1 queries. Replace with Drizzle ORM joins or batch lookups for significant performance gains.
 
 ### 4. Frontend Architecture
 - **React Suspense for Data**: Leverage React Suspense with TanStack Query's `useSuspenseQuery` for a more declarative loading state approach, reducing boilerplate `isLoading` checks.
 - **Form Validation UX**: Ensure all forms display inline validation errors as the user types (not just on submit), using `react-hook-form`'s `mode: 'onBlur'` or `mode: 'onChange'`.
 
 ### 5. Performance
-- **Server-Side Pagination**: Large list endpoints (`getAllUsers`, `getAllTopics`, `getAllProjects`) currently return the entire dataset. Implement cursor-based or offset pagination to reduce payload size and improve response times.
-- **API Response Caching**: Add cache headers (`Cache-Control`, `ETag`) for read-heavy endpoints like `/api/topics/approved` to reduce redundant database queries.
-- **Bundle Size Optimization**: Audit the client bundle with `npx vite-bundle-visualizer`. Consider lazy-loading heavier dependencies like `recharts`, `xlsx`, and `mermaid` only on the pages that need them.
+- [x] **Server-Side Pagination**: Large list endpoints (`getAllUsers`, `getAllTopics`, `getAllProjects`) currently return the entire dataset. Implement cursor-based or offset pagination to reduce payload size and improve response times.
+- [x] **API Response Caching**: Add cache headers (`Cache-Control`, `ETag`) for read-heavy endpoints like `/api/topics/approved` to reduce redundant database queries.
+- [x] **Bundle Size Optimization**: Audit the client bundle with `npx vite-bundle-visualizer`. Consider lazy-loading heavier dependencies like `recharts`, `xlsx`, and `mermaid` only on the pages that need them.
 - **Image Optimization**: If profile pictures or file uploads are added in the future, implement server-side compression and responsive image serving.
 
 ### 6. DevOps & Deployment

@@ -115,14 +115,12 @@ export function registerProjectRoutes(router: Router, storage: DBStorage) {
     // Get all projects (for coordinators, admins, and supervisors)
     router.get("/api/projects", requireRole([UserRole.COORDINATOR, UserRole.ADMIN, UserRole.SUPERVISOR]), async (req: Request, res: Response) => {
         try {
-            let projects = await storage.getAllProjects();
             const courseFilter = req.query.course as string | undefined;
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 50;
 
-            if (courseFilter) {
-                projects = projects.filter(p => (p.student as any).course === courseFilter);
-            }
-
-            res.json(projects);
+            const paginatedProjects = await storage.getPaginatedProjects(page, limit, courseFilter);
+            res.json(paginatedProjects);
         } catch (error) {
             res.status(500).json({ message: "Failed to fetch projects" });
         }

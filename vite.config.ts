@@ -27,6 +27,15 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-ui': ['lucide-react', 'framer-motion', 'recharts'],
+          'vendor-utils': ['date-fns', 'xlsx', 'mermaid']
+        }
+      }
+    }
   },
   server: {
     host: '0.0.0.0', // Explicitly bind to all network interfaces

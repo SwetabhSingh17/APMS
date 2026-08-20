@@ -125,26 +125,36 @@ export class DBStorage {
   }
 
   async getPendingTopics(): Promise<ProjectTopic[]> {
-    const topics = await db.select().from(projectTopics).where(and(eq(projectTopics.status, "pending"), eq(projectTopics.isDeleted, false)));
-    const topicsWithSubmitter = await Promise.all(topics.map(async (topic) => {
-      const [submitter] = await db.select().from(users).where(eq(users.id, topic.submittedById));
-      return { ...(topic as ProjectTopic), submittedBy: submitter as any };
+    const rows = await db.select({
+      topic: projectTopics,
+      submitter: users,
+    })
+    .from(projectTopics)
+    .innerJoin(users, eq(projectTopics.submittedById, users.id))
+    .where(and(eq(projectTopics.status, "pending"), eq(projectTopics.isDeleted, false)));
+
+    return rows.map(r => ({
+      ...r.topic,
+      submittedBy: r.submitter as any
     }));
-    return topicsWithSubmitter;
   }
 
   async getApprovedTopics(): Promise<ProjectTopic[]> {
-    const topics = await db.select().from(projectTopics).where(and(eq(projectTopics.status, "approved"), eq(projectTopics.isDeleted, false)));
+    const rows = await db.select({
+      topic: projectTopics,
+      submitter: users,
+    })
+    .from(projectTopics)
+    .innerJoin(users, eq(projectTopics.submittedById, users.id))
+    .where(and(eq(projectTopics.status, "approved"), eq(projectTopics.isDeleted, false)));
 
     const allottedTopicIds = (await db.select({ topicId: studentProjects.topicId }).from(studentProjects)).map(p => p.topicId);
 
-    const topicsWithExtra = await Promise.all(topics.map(async (topic) => {
-      const [submitter] = await db.select().from(users).where(eq(users.id, topic.submittedById));
-      // We cast to any to attach isAllotted which is used by frontend but not in strict ProjectTopic schema
-      return { ...(topic as ProjectTopic), submittedBy: submitter as any, isAllotted: allottedTopicIds.includes(topic.id) } as any as ProjectTopic;
-    }));
-
-    return topicsWithExtra;
+    return rows.map(r => ({
+      ...r.topic,
+      submittedBy: r.submitter as any,
+      isAllotted: allottedTopicIds.includes(r.topic.id)
+    } as any as ProjectTopic));
   }
 
   async getRejectedTopics(): Promise<ProjectTopic[]> {
@@ -239,29 +249,32 @@ export class DBStorage {
   }
 
   async getAllProjects(course?: string): Promise<(StudentProject & { topic: ProjectTopic; student: User })[]> {
-    const projects = await db.select().from(studentProjects);
+    const rows = await db.select({
+      project: studentProjects,
+      topic: projectTopics,
+      student: users
+    })
+    .from(studentProjects)
+    .innerJoin(projectTopics, eq(studentProjects.topicId, projectTopics.id))
+    .innerJoin(users, eq(studentProjects.studentId, users.id))
+    .where(course ? eq(projectTopics.course, course) : undefined);
 
-    const detailed = await Promise.all(projects.map(async (p) => {
-      const [topic] = await db.select().from(projectTopics).where(eq(projectTopics.id, p.topicId));
-      const [student] = await db.select().from(users).where(eq(users.id, p.studentId));
-      // Provide default submitter if missing (should not happen if data integrity held)
-      let submitter: User | undefined;
-      if (topic) {
-        [submitter] = await db.select().from(users).where(eq(users.id, topic.submittedById));
-      }
-
-      return {
-        ...(p as StudentProject),
-        student: student as User,
-        topic: { ...(topic as ProjectTopic), submittedBy: submitter }
-      };
-    }));
-
-    let results = detailed as (StudentProject & { topic: ProjectTopic; student: User })[];
-    if (course) {
-        results = results.filter(p => p.topic?.course === course);
+    const submitterIds = Array.from(new Set(rows.map(r => r.topic.submittedById).filter(id => id != null) as number[]));
+    let submitters: User[] = [];
+    if (submitterIds.length > 0) {
+      submitters = await db.select().from(users).where(inArray(users.id, submitterIds));
     }
-    return results;
+
+    const submitterMap = new Map(submitters.map(s => [s.id, s]));
+
+    return rows.map(r => ({
+      ...(r.project as StudentProject),
+      student: r.student as User,
+      topic: {
+        ...(r.topic as ProjectTopic),
+        submittedBy: r.topic.submittedById ? submitterMap.get(r.topic.submittedById) : undefined
+      }
+    }));
   }
 
   async isTopicAllotted(topicId: number): Promise<boolean> {
@@ -744,6 +757,97 @@ export class DBStorage {
     }));
 
     return reportData;
+  }
+
+  // --- Paginated Methods ---
+
+  async getPaginatedUsers(page: number, limit: number, course?: string): Promise<import('@shared/schema').PaginatedResponse<User>> {
+    const conditions = [eq(users.isDeleted, false)];
+    if (course) conditions.push(eq(users.course, course));
+    
+    const countQuery = await db.select({ count: sql<number>`count(*)` }).from(users).where(and(...conditions));
+    const total = Number(countQuery[0].count);
+    
+    const data = await db.select().from(users).where(and(...conditions)).limit(limit).offset((page - 1) * limit) as User[];
+    
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async getPaginatedTopics(page: number, limit: number, course?: string): Promise<import('@shared/schema').PaginatedResponse<ProjectTopic>> {
+    const conditions = [eq(projectTopics.isDeleted, false)];
+    if (course) conditions.push(eq(projectTopics.course, course));
+    
+    const countQuery = await db.select({ count: sql<number>`count(*)` }).from(projectTopics).where(and(...conditions));
+    const total = Number(countQuery[0].count);
+    
+    const data = await db.select().from(projectTopics).where(and(...conditions)).limit(limit).offset((page - 1) * limit) as ProjectTopic[];
+    
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async getPaginatedApprovedTopics(page: number, limit: number, course?: string): Promise<import('@shared/schema').PaginatedResponse<ProjectTopic>> {
+    const conditions = [eq(projectTopics.status, "approved"), eq(projectTopics.isDeleted, false)];
+    if (course) conditions.push(eq(projectTopics.course, course));
+    
+    const countQuery = await db.select({ count: sql<number>`count(*)` }).from(projectTopics).where(and(...conditions));
+    const total = Number(countQuery[0].count);
+    
+    const rows = await db.select({
+      topic: projectTopics,
+      submitter: users,
+    })
+    .from(projectTopics)
+    .innerJoin(users, eq(projectTopics.submittedById, users.id))
+    .where(and(...conditions))
+    .limit(limit).offset((page - 1) * limit);
+
+    const allottedTopicIds = (await db.select({ topicId: studentProjects.topicId }).from(studentProjects)).map(p => p.topicId);
+
+    const data = rows.map(r => ({
+      ...r.topic,
+      submittedBy: r.submitter as any,
+      isAllotted: allottedTopicIds.includes(r.topic.id)
+    } as any as ProjectTopic));
+    
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async getPaginatedProjects(page: number, limit: number, course?: string): Promise<import('@shared/schema').PaginatedResponse<StudentProject & { topic: ProjectTopic; student: User }>> {
+    const countQuery = await db.select({ count: sql<number>`count(*)` })
+      .from(studentProjects)
+      .innerJoin(projectTopics, eq(studentProjects.topicId, projectTopics.id))
+      .where(course ? eq(projectTopics.course, course) : undefined);
+      
+    const total = Number(countQuery[0].count);
+
+    const rows = await db.select({
+      project: studentProjects,
+      topic: projectTopics,
+      student: users
+    })
+    .from(studentProjects)
+    .innerJoin(projectTopics, eq(studentProjects.topicId, projectTopics.id))
+    .innerJoin(users, eq(studentProjects.studentId, users.id))
+    .where(course ? eq(projectTopics.course, course) : undefined)
+    .limit(limit).offset((page - 1) * limit);
+
+    const submitterIds = Array.from(new Set(rows.map(r => r.topic.submittedById).filter(id => id != null) as number[]));
+    let submitters: User[] = [];
+    if (submitterIds.length > 0) {
+      submitters = await db.select().from(users).where(inArray(users.id, submitterIds));
+    }
+    const submitterMap = new Map(submitters.map(s => [s.id, s]));
+
+    const data = rows.map(r => ({
+      ...(r.project as StudentProject),
+      student: r.student as User,
+      topic: {
+        ...(r.topic as ProjectTopic),
+        submittedBy: r.topic.submittedById ? submitterMap.get(r.topic.submittedById) : undefined
+      }
+    }));
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 }
 

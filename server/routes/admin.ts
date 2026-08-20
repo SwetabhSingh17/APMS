@@ -10,10 +10,14 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
     router.get("/api/users", requireRole([UserRole.ADMIN, UserRole.COORDINATOR]), async (req: Request, res: Response) => {
         try {
             const course = req.query.course as string | undefined;
-            const users = await storage.getAllUsers(course);
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 50;
+
+            const paginatedUsers = await storage.getPaginatedUsers(page, limit, course);
+            
             // Remove passwords from response
-            const usersWithoutPasswords = users.map(({ password, ...user }) => user);
-            res.json(usersWithoutPasswords);
+            const data = paginatedUsers.data.map(({ password, ...user }) => user);
+            res.json({ ...paginatedUsers, data });
         } catch (error) {
             res.status(500).json({ message: "Failed to fetch users" });
         }

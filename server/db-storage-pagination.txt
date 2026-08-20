@@ -1,0 +1,11 @@
+  async getPaginatedUsers(page: number, limit: number, course?: string): Promise<import('@shared/schema').PaginatedResponse<User>> {
+    const conditions = [eq(users.isDeleted, false)];
+    if (course) conditions.push(eq(users.course, course));
+    
+    const countQuery = await db.select({ count: sql<number>\`count(*)\` }).from(users).where(and(...conditions));
+    const total = Number(countQuery[0].count);
+    
+    const data = await db.select().from(users).where(and(...conditions)).limit(limit).offset((page - 1) * limit) as User[];
+    
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }

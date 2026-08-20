@@ -246,3 +246,12 @@ export enum CourseType {
   BCA = "BCA",
   MCA = "MCA",
 }
+
+// Paginated response type
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}

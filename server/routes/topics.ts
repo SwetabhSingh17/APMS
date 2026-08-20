@@ -21,11 +21,14 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
     // Get all approved topics (with categorization for students)
     router.get("/api/topics/approved", async (req: Request, res: Response) => {
         try {
-            let topics = await storage.getApprovedTopics();
+            // Set Cache-Control for read-heavy endpoint
+            res.setHeader('Cache-Control', 'public, max-age=60');
+
             const courseFilter = req.query.course as string | undefined;
 
             // If the user is a student, auto-filter by their course
             if (isAuthenticatedRequest(req) && req.user?.role === UserRole.STUDENT) {
+                let topics = await storage.getApprovedTopics();
                 const studentId = req.user.id;
                 const studentCourse = (req.user as any).course;
 
@@ -60,13 +63,13 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
                     availableTopics,
                     takenTopics
                 });
+            } else {
+                // Admin or other roles - Paginate response
+                const page = parseInt(req.query.page as string) || 1;
+                const limit = parseInt(req.query.limit as string) || 50;
+                const paginatedTopics = await storage.getPaginatedApprovedTopics(page, limit, courseFilter);
+                res.json(paginatedTopics);
             }
-
-            // For non-students, apply course filter if provided
-            if (courseFilter) {
-                topics = topics.filter(t => (t as any).course === courseFilter);
-            }
-            res.json(topics);
         } catch (error) {
             res.status(500).json({ message: "Failed to fetch approved topics" });
         }
