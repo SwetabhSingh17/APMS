@@ -20,6 +20,13 @@
 1. **API Response Caching**: Added cache headers for read-heavy endpoints to reduce database queries.
 2. **Accessibility Audit**: Ensured proper ARIA labels, keyboard navigation, and WCAG compliance across the application.
 
+### Bug Fixes
+1. **Frontend Array Mapping Crash**: Fixed a bug where `.map is not a function` errors would crash frontend tables (`/projects`, `/manage-project`, `/track-progress`, `/user-management`, etc.) because the components expected a raw array but received a `PaginatedResponse` object due to the server-side pagination enhancements in v1.4.0.
+2. **Build Configuration Fix**: Corrected a dependency mismatch in `vite.config.ts` where `react-router-dom` was mistakenly referenced in `manualChunks` instead of `wouter`, which caused the production build to fail.
+
+### Documentation
+1. **Fixes Required Update**: Expanded the `Fixes_required.md` with new architectural and feature proposals, including Background Jobs, Advanced Rate Limiting, OpenAPI generation, Multi-Department Support, and PDF generation. Numbering anomalies in the document were also resolved.
+
 ## Version 1.3.0
 ### Course Segregation (BCA / MCA)
 1. **Schema Update**: Added mandatory `course` field (BCA or MCA) to `users` (Student roles) and `project_topics` schema.
@@ -35,7 +42,7 @@
 4. **Member Search & Editing**: Provided Admins and Coordinators with a powerful autocomplete member search and the ability to add, edit, or remove members in a team from the `/manage-project` page. Supervisors can edit members exclusively for teams they supervise.
 5. **Team Edit Notifications**: Integrated automated real-time notifications to Admins, Coordinators, and the relevant Supervisor whenever a team's members are modified.
 
-## Version 1.2.0 (Current)
+## Version 1.2.0
 ### Manual Supervisor Allotment & Manage Project
 1. **Manage Project Page**: New dedicated page (`/manage-project`) for Admins and Coordinators to view all project teams, their members, and assigned supervisors in one place.
 2. **Manual Supervisor Reassignment**: Admins and Coordinators can now seamlessly change the supervisor assigned to any project team via a "Change Supervisor" dialog with a searchable dropdown.
@@ -133,10 +140,4 @@
 - Drizzle ORM
 - Express.js
 - TypeScript
-- Tailwind CSS 
-## Version 1.4.1
-### Bug Fixes
-1. **Frontend Array Mapping Crash**: Fixed a bug where `.map is not a function` errors would crash frontend tables (`/projects`, `/manage-project`, `/track-progress`, `/user-management`, etc.) because the components expected a raw array but received a `PaginatedResponse` object due to the server-side pagination enhancements in v1.4.0.
-2. **Build Configuration Fix**: Corrected a dependency mismatch in `vite.config.ts` where `react-router-dom` was mistakenly referenced in `manualChunks` instead of `wouter`, which caused the production build to fail.
-### Documentation
-1. **Fixes Required Update**: Expanded the `Fixes_required.md` with new architectural and feature proposals, including Background Jobs, Advanced Rate Limiting, OpenAPI generation, Multi-Department Support, and PDF generation. Numbering anomalies in the document were also resolved.
+- Tailwind CSS
