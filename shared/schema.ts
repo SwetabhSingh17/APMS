@@ -16,7 +16,7 @@
  *  - notifications        — User notification queue
  *  - sessions             — Express session storage
  */
-import { pgTable, text, serial, integer, boolean, timestamp, varchar, pgEnum, index } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, varchar, pgEnum, index, json } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -173,12 +173,14 @@ export const insertProjectMilestoneSchema = createInsertSchema(projectMilestones
 });
 
 // Sessions table
-export const sessions = pgTable("sessions", {
-  id: text("id").primaryKey(),
-  data: text("data").notNull(),
-  expires: timestamp("expires").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+export const sessions = pgTable("session", {
+  sid: varchar("sid").primaryKey(),
+  sess: json("sess").notNull(),
+  expire: timestamp("expire", { precision: 6 }).notNull(),
+}, (table) => {
+  return {
+    expireIdx: index("IDX_session_expire").on(table.expire),
+  };
 });
 
 // Student group members table

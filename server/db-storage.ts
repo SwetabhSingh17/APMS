@@ -30,7 +30,6 @@ export class DBStorage {
   constructor() {
     this.sessionStore = new PostgresSessionStore({
       pool,
-      tableName: 'sessions',
       createTableIfMissing: true,
     });
     this.initializeDefaultUser();
