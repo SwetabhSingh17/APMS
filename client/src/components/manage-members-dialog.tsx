@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,6 @@ export function ManageMembersDialog({ group, open, onOpenChange }: { group: any,
   const [enrollmentNumbers, setEnrollmentNumbers] = useState<string[]>(group?.members?.map((m: any) => m.enrollmentNumber) || []);
 
   // Update on prop change
-  import { useEffect } from "react";
   useEffect(() => {
     if (open && group) {
       setEnrollmentNumbers(group.members?.map((m: any) => m.enrollmentNumber) || []);

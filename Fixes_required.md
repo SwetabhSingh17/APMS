@@ -44,6 +44,17 @@ This document outlines suggested architectural, security, and maintenance improv
 
 ---
 
+## ✅ Completed (v1.3.0)
+
+### Course Segregation & Project Team Management
+- [x] **Strict Size Constraints** — BCA student teams restricted to 2-5 members; MCA student teams restricted to 1-2 members.
+- **Course Isolation** — Implemented strict course isolation so BCA students can only group with BCA students, and MCA with MCA.
+- [x] **Member Management API** — New `PATCH /api/student-groups/:groupId/members` allows Admins, Coordinators, and the designated Supervisor to edit team memberships globally.
+- [x] **Management UI Overhaul** — Added a "Create Team" and "Manage Members" Dialog in the `manage-project` page, providing Admins/Coordinators powerful autocomplete search tools for team curation.
+- [x] **Real-Time Edit Notifications** — Added WebSocket notifications to Admins, Coordinators, and the Team Supervisor whenever a team's members are edited.
+
+---
+
 ## 🔴 Remaining / New Improvements
 
 ### 1. Authentication Modernization
