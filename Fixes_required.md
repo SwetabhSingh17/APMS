@@ -99,33 +99,33 @@ This document outlines suggested architectural, security, and maintenance improv
 - **Controller Separation**: Business logic currently lives inside route handler callbacks in `server/auth.ts` and `server/routes.ts`. Extract this into dedicated controller files (e.g., `server/controllers/topicController.ts`, `server/controllers/userController.ts`) for better testability and separation of concerns.
 - **Input Sanitization**: Add server-side sanitization (e.g., `xss` or `DOMPurify` on the server) for user-generated text fields (topic descriptions, feedback, group names) to prevent stored XSS attacks.
 
-### 4. Frontend Architecture
+### 3. Frontend Architecture
 - **React Suspense for Data**: Leverage React Suspense with TanStack Query's `useSuspenseQuery` for a more declarative loading state approach, reducing boilerplate `isLoading` checks.
 - **Form Validation UX**: Ensure all forms display inline validation errors as the user types (not just on submit), using `react-hook-form`'s `mode: 'onBlur'` or `mode: 'onChange'`.
 
-### 5. Performance
+### 4. Performance
 - **Image Optimization**: If profile pictures or file uploads are added in the future, implement server-side compression and responsive image serving.
 
-### 6. DevOps & Deployment
+### 5. DevOps & Deployment
 - **Environment Variable Validation**: Use Zod to validate all required environment variables at server startup (e.g., `DATABASE_URL`, `SESSION_SECRET`), failing fast with clear error messages if any are missing.
 - **Health Check Endpoint**: Add a `/api/health` endpoint that returns the server status and database connectivity, useful for load balancers and monitoring.
 - **Structured Logging**: Replace `console.log` / `console.error` calls with a structured logger (e.g., `pino` or `winston`) that supports log levels, JSON output, and timestamps for production debugging.
 - **Docker Support**: Add a `Dockerfile` and `docker-compose.yml` for containerized development and deployment with PostgreSQL.
 
-### 7. UX & Feature Gaps
+### 6. UX & Feature Gaps
 - **Email Notifications**: Integrate an email service (e.g., `nodemailer` + SMTP or a transactional email API) for critical events like group invitations and topic approval/rejection.
 - **File Uploads**: Allow students to upload project reports/documents attached to milestones.
 - **Audit Log**: Maintain a system-wide audit trail recording who performed what action and when, especially for admin operations like database resets and user deletions.
 
-### 8. System Architecture & Scalability
+### 7. System Architecture & Scalability
 - **Background Jobs System**: Integrate a message queue (e.g., `BullMQ` or `pg-boss`) for offloading long-running tasks like batch email notifications, generating heavy Excel/PDF reports, or processing periodic project progress summaries.
 - **Advanced Rate Limiting**: Extend the current rate limiting beyond just authentication. Implement distinct limits for expensive endpoints (e.g., large data exports) and write-heavy endpoints (e.g., topic submissions) to prevent system abuse.
 - **API Documentation**: Auto-generate OpenAPI/Swagger documentation directly from Zod schemas (using `zod-openapi` and `swagger-ui-express`) to create a live API testing interface for developers.
 
-### 9. Extended Administrative Capabilities
+### 8. Extended Administrative Capabilities
 - **Multi-Department Support**: Lay the groundwork for multi-tenant behavior so a single APMS instance can manage completely isolated data for multiple departments (e.g., CS, IT, Mechanical) under different Department Heads.
 - **Granular RBAC System**: Migrate from simple role arrays (e.g., `requireRole([Admin, Coordinator])`) to a more granular, attribute-based access control system (like `CASL`) where permissions can be dynamically defined at the database level.
 
-### 10. Frontend Polish
+### 9. Frontend Polish
 - **Mobile Responsiveness Audit**: Conduct a comprehensive pass on complex data grids (Project Table, User Management) and multi-step dialogs to ensure they are fully usable on smaller mobile viewports.
 - **PDF Export Capabilities**: Supplement the existing Excel exports with client-side or server-side PDF generation (e.g., `react-pdf` or `Puppeteer`) for official, print-ready reports.

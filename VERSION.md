@@ -130,3 +130,5 @@
 ### Bug Fixes
 1. **Frontend Array Mapping Crash**: Fixed a bug where `.map is not a function` errors would crash frontend tables (`/projects`, `/manage-project`, `/track-progress`, `/user-management`, etc.) because the components expected a raw array but received a `PaginatedResponse` object due to the server-side pagination enhancements in v1.4.0.
 2. **Build Configuration Fix**: Corrected a dependency mismatch in `vite.config.ts` where `react-router-dom` was mistakenly referenced in `manualChunks` instead of `wouter`, which caused the production build to fail.
+### Documentation
+1. **Fixes Required Update**: Expanded the `Fixes_required.md` with new architectural and feature proposals, including Background Jobs, Advanced Rate Limiting, OpenAPI generation, Multi-Department Support, and PDF generation. Numbering anomalies in the document were also resolved.
