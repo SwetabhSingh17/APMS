@@ -1,12 +1,9 @@
+import 'dotenv/config';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import { db } from '../server/db.js';
-import { users } from '../shared/schema.js';
-import { eq } from 'drizzle-orm';
-import { scrypt, randomBytes } from 'crypto';
-import { promisify as utilPromisify } from 'util';
+import { DBStorage } from '../server/db-storage.js';
 
 const execAsync = promisify(exec);
 
@@ -25,39 +22,14 @@ const dbConfig = {
     password: process.env.DB_PASSWORD || '',
 };
 
-const scryptAsync = utilPromisify(scrypt);
 
-// Hash password function (copied from db-storage.ts to avoid circular dependency)
-async function hashPassword(password: string): Promise<string> {
-    const salt = randomBytes(16).toString('hex');
-    const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-    return `${buf.toString('hex')}.${salt}`;
-}
 
 async function initializeAdminUser() {
     try {
-        console.log('🔧 Initializing admin user...');
-
-        // Check if admin exists
-        const existingAdmin = await db.select().from(users).where(eq(users.role, 'admin')).limit(1);
-
-        if (existingAdmin.length === 0) {
-            // Create admin user
-            const adminPassword = await hashPassword('Admin@123');
-            await db.insert(users).values({
-                username: 'admin',
-                password: adminPassword,
-                firstName: 'Admin',
-                lastName: 'User',
-                email: 'admin@example.com',
-                role: 'admin',
-            });
-            console.log('   ✅ Admin user created');
-            console.log('   Username: admin');
-            console.log('   Password: Admin@123');
-        } else {
-            console.log('   ℹ️  Admin user already exists');
-        }
+        console.log('🔧 Initializing default admin user...');
+        const storage = new DBStorage();
+        await storage.initializeDefaultUser();
+        console.log('   ✅ Default admin check complete');
     } catch (error: any) {
         console.error('   ⚠️  Failed to initialize admin user:', error.message);
         throw error;
@@ -114,7 +86,7 @@ async function runMigrations() {
     try {
         console.log('🔄 Running database migrations...');
 
-        const migrateCmd = 'npm run db:migrate';
+        const migrateCmd = 'npm run db:push';
         const { stdout } = await execAsync(migrateCmd);
 
         console.log(stdout);
@@ -163,7 +135,7 @@ async function run() {
         console.log('\n🎉 Database restore complete!');
         console.log('   You can now start the server and log in with:');
         console.log('   Username: admin');
-        console.log('   Password: Admin@123');
+        console.log('   Password: Admin@123 (if freshly initialized)');
 
         process.exit(0);
     } catch (error: any) {

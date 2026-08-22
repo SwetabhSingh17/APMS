@@ -304,6 +304,9 @@ if (-not $envExists) {
     $envContent += "`r`n"
     $envContent += "# Session Configuration`r`n"
     $envContent += "SESSION_SECRET=$sessionSecret`r`n"
+    $envContent += "`r`n"
+    $envContent += "# Derived Configuration (for drizzle-kit)`r`n"
+    $envContent += "DATABASE_URL=postgres://postgres:root123@localhost:5432/integral_project_hub`r`n"
     
     $envContent | Out-File -FilePath ".env" -Encoding utf8
     
@@ -375,7 +378,7 @@ if ($backupFiles.Count -gt 0) {
     Write-Host "Database restore completed" -ForegroundColor Green
 } else {
     Write-Host "No backups found. Syncing database schema..." -ForegroundColor Cyan
-    npm run db:push
+    npm run db:setup
     Write-Host "Schema sync completed" -ForegroundColor Green
 }
 Write-Host ""

@@ -47,8 +47,9 @@ The repository is structured as a monorepo-style full-stack application:
   - `websocket.ts`: WebSocket server for real-time notification delivery.
 - `shared/`: Types and schemas shared between client and server.
   - `schema.ts`: Core Drizzle tables, Zod schemas, and TypeScript interfaces.
-- `scripts/`: DB seeding, backup, restore, and reset scripts.
-
+- `scripts/`: DB seeding, backup, restore, setup, and reset scripts.
+  - `setup_db.ts`: Unified database installation (wipes public schema, pushes tables, inits default admin).
+  - `hard_reset.ts`: Aliased to setup_db.ts for safe resetting.
 ---
 
 ## 4. Database Schema (drizzle)

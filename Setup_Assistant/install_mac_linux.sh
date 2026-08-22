@@ -223,6 +223,9 @@ NODE_ENV=development
 
 # Session Configuration
 SESSION_SECRET=$SESSION_SECRET
+
+# Derived Configuration (for drizzle-kit)
+DATABASE_URL=postgres://postgres:@localhost:5432/integral_project_hub
 EOF
     
     print_success "Environment file created"
@@ -288,7 +291,7 @@ fi
 if [ "$SKIP_PUSH" = false ]; then
     # Sync database schema using Drizzle
     print_info "Syncing database schema..."
-    npm run db:push
+    npm run db:setup
     if [ $? -eq 0 ]; then
         print_success "Schema sync completed"
     else

@@ -1,0 +1,16 @@
+# Database Configuration
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=integral_project_hub
+DB_USER=postgres
+DB_PASSWORD=root123
+
+# Server Configuration
+PORT=3000
+NODE_ENV=development
+
+# Session Configuration
+SESSION_SECRET=VfJtO5x9B1pZ7kL2QwN3mR4hT8yC6aE0
+
+# Derived Configuration (for drizzle-kit)
+DATABASE_URL=postgres://postgres:root123@localhost:5432/integral_project_hub

@@ -1,0 +1,19 @@
+=== SYSTEM ACCOUNTS ===
+admin | Admin@123 | admin | N/A
+coordinator | Coord@123 | coordinator | BCA
+faculty_a | Pass@123 | supervisor | BCA
+faculty_b | Pass@123 | supervisor | BCA
+faculty_c | Pass@123 | supervisor | MCA
+faculty_d | Pass@123 | supervisor | MCA
+stu_bca_1 | Pass@123 | student | BCA
+stu_bca_2 | Pass@123 | student | BCA
+stu_bca_3 | Pass@123 | student | BCA
+stu_bca_4 | Pass@123 | student | BCA
+stu_bca_5 | Pass@123 | student | BCA
+stu_bca_6 | Pass@123 | student | BCA
+stu_mca_1 | Pass@123 | student | MCA
+stu_mca_2 | Pass@123 | student | MCA
+stu_mca_3 | Pass@123 | student | MCA
+stu_mca_4 | Pass@123 | student | MCA
+stu_mca_5 | Pass@123 | student | MCA
+stu_mca_6 | Pass@123 | student | MCA

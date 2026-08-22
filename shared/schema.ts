@@ -206,7 +206,7 @@ export const insertSessionSchema = createInsertSchema(sessions).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
-});
+} as any);
 
 export const insertStudentGroupMemberSchema = createInsertSchema(studentGroupMembers).omit({
   id: true,

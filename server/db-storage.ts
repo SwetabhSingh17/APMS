@@ -32,10 +32,11 @@ export class DBStorage {
       pool,
       createTableIfMissing: true,
     });
-    this.initializeDefaultUser();
+    // Removed synchronous initialization to prevent crashes if DB tables are missing.
+    // It will be called explicitly during server startup.
   }
 
-  private async initializeDefaultUser() {
+  public async initializeDefaultUser() {
     try {
       const existingAdmin = await db.select().from(users)
         .where(eq(users.username, 'admin'));
@@ -52,9 +53,14 @@ export class DBStorage {
           enrollmentNumber: null,
           groupId: null
         } as unknown as InsertUser);
+        console.log("✅ Default admin user successfully created.");
       }
-    } catch (error) {
-      console.error("Failed to create default admin user:", error);
+    } catch (error: any) {
+      if (error?.code === '42P01') {
+        console.error("⚠️ Schema 'users' does not exist. Please run 'npm run db:setup' to prepare your database.");
+      } else {
+        console.error("❌ Failed to create default admin user:", error.message || error);
+      }
     }
   }
 

@@ -13,7 +13,8 @@
     "db:backup": "tsx scripts/backup_schema.ts",
     "db:backup:schema-only": "tsx scripts/backup_schema.ts --schema-only",
     "db:restore": "tsx scripts/restore_schema.ts",
-    "db:hard-reset": "tsx scripts/hard_reset.ts"
+    "db:setup": "tsx scripts/setup_db.ts",
+    "db:hard-reset": "npm run db:setup"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

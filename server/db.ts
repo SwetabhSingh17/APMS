@@ -27,8 +27,8 @@ export const pool = new Pool(dbConfig);
 /**
  * Verify database connectivity on startup.
  *
- * This project uses `drizzle-kit push` (npm run db:push) to synchronize
- * the schema directly — file-based migrations are not used. This function
+ * This project uses `drizzle-kit push` (npm run db:push) or `npm run db:setup`
+ * to synchronize the schema directly — file-based migrations are not used. This function
  * simply confirms the database is reachable before the server starts
  * accepting traffic.
  */

@@ -52,9 +52,9 @@ If you are on a Windows Server (which lacks the Microsoft Store for automated in
    ```cmd
    "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres -c "CREATE DATABASE integral_project_hub;"
    ```
-8. Build the tables inside the database:
+8. Build the tables and initialize the admin account:
    ```cmd
-   npm run db:push
+   npm run db:setup
    ```
    *(⚠️ If this step shows an error in red, open the `.env` file and make sure the `DB_PASSWORD` matches what you set in step 2!)*
 9. Skip to **Step 2**!
@@ -88,9 +88,9 @@ If you are on a Windows Server (which lacks the Microsoft Store for automated in
    ```bash
    cp .env.example .env
    ```
-6. Build the database:
+6. Build the database and initialize the admin account:
    ```bash
-   npm run db:push
+   npm run db:setup
    ```
 7. Skip to **Step 2**!
 
@@ -126,9 +126,9 @@ If you are on a Windows Server (which lacks the Microsoft Store for automated in
    ```bash
    cp .env.example .env
    ```
-6. Build the database:
+6. Build the database and initialize the admin account:
    ```bash
-   npm run db:push
+   npm run db:setup
    ```
 7. Skip to **Step 2**!
 
@@ -184,3 +184,41 @@ Just double-click the **`start_server.bat`** file in your APMS folder! It will a
    ```
 
 You are officially a coding superstar! 🌟
+
+---
+
+## 🔄 Step 4: Updating an Existing Application
+
+If you already have the application running and need to update the code to the latest version gracefully without losing your database:
+
+### Option A: Using Git (Recommended)
+1. Stop your running server (`Ctrl + C`).
+2. Open your Terminal/Command Prompt in your project folder.
+3. Pull the latest code:
+   ```bash
+   git pull origin main
+   ```
+4. Install any new dependencies:
+   ```bash
+   npm install
+   ```
+5. Apply database schema changes safely (this preserves data):
+   ```bash
+   npm run db:push
+   ```
+6. Restart your server!
+
+### Option B: Using a Downloaded ZIP file
+1. Stop your running server (`Ctrl + C`).
+2. Download the new ZIP file and extract it to a **new** folder.
+3. **Important**: Copy your `.env` file from the **old** folder into the **new** folder. This ensures you connect to the same database!
+4. Open Terminal/Command Prompt in the **new** folder.
+5. Install dependencies:
+   ```bash
+   npm install
+   ```
+6. Apply database schema changes safely:
+   ```bash
+   npm run db:push
+   ```
+7. Start your server! (You can safely delete the old folder once you verify everything works).

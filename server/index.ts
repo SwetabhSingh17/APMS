@@ -89,6 +89,9 @@ async function startServer(): Promise<void> {
     // 1. Validate DB schema before serving traffic
     await runMigrations();
 
+    // 1.5 Initialize default admin user (safe to run after DB connection is verified)
+    await storage.initializeDefaultUser();
+
     // 2. Initialize bound physical web server
     const server = createServer(app);
 

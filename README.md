@@ -175,8 +175,10 @@ If you prefer to run the steps manually:
    Edit `.env` with your PostgreSQL connection string and a secure session secret. See [Configuration](#-configuration) for details.
 
 4. **Set up the database**
+   
+   Initialize the database schema and default admin account:
    ```bash
-   npm run db:push
+   npm run db:setup
    ```
 
 5. **Start the development server**
@@ -185,6 +187,22 @@ If you prefer to run the steps manually:
    ```
    
    The app will be available at `http://localhost:3000`.
+
+### Gracefully Updating an Existing Application
+
+If you already have a running instance and want to pull the latest code without losing your database state:
+
+1. **Stop the server** (`Ctrl + C`).
+2. **Get the latest code** using `git pull origin main` (or extract a new ZIP, but remember to copy over your `.env` file from the old folder).
+3. **Install new dependencies**:
+   ```bash
+   npm install
+   ```
+4. **Apply safe schema updates**:
+   ```bash
+   npm run db:push
+   ```
+5. **Restart your server**.
 
 ---
 
@@ -211,7 +229,8 @@ All configuration is managed through environment variables in a `.env` file at t
 | `npm run build` | Build for production (client + server) |
 | `npm start` | Start production server |
 | `npm run check` | Run TypeScript type checking |
-| `npm run db:push` | Push schema changes to database (Replaces db:migrate) |
+| `npm run db:setup` | Clean install schema and initialize default admin |
+| `npm run db:push` | Push non-destructive schema changes to existing database |
 | `npm run db:backup` | Backup database schema and data |
 | `npm run db:restore` | Restore database from backup |
 | `npm run db:hard-reset` | ⚠️ Full database reset (destructive) |

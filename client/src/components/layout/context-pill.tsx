@@ -12,7 +12,7 @@ export function ContextPill() {
   const [status, setStatus] = useState<"idle" | "syncing" | "notification" | "success" | "toast">("idle");
   const [message, setMessage] = useState("");
   const [subMessage, setSubMessage] = useState("");
-  const [toastVariant, setToastVariant] = useState<string | undefined>(undefined);
+  const [toastVariant, setToastVariant] = useState<"default" | "destructive" | null | undefined>(undefined);
   const { toasts, dismiss } = useToast();
   const processedToastIds = useRef<Set<string>>(new Set());
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
