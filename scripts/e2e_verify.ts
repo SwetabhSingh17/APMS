@@ -34,25 +34,30 @@ const USERS: Record<string, any> = {
     fac_d: { username: 'faculty_d', password: PASSWORDS.DEFAULT, role: 'supervisor', firstName: 'Faculty', lastName: 'D', email: 'fac_d@test.com', course: 'MCA', enrollmentNumber: 'FACD' },
 };
 
-// 6 BCA Students
+// 6 BCA Students (1-6)
 for (let i = 1; i <= 6; i++) {
-    USERS[`stu_bca_${i}`] = { username: `stu_bca_${i}`, password: PASSWORDS.DEFAULT, role: 'student', firstName: 'BCA Stu', lastName: `${i}`, email: `bca${i}@test.com`, course: 'BCA', enrollmentNumber: `BCA00${i}` };
+    USERS[`stu_${i}`] = { username: `student_${i}`, password: PASSWORDS.DEFAULT, role: 'student', firstName: 'Student', lastName: `${i}`, email: `student${i}@test.com`, course: 'BCA', enrollmentNumber: `E00${i}` };
 }
-// 6 MCA Students
-for (let i = 1; i <= 6; i++) {
-    USERS[`stu_mca_${i}`] = { username: `stu_mca_${i}`, password: PASSWORDS.DEFAULT, role: 'student', firstName: 'MCA Stu', lastName: `${i}`, email: `mca${i}@test.com`, course: 'MCA', enrollmentNumber: `MCA00${i}` };
+// 6 MCA Students (7-12)
+for (let i = 7; i <= 12; i++) {
+    USERS[`stu_${i}`] = { username: `student_${i}`, password: PASSWORDS.DEFAULT, role: 'student', firstName: 'Student', lastName: `${i}`, email: `student${i}@test.com`, course: 'MCA', enrollmentNumber: `E00${i}` };
 }
 
 const TOPICS: Record<string, any> = {
     A: { title: 'Topic A (BCA)', description: 'Desc A', technology: 'React', projectType: 'Research', course: 'BCA', owner: 'fac_a' },
     B: { title: 'Topic B (BCA)', description: 'Desc B', technology: 'Node', projectType: 'Development', course: 'BCA', owner: 'fac_b' },
     C: { title: 'Topic C (BCA)', description: 'Desc C', technology: 'Python', projectType: 'Mini Project', course: 'BCA', owner: 'fac_b' },
+    I: { title: 'Topic I (BCA Unallocated)', description: 'Desc I', technology: 'Vue', projectType: 'Mini Project', course: 'BCA', owner: 'fac_a' },
+    
     D: { title: 'Topic D (MCA)', description: 'Desc D', technology: 'Java', projectType: 'Major Project', course: 'MCA', owner: 'fac_c' },
     E: { title: 'Topic E (MCA)', description: 'Desc E', technology: 'C++', projectType: 'Research', course: 'MCA', owner: 'fac_d' },
     F: { title: 'Topic F (MCA)', description: 'Desc F', technology: 'Go', projectType: 'Development', course: 'MCA', owner: 'fac_c' },
     G: { title: 'Topic G (MCA)', description: 'Desc G', technology: 'Rust', projectType: 'Development', course: 'MCA', owner: 'fac_d' },
+    J: { title: 'Topic J (MCA Unallocated)', description: 'Desc J', technology: 'Ruby', projectType: 'Development', course: 'MCA', owner: 'fac_c' },
+    
     H: { title: 'Topic H (MCA Reject)', description: 'Desc H', technology: 'Rust', projectType: 'Development', course: 'MCA', owner: 'fac_d' }, // For rejection
 };
+
 
 async function runTest() {
     console.log('🚀 Starting End-to-End Flow Validation...');
@@ -100,12 +105,12 @@ async function runTest() {
             return gRes.data.id;
         }
 
-        await createGroup('stu_bca_1', ['stu_bca_2'], 'BCA Alpha', 'fac_a');
-        await createGroup('stu_bca_3', ['stu_bca_4'], 'BCA Beta', 'fac_b');
-        await createGroup('stu_bca_5', ['stu_bca_6'], 'BCA Gamma', 'fac_a');
+        await createGroup('stu_1', ['stu_2'], 'BCA Alpha', 'fac_a');
+        await createGroup('stu_3', ['stu_4'], 'BCA Beta', 'fac_b');
+        await createGroup('stu_5', ['stu_6'], 'BCA Gamma', 'fac_a');
 
-        await createGroup('stu_mca_3', ['stu_mca_4'], 'MCA Delta', 'fac_c');
-        await createGroup('stu_mca_5', ['stu_mca_6'], 'MCA Epsilon', 'fac_d');
+        await createGroup('stu_9', ['stu_10'], 'MCA Delta', 'fac_c');
+        await createGroup('stu_11', ['stu_12'], 'MCA Epsilon', 'fac_d');
 
         console.log('\n🎯 Step 5: Allocating Topics...');
         async function selectTopic(stuKey: string, topicKey: string, expectedStatus: number) {
@@ -114,27 +119,27 @@ async function runTest() {
         }
 
         // BCA
-        await selectTopic('stu_bca_1', 'A', 201);
-        await selectTopic('stu_bca_3', 'B', 201);
-        await selectTopic('stu_bca_5', 'C', 201);
+        await selectTopic('stu_1', 'A', 201);
+        await selectTopic('stu_3', 'B', 201);
+        await selectTopic('stu_5', 'C', 201);
         
         // Block double select
-        await selectTopic('stu_bca_5', 'A', 400); // Already taken by BCA Alpha
+        await selectTopic('stu_5', 'A', 400); // Already taken by BCA Alpha
 
         // MCA Independent
-        await selectTopic('stu_mca_1', 'D', 201);
-        await selectTopic('stu_mca_2', 'E', 201);
+        await selectTopic('stu_7', 'D', 201);
+        await selectTopic('stu_8', 'E', 201);
 
         // MCA Groups
-        await selectTopic('stu_mca_3', 'F', 201);
-        await selectTopic('stu_mca_5', 'G', 201);
+        await selectTopic('stu_9', 'F', 201);
+        await selectTopic('stu_11', 'G', 201);
 
         // Cross-course selection block check
-        // stu_mca_1 tries to select BCA Topic C
-        await selectTopic('stu_mca_1', 'C', 400); 
+        // stu_7 tries to select BCA Topic C
+        await selectTopic('stu_7', 'C', 400); 
 
         // Reject topic block check
-        await selectTopic('stu_mca_2', 'H', 400); 
+        await selectTopic('stu_8', 'H', 400); 
 
         console.log('\n🔄 Step 6: System Reset...');
         res = await request('POST', '/api/admin/reset', { password: PASSWORDS.ADMIN }, 'admin');
