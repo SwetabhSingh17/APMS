@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Text, Float, Environment } from '@react-three/drei';
+import { OrbitControls, Text, Float } from '@react-three/drei';
 import * as THREE from 'three';
 
 interface PhaseProgress {
@@ -105,7 +105,7 @@ export default function Progress3D({ stats }: Progress3DProps) {
         <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={1} />
         <pointLight position={[-10, -10, -10]} intensity={0.5} />
         
-        <Environment preset="city" />
+
         
         {phases.map((phase, index) => (
           <ProgressRing key={index} {...phase} />
