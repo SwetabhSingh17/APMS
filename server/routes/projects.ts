@@ -305,41 +305,52 @@ export function registerProjectRoutes(router: Router, storage: DBStorage) {
     });
 
     // Update project progress
+    // Authorization: the project owner (student), the supervising faculty
+    // (topic proposer or group supervisor), or Coordinator/Admin.
     router.put('/api/projects/:id/progress', async (req: Request, res: Response) => {
-        const projectId = parseInt(req.params.id);
-        const { progress } = req.body;
-        const userId = req.user?.id;
-
-        console.log('Progress update request:', {
-            projectId,
-            progress,
-            userId,
-            body: req.body
-        });
-
-        if (!userId) {
-            console.log('No user ID found in request');
+        if (!isAuthenticatedRequest(req)) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
+        const projectId = parseInt(req.params.id);
+        const { progress } = req.body;
+
         if (typeof progress !== 'number' || progress < 0 || progress > 100) {
-            console.log('Invalid progress value:', progress);
             return res.status(400).json({ error: 'Invalid progress value' });
         }
 
         try {
             const project = await storage.getStudentProject(projectId);
-            console.log('Found project:', project);
-
             if (!project) {
-                console.log('Project not found:', projectId);
                 return res.status(404).json({ error: 'Project not found' });
+            }
+
+            let isAuthorized = req.user.role === UserRole.ADMIN || req.user.role === UserRole.COORDINATOR;
+
+            if (!isAuthorized && req.user.role === UserRole.STUDENT) {
+                isAuthorized = req.user.id === project.studentId;
+            }
+
+            if (!isAuthorized && req.user.role === UserRole.SUPERVISOR) {
+                const topic = await storage.getProjectTopic(project.topicId);
+                isAuthorized = !!topic && topic.submittedById === req.user.id;
+                if (!isAuthorized) {
+                    // Also allow the supervisor currently assigned to the student's group
+                    const student = await storage.getUser(project.studentId);
+                    if (student?.groupId) {
+                        const group = await storage.getGroup(student.groupId);
+                        isAuthorized = !!group && group.supervisorId === req.user.id;
+                    }
+                }
+            }
+
+            if (!isAuthorized) {
+                return res.status(403).json({ error: 'You are not authorized to update this project' });
             }
 
             const updatedProject = await storage.updateStudentProject(projectId, {
                 progress
             } as any);
-            console.log('Updated project:', updatedProject);
 
             res.json(updatedProject);
         } catch (error) {

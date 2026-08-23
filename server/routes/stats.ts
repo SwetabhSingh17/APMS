@@ -7,6 +7,10 @@ import { isAuthenticatedRequest } from "./utils";
 export function registerStatsRoutes(router: Router, storage: DBStorage) {
     // Get statistics for dashboard
     router.get("/api/stats", async (req: Request, res: Response) => {
+        if (!isAuthenticatedRequest(req)) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
         try {
             let projects = await storage.getAllProjects();
             let topics = await storage.getAllTopics();

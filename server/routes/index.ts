@@ -9,6 +9,7 @@ import { registerProjectRoutes } from "./projects";
 import { registerTopicRoutes } from "./topics";
 import { registerGroupRoutes } from "./groups";
 import { registerAdminRoutes } from "./admin";
+import { registerNotificationRoutes } from "./notifications";
 
 export async function registerRoutes(app: Express, storage: DBStorage): Promise<Server> {
     const router = Router();
@@ -20,6 +21,7 @@ export async function registerRoutes(app: Express, storage: DBStorage): Promise<
     registerTopicRoutes(router, storage);
     registerGroupRoutes(router, storage);
     registerAdminRoutes(router, storage);
+    registerNotificationRoutes(router, storage);
 
     app.use(router);
 

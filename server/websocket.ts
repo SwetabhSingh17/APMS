@@ -1,27 +1,89 @@
 import { WebSocketServer, WebSocket } from "ws";
 import type { Server } from "http";
+import type { IncomingMessage } from "http";
 import type { Notification } from "@shared/schema";
 import { log } from "./vite";
+import type { DBStorage } from "./db-storage";
+import crypto from "crypto";
 
 // Map to store connected clients by user ID
 const clients = new Map<number, Set<WebSocket>>();
 
-export function setupWebSocket(server: Server) {
+/**
+ * Un-signs an express-session cookie value (`s:<sid>.<hmac>`) using the same
+ * algorithm as the `cookie-signature` package used by express-session.
+ * Returns the raw session id, or null when the signature is invalid.
+ */
+function unsignSessionId(signed: string, secret: string): string | null {
+  const dot = signed.lastIndexOf(".");
+  if (dot <= 2 || !signed.startsWith("s:")) return null;
+
+  const sid = signed.slice(2, dot);
+  const receivedSig = signed.slice(dot + 1);
+  const expectedSig = crypto
+    .createHmac("sha256", secret)
+    .update(sid)
+    .digest("base64")
+    .replace(/=+$/, "");
+
+  const a = Buffer.from(expectedSig);
+  const b = Buffer.from(receivedSig);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return null;
+  }
+  return sid;
+}
+
+function extractSessionCookie(req: IncomingMessage): string | null {
+  const header = req.headers.cookie;
+  if (!header) return null;
+
+  for (const part of header.split(";")) {
+    const [name, ...rest] = part.trim().split("=");
+    if (name === "connect.sid") {
+      try {
+        return decodeURIComponent(rest.join("="));
+      } catch {
+        return rest.join("=");
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Resolves the authenticated userId for an incoming WebSocket handshake by
+ * validating the express-session cookie against the session store.
+ *
+ * SECURITY: the userId is derived server-side from the signed session cookie.
+ * The client-supplied ?userId= query parameter is ignored entirely — it could
+ * otherwise be spoofed to subscribe to another user's notifications.
+ */
+function resolveUserIdFromSession(req: IncomingMessage, storage: DBStorage): Promise<number | null> {
+  return new Promise((resolve) => {
+    const signed = extractSessionCookie(req);
+    if (!signed) return resolve(null);
+
+    const secret = process.env.SESSION_SECRET || "integral-university-project-portal-secret";
+    const sid = unsignSessionId(signed, secret);
+    if (!sid) return resolve(null);
+
+    storage.sessionStore.get(sid, (err, session) => {
+      if (err || !session) return resolve(null);
+      const userId = (session as any)?.passport?.user;
+      resolve(typeof userId === "number" ? userId : null);
+    });
+  });
+}
+
+export function setupWebSocket(server: Server, storage: DBStorage) {
   const wss = new WebSocketServer({ server, path: "/ws" });
 
-  wss.on("connection", (ws, req) => {
-    // Basic URL parsing to extract userId from query params e.g. /ws?userId=123
-    const url = new URL(req.url || "", `http://${req.headers.host || "localhost"}`);
-    const userIdStr = url.searchParams.get("userId");
-    
-    if (!userIdStr) {
-      ws.close(1008, "User ID required");
-      return;
-    }
+  wss.on("connection", async (ws, req) => {
+    const userId = await resolveUserIdFromSession(req, storage);
 
-    const userId = parseInt(userIdStr, 10);
-    if (isNaN(userId)) {
-      ws.close(1008, "Invalid User ID");
+    if (userId === null) {
+      ws.close(1008, "Unauthorized");
       return;
     }
 

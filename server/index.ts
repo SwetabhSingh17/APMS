@@ -95,8 +95,8 @@ async function startServer(): Promise<void> {
     // 2. Initialize bound physical web server
     const server = createServer(app);
 
-    // 2.5 Initialize WebSocket Server
-    setupWebSocket(server);
+    // 2.5 Initialize WebSocket Server (session-authenticated)
+    setupWebSocket(server, storage);
 
     // 3. Mount assets dynamically based on environment
     if (process.env.NODE_ENV === "development") {

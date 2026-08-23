@@ -571,6 +571,27 @@ export class DBStorage {
     return n as Notification;
   }
 
+  /**
+   * Marks a notification as read ONLY if it belongs to the given user.
+   * Returns the updated row, or undefined when the notification does not
+   * exist or belongs to someone else (prevents cross-user IDOR).
+   */
+  async markNotificationAsReadForUser(id: number, userId: number): Promise<Notification | undefined> {
+    const [n] = await db.update(notifications)
+      .set({ isRead: true })
+      .where(and(eq(notifications.id, id), eq(notifications.userId, userId)))
+      .returning();
+    return n as Notification | undefined;
+  }
+
+  async markAllNotificationsAsRead(userId: number): Promise<void> {
+    await db.update(notifications).set({ isRead: true }).where(eq(notifications.userId, userId));
+  }
+
+  async deleteAllNotificationsForUser(userId: number): Promise<void> {
+    await db.delete(notifications).where(eq(notifications.userId, userId));
+  }
+
 
   // Project Assessment operations
   async createProjectAssessment(assessment: InsertProjectAssessment): Promise<ProjectAssessment> {

@@ -9,73 +9,37 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLocation } from "wouter";
-import { useState } from "react";
-
-type Notification = {
-  id: number;
-  title: string;
-  message: string;
-  timestamp: Date;
-  read: boolean;
-  type: 'info' | 'warning' | 'success' | 'error';
-};
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getQueryFn, apiRequest } from "@/lib/queryClient";
+import type { Notification } from "@shared/schema";
 
 export function NotificationDropdown() {
   const [, setLocation] = useLocation();
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: 1,
-      title: "New Project Topic",
-      message: "A new project topic has been submitted for approval",
-      timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-      read: false,
-      type: 'info'
+  const queryClient = useQueryClient();
+
+  const { data: notifications } = useQuery<Notification[]>({
+    queryKey: ["/api/notifications"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+  });
+
+  const markAsReadMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("PATCH", `/api/notifications/${id}/read`);
     },
-    {
-      id: 2,
-      title: "Topic Approved",
-      message: "Your project topic 'AI-based Attendance System' has been approved",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-      read: false,
-      type: 'success'
-    },
-    {
-      id: 3,
-      title: "Deadline Reminder",
-      message: "Project milestone submission due in 2 days",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-      read: true,
-      type: 'warning'
-    }
-  ]);
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/notifications"] }),
+  });
 
-  const markAsRead = (id: number) => {
-    setNotifications(prevNotifications =>
-      prevNotifications.map(notification =>
-        notification.id === id
-          ? { ...notification, read: true }
-          : notification
-      )
-    );
-  };
+  const list = notifications ?? [];
+  const unreadCount = list.filter(n => !n.isRead).length;
 
-  const unreadCount = notifications.filter(n => !n.read).length;
-
-  const formatTimeAgo = (date: Date) => {
+  const formatTimeAgo = (date: string | Date) => {
     const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-    
+    const diffInMinutes = Math.floor((now.getTime() - new Date(date).getTime()) / (1000 * 60));
+
     if (diffInMinutes < 1) return 'just now';
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
     if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
     return `${Math.floor(diffInMinutes / 1440)}d ago`;
-  };
-
-  const getNotificationStyles = (type: Notification['type'], read: boolean) => {
-    const baseStyles = "flex flex-col gap-1 px-4 py-3 hover:bg-accent transition-colors cursor-pointer";
-    const readStyles = read ? "opacity-70" : "";
-    
-    return `${baseStyles} ${readStyles}`;
   };
 
   return (
@@ -99,12 +63,14 @@ export function NotificationDropdown() {
         </div>
         <DropdownMenuSeparator />
         <ScrollArea className="h-[300px]">
-          {notifications.length > 0 ? (
-            notifications.map((notification) => (
-              <DropdownMenuItem 
-                key={notification.id} 
-                className={getNotificationStyles(notification.type, notification.read)}
-                onClick={() => markAsRead(notification.id)}
+          {list.length > 0 ? (
+            list.map((notification) => (
+              <DropdownMenuItem
+                key={notification.id}
+                className={`flex flex-col gap-1 px-4 py-3 hover:bg-accent transition-colors cursor-pointer ${notification.isRead ? "opacity-70" : ""}`}
+                onClick={() => {
+                  if (!notification.isRead) markAsReadMutation.mutate(notification.id);
+                }}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
@@ -112,7 +78,7 @@ export function NotificationDropdown() {
                     <p className="text-sm text-muted-foreground">{notification.message}</p>
                   </div>
                   <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {formatTimeAgo(notification.timestamp)}
+                    {formatTimeAgo(notification.createdAt)}
                   </span>
                 </div>
               </DropdownMenuItem>
@@ -125,9 +91,9 @@ export function NotificationDropdown() {
         </ScrollArea>
         <DropdownMenuSeparator />
         <div className="px-4 py-2">
-          <Button 
-            variant="ghost" 
-            className="w-full text-sm" 
+          <Button
+            variant="ghost"
+            className="w-full text-sm"
             size="sm"
             onClick={() => {
               setLocation('/notifications');
@@ -139,4 +105,4 @@ export function NotificationDropdown() {
       </DropdownMenuContent>
     </DropdownMenu>
   );
-} 
+}

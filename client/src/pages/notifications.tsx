@@ -1,112 +1,78 @@
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { getQueryFn, apiRequest } from "@/lib/queryClient";
 import MainLayout from "@/components/layout/main-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Bell, CheckCheck, Search, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-type Notification = {
-  id: number;
-  title: string;
-  message: string;
-  timestamp: Date;
-  read: boolean;
-  type: 'info' | 'warning' | 'success' | 'error';
-};
+import type { Notification } from "@shared/schema";
 
 export default function Notifications() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [searchQuery, setSearchQuery] = useState("");
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: 1,
-      title: "New Project Topic",
-      message: "A new project topic has been submitted for approval",
-      timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-      read: false,
-      type: 'info'
+
+  const { data: notifications, isLoading } = useQuery<Notification[]>({
+    queryKey: ["/api/notifications"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: !!user,
+  });
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+
+  const markAsReadMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("PATCH", `/api/notifications/${id}/read`);
     },
-    {
-      id: 2,
-      title: "Topic Approved",
-      message: "Your project topic 'AI-based Attendance System' has been approved",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-      read: false,
-      type: 'success'
+    onSuccess: invalidate,
+  });
+
+  const markAllAsReadMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/notifications/read-all");
     },
-    {
-      id: 3,
-      title: "Deadline Reminder",
-      message: "Project milestone submission due in 2 days",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-      read: true,
-      type: 'warning'
-    }
-  ]);
+    onSuccess: () => {
+      invalidate();
+      toast({
+        title: "Notifications marked as read",
+        description: "All notifications have been marked as read.",
+      });
+    },
+  });
 
-  const markAllAsRead = () => {
-    setNotifications(prevNotifications =>
-      prevNotifications.map(notification => ({
-        ...notification,
-        read: true
-      }))
-    );
-    toast({
-      title: "Notifications marked as read",
-      description: "All notifications have been marked as read.",
-    });
-  };
+  const clearAllMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", "/api/notifications");
+    },
+    onSuccess: () => {
+      invalidate();
+      toast({
+        title: "Notifications cleared",
+        description: "All notifications have been cleared.",
+      });
+    },
+  });
 
-  const markAsRead = (id: number) => {
-    setNotifications(prevNotifications =>
-      prevNotifications.map(notification =>
-        notification.id === id
-          ? { ...notification, read: true }
-          : notification
-      )
-    );
-  };
-
-  const clearAllNotifications = () => {
-    setNotifications([]);
-    toast({
-      title: "Notifications cleared",
-      description: "All notifications have been cleared.",
-    });
-  };
-
-  const formatDate = (date: Date) => {
+  const formatDate = (date: string | Date) => {
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
       minute: 'numeric',
       hour12: true
-    }).format(date);
+    }).format(new Date(date));
   };
 
-  const getNotificationIcon = (type: Notification['type']) => {
-    switch (type) {
-      case 'info':
-        return <Bell className="w-4 h-4 text-blue-500" />;
-      case 'warning':
-        return <Bell className="w-4 h-4 text-yellow-500" />;
-      case 'success':
-        return <Bell className="w-4 h-4 text-green-500" />;
-      case 'error':
-        return <Bell className="w-4 h-4 text-red-500" />;
-    }
-  };
-
-  const filteredNotifications = notifications
+  const list = notifications ?? [];
+  const filteredNotifications = list
     .filter(notification => {
-      if (filter === 'unread') return !notification.read;
+      if (filter === 'unread') return !notification.isRead;
       return true;
     })
     .filter(notification => {
@@ -118,7 +84,7 @@ export default function Notifications() {
       );
     });
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = list.filter(n => !n.isRead).length;
 
   if (!user) {
     return (
@@ -150,24 +116,24 @@ export default function Notifications() {
             <div>
               <CardTitle>All Notifications</CardTitle>
               <CardDescription>
-                You have {unreadCount} unread notifications
+                {isLoading ? "Loading notifications..." : `You have ${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`}
               </CardDescription>
             </div>
             <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={markAllAsRead}
-                disabled={unreadCount === 0}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => markAllAsReadMutation.mutate()}
+                disabled={unreadCount === 0 || markAllAsReadMutation.isPending}
               >
                 <CheckCheck className="w-4 h-4 mr-2" />
                 Mark all read
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={clearAllNotifications}
-                disabled={notifications.length === 0}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => clearAllMutation.mutate()}
+                disabled={list.length === 0 || clearAllMutation.isPending}
               >
                 <Trash2 className="w-4 h-4 mr-2" />
                 Clear all
@@ -203,11 +169,15 @@ export default function Notifications() {
               <div
                 key={notification.id}
                 className={`flex items-start gap-4 p-4 rounded-lg transition-colors cursor-pointer hover:bg-accent/50 ${
-                  notification.read ? 'opacity-70 bg-background' : 'bg-accent'
+                  notification.isRead ? 'opacity-70 bg-background' : 'bg-accent'
                 }`}
-                onClick={() => markAsRead(notification.id)}
+                onClick={() => {
+                  if (!notification.isRead) markAsReadMutation.mutate(notification.id);
+                }}
               >
-                <div className="mt-1">{getNotificationIcon(notification.type)}</div>
+                <div className="mt-1">
+                  <Bell className="w-4 h-4 text-primary" />
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
                     <div>
@@ -215,7 +185,7 @@ export default function Notifications() {
                       <p className="text-sm text-muted-foreground">{notification.message}</p>
                     </div>
                     <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      {formatDate(notification.timestamp)}
+                      {formatDate(notification.createdAt)}
                     </span>
                   </div>
                 </div>
@@ -224,7 +194,7 @@ export default function Notifications() {
 
             {filteredNotifications.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
-                No notifications found
+                {isLoading ? "Loading..." : "No notifications found"}
               </div>
             )}
           </div>
@@ -232,4 +202,4 @@ export default function Notifications() {
       </Card>
     </MainLayout>
   );
-} 
+}
