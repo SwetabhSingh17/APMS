@@ -152,12 +152,14 @@ export default function SystemManagement() {
         onSuccess: () => {
             setResetDialogOpen(false);
             setAdminPassword("");
+            // Wipe the ENTIRE query cache — after a hard reset every cached
+            // list (users, stats, topics, ...) belongs to erased data.
+            queryClient.clear();
             toast({
                 title: "System Reset Successful",
                 description: "Database reset. Please log in with default credentials (admin / Admin@123).",
             });
             // Clear auth state and redirect to login
-            queryClient.setQueryData(["/api/user"], null);
             setLocation("/auth");
         },
         onError: (error) => {
@@ -290,7 +292,15 @@ export default function SystemManagement() {
                         </p>
                         <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
                             <DialogTrigger asChild>
-                                <Button variant="destructive" className="w-full gap-2">
+                                <Button
+                                    variant="destructive"
+                                    className="w-full gap-2"
+                                    onClick={() => toast({
+                                        title: "Export your data first",
+                                        description: "Reset is instant and irreversible. Click 'Export Database' before proceeding if you want an archive of last year's records.",
+                                        variant: "destructive",
+                                    })}
+                                >
                                     <Trash2 className="h-4 w-4" />
                                     Reset Database
                                 </Button>
@@ -302,6 +312,10 @@ export default function SystemManagement() {
                                         This action cannot be undone. Please enter your admin password to confirm.
                                     </DialogDescription>
                                 </DialogHeader>
+                                <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                                    Tip: If you haven't already, cancel and run <span className="font-semibold">Export Database</span> first —
+                                    the reset wipes everything instantly and gives you no way back.
+                                </div>
                                 <div className="space-y-4 py-4">
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">Admin Password</label>

@@ -5,7 +5,7 @@ import {
   users, projectTopics, studentProjects, studentGroups, projectAssessments, notifications, projectMilestones, studentGroupMembers
 } from "@shared/schema";
 import { db } from "./db";
-import { notifyUser } from "./websocket";
+import { notifyUser, disconnectAllClients } from "./websocket";
 import { eq, and, desc, sql, inArray, not, ne, aliasedTable, SQL } from "drizzle-orm";
 import connectPg from "connect-pg-simple";
 import session from "express-session";
@@ -36,7 +36,7 @@ export class DBStorage {
     // It will be called explicitly during server startup.
   }
 
-  public async initializeDefaultUser() {
+  public async initializeDefaultUser(): Promise<boolean> {
     try {
       const existingAdmin = await db.select().from(users)
         .where(eq(users.username, 'admin'));
@@ -55,12 +55,14 @@ export class DBStorage {
         } as unknown as InsertUser);
         console.log("✅ Default admin user successfully created.");
       }
+      return true;
     } catch (error: any) {
       if (error?.code === '42P01') {
         console.error("⚠️ Schema 'users' does not exist. Please run 'npm run db:setup' to prepare your database.");
       } else {
         console.error("❌ Failed to create default admin user:", error.message || error);
       }
+      return false;
     }
   }
 
@@ -658,43 +660,47 @@ export class DBStorage {
     };
   }
 
-  async resetDatabase(): Promise<boolean> {
-    await db.delete(projectAssessments);
-    await db.delete(projectMilestones);
-    await db.delete(studentProjects);
-    await db.delete(studentGroupMembers);
+  /**
+   * Wipes all application data and restores the exact fresh-install state
+   * (identical to `npm run db:setup`): empty tables, sequences restarted at 1,
+   * sessions cleared, and the default admin (admin / Admin@123) recreated.
+   *
+   * TRUNCATE ... RESTART IDENTITY resets every serial sequence so new records
+   * start from id=1, exactly like a fresh install. It also guarantees that a
+   * subsequent backup Import cannot collide with stale high-water-mark IDs.
+   */
+  async resetDatabase(options?: { preserveSessions?: boolean }): Promise<boolean> {
+    const preserveSessions = options?.preserveSessions === true;
 
-    // Break circular dependency: Users -> Groups -> Users
-    await db.update(users).set({ groupId: null });
+    // Drop every live socket first: after IDs restart from 1, stale pre-reset
+    // connections must not receive notifications addressed to recycled user IDs.
+    disconnectAllClients();
 
-    await db.delete(studentGroups);
-    await db.delete(projectTopics);
-    await db.delete(notifications);
-
-    // Clear sessions to prevent stale cookies
     try {
-      await db.execute(sql`TRUNCATE TABLE "session"`);
-    } catch (e) {
-      // Ignore if session table doesn't exist or is named differently
-      console.log("Session truncation failed (non-critical):", e);
+      // TRUNCATE is transactional DDL in PostgreSQL — all-or-nothing.
+      await db.transaction(async (tx) => {
+        const dataTables = `"project_assessments", "project_milestones", "student_projects", "student_group_members", "student_groups", "project_topics", "notifications", "users"`;
+        if (!preserveSessions) {
+          await tx.execute(sql.raw(`TRUNCATE TABLE ${dataTables}, "session" RESTART IDENTITY CASCADE`));
+        } else {
+          await tx.execute(sql.raw(`TRUNCATE TABLE ${dataTables} RESTART IDENTITY CASCADE`));
+        }
+      });
+    } catch (error) {
+      console.error("Database truncate failed:", error);
+      return false;
     }
 
-    // Delete non-admin users
-    await db.delete(users).where(ne(users.role, UserRole.ADMIN));
-
-    // Reset Admin password to default
-    const defaultPasswordHash = await hashPassword("Admin@123");
-    await db.update(users)
-      .set({ password: defaultPasswordHash })
-      .where(eq(users.role, UserRole.ADMIN));
-
-    return true;
+    // Recreate the default admin through the canonical seeding path
+    // (same one used by scripts/setup_db.ts on a fresh install).
+    return this.initializeDefaultUser();
   }
 
   async importData(data: any): Promise<boolean> {
     try {
-      // First, clear existing data (except admin user)
-      await this.resetDatabase();
+      // First, clear existing data (except admin user).
+      // preserveSessions keeps the importing admin logged in.
+      await this.resetDatabase({ preserveSessions: true });
 
       // Import users (skip admin since it exists)
       if (data.users && Array.isArray(data.users)) {
@@ -753,10 +759,41 @@ export class DBStorage {
         }
       }
 
+      // PostgreSQL does NOT advance serial sequences when rows are inserted
+      // with explicit ids. Re-sync every sequence past the imported MAX(id)
+      // so newly created records can never collide with imported ones.
+      await this.syncSequences();
+
       return true;
     } catch (error) {
       console.error("Import failed:", error);
       throw error;
+    }
+  }
+
+  /**
+   * Aligns each table's id sequence to MAX(id) + 1. Safe on empty tables.
+   */
+  private async syncSequences(): Promise<void> {
+    const tables = [
+      "users",
+      "student_groups",
+      "student_group_members",
+      "project_topics",
+      "student_projects",
+      "project_assessments",
+      "project_milestones",
+      "notifications"
+    ];
+    for (const table of tables) {
+      try {
+        await db.execute(sql.raw(
+          `SELECT setval(pg_get_serial_sequence('"${table}"', 'id'), COALESCE((SELECT MAX(id) FROM "${table}"), 0) + 1, false)`
+        ));
+      } catch (err) {
+        // Non-fatal: sequence helpers only exist for serial columns
+        console.warn(`Sequence sync skipped for ${table}:`, err);
+      }
     }
   }
 

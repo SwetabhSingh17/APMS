@@ -63,3 +63,22 @@ export function notifyUser(userId: number, notification: Notification) {
     });
   }
 }
+
+/**
+ * Force-closes every live socket and clears the registry. Used after a database
+ * reset: user IDs restart from 1, so stale pre-reset connections must never
+ * receive notifications addressed to recycled user IDs. Clients auto-reconnect
+ * (or are redirected to login by their stale session).
+ */
+export function disconnectAllClients() {
+  clients.forEach((sockets, userId) => {
+    sockets.forEach((ws) => {
+      try {
+        ws.close(1012, "Service Restart");
+      } catch {
+        // Socket may already be closing
+      }
+    });
+  });
+  clients.clear();
+}

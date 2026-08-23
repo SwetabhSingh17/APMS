@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { DBStorage } from "../db-storage";
 import { UserRole } from "@shared/schema";
-import { requireRole } from "../auth";
+import { requireRole, comparePasswords } from "../auth";
 import { isAuthenticatedRequest } from "./utils";
 import { hashPassword } from "../auth";
 
@@ -45,14 +45,34 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
             return res.status(401).json({ message: "Unauthorized" });
         }
 
+        // The UI requires typing the admin password — actually enforce it here,
+        // so a hijacked session cannot wipe the database without credentials.
+        const { password } = req.body as { password?: string };
+        if (!password) {
+            return res.status(400).json({ message: "Password confirmation is required" });
+        }
+        try {
+            const admin = await storage.getUser(req.user.id);
+            if (!admin || !(await comparePasswords(password, admin.password))) {
+                return res.status(401).json({ message: "Incorrect admin password" });
+            }
+        } catch (error) {
+            console.error("Reset verification failed:", error);
+            return res.status(500).json({ message: "Failed to verify admin password" });
+        }
+
         try {
             const success = await storage.resetDatabase();
 
             if (success) {
-                // Log out the user since their account (or session) might be affected/reset
+                // Log out and fully destroy the session (its row was truncated),
+                // clearing the cookie so no stale connect.sid lingers.
                 req.logout((err) => {
-                    // ignore err
-                    res.json({ message: "Database reset successfully. Please log in with default credentials." });
+                    if (err) console.error("Logout after reset failed:", err);
+                    req.session.destroy(() => {
+                        res.clearCookie("connect.sid");
+                        res.json({ message: "Database reset successfully. Please log in with default credentials." });
+                    });
                 });
             } else {
                 res.status(500).json({ message: "Failed to reset database" });
