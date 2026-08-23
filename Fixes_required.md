@@ -4,6 +4,68 @@ This document outlines suggested architectural, security, and maintenance improv
 
 ---
 
+## 🚨 Priority Bugs to be Resolved
+
+All items below were verified directly against the current codebase. Fix in this order — the critical ones are actively exploitable on a LAN deployment.
+
+### 🔴 CRITICAL
+
+- [ ] **Privilege Escalation via `/auth/register`** — `server/routes/auth.ts:23`
+  The duplicate registration endpoint performs **no role validation**: any anonymous caller can `POST /auth/register` with `"role": "admin"` and gain full administrator access. The primary `/api/register` route correctly enforces the single-Admin/single-Coordinator rule, but this shadow surface bypasses it entirely.
+  *Fix:* Delete the `/auth/*` route family or apply identical role whitelisting + uniqueness checks.
+
+- [ ] **Password Hash Exposure via `/auth/login`** — `server/routes/auth.ts:13`
+  Returns `{ user: req.user }` — the raw database row **including the scrypt password hash**. `/auth/register` (line 62) leaks the hash the same way.
+  *Fix:* Strip `password` before responding (mirror the sanitization used by `/api/login`).
+
+- [ ] **Unauthenticated Supervisor Enumeration with Hashes** — `server/routes/users.ts:56`
+  `GET /api/supervisors` has **no auth guard** and `getUsersByRole()` (`server/db-storage.ts:515`) returns complete rows. Anyone on the network — no login required — can enumerate every supervisor's username, email, and password hash.
+  *Fix:* Add `isAuthenticatedRequest` guard + role check; strip passwords like every other listing endpoint.
+
+### 🟠 HIGH
+
+- [ ] **Notification Inbox Is Non-Functional End-to-End** — multiple files
+  There is **no `GET /api/notifications` endpoint anywhere on the server**, yet:
+  - The WebSocket hook invalidates that exact query key (`client/src/hooks/use-notifications.tsx:39`)
+  - The `/notifications` page renders a hardcoded mock array (`client/src/pages/notifications.tsx:26`)
+  - The header bell dropdown also renders hardcoded mocks (`client/src/components/notifications/notification-dropdown.tsx:25`)
+  Real notifications persist to the DB but are never visible except as transient ContextPill toasts; unread counts grow forever.
+  *Fix:* Implement paginated `GET /api/notifications`, `PATCH .../:id/read`, and mark-all-read endpoints; wire both UI components to TanStack Query.
+
+- [ ] **IDOR on Project Progress** — `server/routes/projects.ts:308`
+  `PUT /api/projects/:id/progress` checks only that *some* user is logged in — **any authenticated user can set any project's progress** (0–100) by ID, including other students' projects.
+  *Fix:* Restrict to the project owner, an assigned supervisor, or Coordinator/Admin.
+
+- [ ] **WebSocket Identity Spoofing** — `server/websocket.ts:12`
+  Clients self-declare identity via `/ws?userId=N` with zero verification. Any user can connect as another user's ID and silently receive their real-time notifications.
+  *Fix:* Authenticate the handshake — validate the express-session cookie server-side and derive `userId` from it instead of trusting the query string.
+
+### 🟡 MEDIUM
+
+- [ ] **Coordinator User-Edits Silently Fail (Route Shadowing)** — `server/auth.ts:238` vs `server/routes/admin.ts:117`
+  `setupAuth()` registers `PATCH /api/admin/users/:id` (Admin-only) at app level **before** `registerRoutes()` mounts the intended Admin+Coordinator version. Express matches the first handler, so Coordinator edits always return 403 and the admin.ts handler is unreachable dead code.
+  *Fix:* Remove one of the duplicates (keep the role-flexible router version).
+
+- [ ] **Backup Export/Restore Loses Data & Breaks on FK Order**
+  - `exportData()` (`server/db-storage.ts`) exports only users, topics, projects, groups, members — **project_assessments (grades), project_milestones, and notifications are never archived**, so year-change backups silently drop all evaluation history.
+  - `importData()` inserts **users before student_groups**, but `users.group_id` has an FK to `student_groups.id` → every user row carrying a `groupId` violates the constraint, is caught, logged, and **silently skipped** during restore.
+  *Fix:* Export/import all tables; import in dependency order (groups → users → members → topics → projects → assessments → milestones).
+
+- [ ] **Dashboard "Recent Activity" Is Fake** — `server/routes/stats.ts`
+  `GET /api/activities` returns a hardcoded mock list shown to Coordinators/Admins as if it were live department activity.
+  *Fix:* Derive from recent rows (topics approved, teams created, assessments posted) or remove the widget until implemented.
+
+### ⚪ LOW
+
+- [ ] **Notification Preferences Stub** — `server/routes/users.ts:41`
+  `PATCH /api/user/notifications` returns success without persisting anything.
+- [ ] **Misleading Import Success Message** — `client/src/pages/system-management.tsx`
+  Toast says "Please log in again" and force-redirects to `/auth`, but imports now preserve the importing admin's session server-side.
+- [ ] **Dead Code: Redundant HTTP Server** — `server/routes/index.ts:26`
+  `registerRoutes()` builds its own `http.Server` that `index.ts` discards and recreates. Confusing for maintainers; delete it.
+
+---
+
 ## ✅ Completed (v1.0.1)
 
 ### Security Enhancements
