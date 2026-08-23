@@ -10,17 +10,17 @@ All items below were verified directly against the current codebase. Fix in this
 
 ### 🔴 CRITICAL
 
-- [ ] **Privilege Escalation via `/auth/register`** — `server/routes/auth.ts:23`
-  The duplicate registration endpoint performs **no role validation**: any anonymous caller can `POST /auth/register` with `"role": "admin"` and gain full administrator access. The primary `/api/register` route correctly enforces the single-Admin/single-Coordinator rule, but this shadow surface bypasses it entirely.
-  *Fix:* Delete the `/auth/*` route family or apply identical role whitelisting + uniqueness checks.
+- [x] **Privilege Escalation via `/auth/register`** — `server/routes/auth.ts` — **FIXED**
+  The duplicate registration endpoint performed **no role validation**: any anonymous caller could `POST /auth/register` with `"role": "admin"` and gain full administrator access. The primary `/api/register` route correctly enforces the single-Admin/single-Coordinator rule, but this shadow surface bypassed it entirely.
+  *Resolution:* `/auth/register` deleted. All registration now flows through `/api/register` exclusively.
 
-- [ ] **Password Hash Exposure via `/auth/login`** — `server/routes/auth.ts:13`
-  Returns `{ user: req.user }` — the raw database row **including the scrypt password hash**. `/auth/register` (line 62) leaks the hash the same way.
-  *Fix:* Strip `password` before responding (mirror the sanitization used by `/api/login`).
+- [x] **Password Hash Exposure via `/auth/login`** — `server/routes/auth.ts` — **FIXED**
+  Returned `{ user: req.user }` — the raw database row **including the scrypt password hash**.
+  *Resolution:* Response now strips the `password` field. (Kept for dev/test script compatibility; the client uses `/api/login`.)
 
-- [ ] **Unauthenticated Supervisor Enumeration with Hashes** — `server/routes/users.ts:56`
-  `GET /api/supervisors` has **no auth guard** and `getUsersByRole()` (`server/db-storage.ts:515`) returns complete rows. Anyone on the network — no login required — can enumerate every supervisor's username, email, and password hash.
-  *Fix:* Add `isAuthenticatedRequest` guard + role check; strip passwords like every other listing endpoint.
+- [x] **Unauthenticated Supervisor Enumeration with Hashes** — `server/routes/users.ts` — **FIXED**
+  `GET /api/supervisors` had no auth guard and returned complete user rows. Anyone on the network — no login required — could enumerate every supervisor's username, email, and password hash.
+  *Resolution:* Endpoint now requires authentication (students still have access for team formation) and returns only `{ id, firstName, lastName, email }`.
 
 ### 🟠 HIGH
 

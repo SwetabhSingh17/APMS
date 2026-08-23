@@ -52,11 +52,20 @@ export function registerUserRoutes(router: Router, storage: DBStorage) {
         }
     });
 
-    // Get all supervisors
+    // Get all supervisors (authenticated users only — students need this
+    // when forming teams). Returns a safe projection: never usernames,
+    // password hashes, or enrollment numbers.
     router.get("/api/supervisors", async (req: Request, res: Response) => {
+        if (!isAuthenticatedRequest(req)) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
         try {
             const supervisors = await storage.getUsersByRole(UserRole.SUPERVISOR);
-            res.json(supervisors);
+            const safeSupervisors = supervisors.map(({ id, firstName, lastName, email }) => ({
+                id, firstName, lastName, email
+            }));
+            res.json(safeSupervisors);
         } catch (error) {
             console.error("Error fetching supervisors:", error);
             res.status(500).json({ message: "Failed to fetch supervisors" });
