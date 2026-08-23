@@ -29,10 +29,10 @@
 - **Manage Project** — Admins & Coordinators can view all project teams and manually reassign supervisors  
 - **Progress Tracking** — Real-time dashboards with charts and department statistics  
 - **Project Assessments** — Supervisor grading with score and feedback  
-- **Real-Time Notifications** — WebSocket-powered instant notifications with role-based routing  
+- **Real-Time Notifications** — WebSocket-powered instant notifications with role-based routing, plus a persistent per-user inbox (bell dropdown + notifications page with read/unread state)  
 - **User Management** — Admin panel for bulk user operations, role changes, password resets  
 - **System Management** — Database export/import, Excel reports, full reset capabilities  
-- **Security Hardened** — Helmet HTTP headers, rate-limited auth endpoints, soft-delete data retention  
+- **Security Hardened** — Helmet HTTP headers, rate-limited auth endpoints, soft-delete data retention, session-authenticated WebSockets, per-resource ownership checks, and password-verified destructive operations  
 - **Error Resilient** — Global React Error Boundaries with graceful fallback UI  
 - **Cybertruck Spatial UI** — Glassmorphism, dynamic context pill (iOS-style), holographic data grids, physics-based micro-interactions, and animated cinematic splash screens
 - **Dark/Light Theme** — System-aware with manual toggle  
@@ -100,25 +100,23 @@ APMS/
 │   │   │   ├── ui/         # 48 shadcn/ui primitives
 │   │   │   ├── layout/     # MainLayout, Sidebar, Header
 │   │   │   └── dashboard/  # Dashboard-specific components
-│   │   ├── hooks/          # useAuth, useToast, useMobile
+│   │   ├── hooks/          # useAuth, useToast, useNotifications, useMobile
 │   │   └── lib/            # QueryClient, utils, ProtectedRoute
 │   └── index.html
 ├── server/                 # Backend API
-│   ├── routes/             # Modular API routes (auth, users, projects, etc.)
 │   ├── index.ts            # Express app entry point & route aggregation
 │   ├── auth.ts             # Passport.js auth setup (RBAC)
-│   ├── storage/            # IStorage interface + Drizzle implementation
-│   ├── db.ts               # Database connection & migrations
-│   └── vite.ts             # Vite dev server integration
+│   ├── db.ts               # Database connection, unified config resolution, boot-time schema verification
+│   ├── db-storage.ts       # Storage layer (repository pattern over Drizzle ORM)
+│   ├── websocket.ts        # Session-authenticated WebSocket server for real-time notifications
+│   └── routes/             # Modular API routes (auth, users, projects, topics, groups, notifications, etc.)
 ├── shared/                 # Shared code
 │   └── schema.ts           # Drizzle table definitions + Zod schemas + TypeScript types
 ├── scripts/                # Database utilities
+│   ├── ensure_db.ts        # Production-safe bootstrap (schema check + non-destructive setup)
+│   ├── setup_db.ts         # Full database reset (destructive)
 │   ├── backup_schema.ts    # Schema backup
-│   ├── restore_schema.ts   # Schema restore
-│   ├── hard_reset.ts       # Full database reset
-│   └── seed_test_data.ts   # Test data seeding
-├── migrations/             # Drizzle-generated SQL migrations
-├── database/               # DB init scripts & backups
+│   └── restore_schema.ts   # Schema restore
 └── Setup_Assistant/        # Cross-platform installation scripts
 ```
 
@@ -178,8 +176,9 @@ If you prefer to run the steps manually:
    
    Initialize the database schema and default admin account:
    ```bash
-   npm run db:setup
+   npm run db:ensure
    ```
+   *(Safe to re-run at any time — it only creates what is missing and never wipes data. Use `npm run db:setup` for a full destructive reset.)*
 
 5. **Start the development server**
    ```bash
@@ -192,6 +191,9 @@ If you prefer to run the steps manually:
 
 If you already have a running instance and want to pull the latest code without losing your database state:
 
+**Windows Server (one click):** just double-click `start_server.bat` — it installs dependencies, safely syncs the database schema (`db:ensure` never wipes data), rebuilds, and restarts.
+
+**Manual:**
 1. **Stop the server** (`Ctrl + C`).
 2. **Get the latest code** using `git pull origin main` (or extract a new ZIP, but remember to copy over your `.env` file from the old folder).
 3. **Install new dependencies**:
@@ -200,7 +202,7 @@ If you already have a running instance and want to pull the latest code without 
    ```
 4. **Apply safe schema updates**:
    ```bash
-   npm run db:push
+   npm run db:ensure
    ```
 5. **Restart your server**.
 
@@ -208,16 +210,17 @@ If you already have a running instance and want to pull the latest code without 
 
 ## ⚙️ Configuration
 
-All configuration is managed through environment variables in a `.env` file at the project root.
+All configuration is managed through a `.env` file at the project root.
 
 | Variable | Required | Description | Example |
 |----------|----------|-------------|---------|
-| `DATABASE_URL` | ✅ | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/integral_hub` |
+| `DATABASE_URL` | ✅ | PostgreSQL connection string — the canonical config used by both the server and database tooling | `postgres://user:pass@localhost:5432/integral_project_hub` |
 | `SESSION_SECRET` | ✅ | Secret key for session encryption | A long random string |
 | `PORT` | ❌ | Server port (default: `3000`) | `3000` |
 | `NODE_ENV` | ❌ | Environment mode | `development` / `production` |
+| `DB_HOST` `DB_PORT` `DB_NAME` `DB_USER` `DB_PASSWORD` | ❌ | Alternative individual database settings. If `DATABASE_URL` is set it takes precedence | `localhost`, `5432`, `integral_project_hub`... |
 
-> **Note:** See `.env.example` for a ready-to-use template.
+> **Note:** See `.env.example` for a ready-to-use template. On first run, `start_server.bat` creates `.env` from this template automatically.
 
 ---
 
@@ -229,7 +232,8 @@ All configuration is managed through environment variables in a `.env` file at t
 | `npm run build` | Build for production (client + server) |
 | `npm start` | Start production server |
 | `npm run check` | Run TypeScript type checking |
-| `npm run db:setup` | Clean install schema and initialize default admin |
+| `npm run db:ensure` | ✅ Safe database bootstrap — verifies connectivity, creates missing tables + default admin, syncs schema changes. Never wipes data |
+| `npm run db:setup` | Clean install schema and initialize default admin (⚠️ wipes all data) |
 | `npm run db:push` | Push non-destructive schema changes to existing database |
 | `npm run db:backup` | Backup database schema and data |
 | `npm run db:restore` | Restore database from backup |

@@ -54,9 +54,9 @@ If you are on a Windows Server (which lacks the Microsoft Store for automated in
    ```
 8. Build the tables and initialize the admin account:
    ```cmd
-   npm run db:setup
+   npm run db:ensure
    ```
-   *(⚠️ If this step shows an error in red, open the `.env` file and make sure the `DB_PASSWORD` matches what you set in step 2!)*
+   *(⚠️ If this step shows an error in red, open the `.env` file and make sure the `DATABASE_URL` or `DB_PASSWORD` matches what you set in step 2! This command is safe to run again — it only creates what is missing.)*
 9. Skip to **Step 2**!
 
 ---
@@ -90,7 +90,7 @@ If you are on a Windows Server (which lacks the Microsoft Store for automated in
    ```
 6. Build the database and initialize the admin account:
    ```bash
-   npm run db:setup
+   npm run db:ensure
    ```
 7. Skip to **Step 2**!
 
@@ -128,7 +128,7 @@ If you are on a Windows Server (which lacks the Microsoft Store for automated in
    ```
 6. Build the database and initialize the admin account:
    ```bash
-   npm run db:setup
+   npm run db:ensure
    ```
 7. Skip to **Step 2**!
 
@@ -169,8 +169,13 @@ You are amazing! You just built a real website all by yourself! Give yourself a 
 
 When you are done playing and want to make the website super fast:
 
-**For Windows Users:**
-Just double-click the **`start_server.bat`** file in your APMS folder! It will automatically build and start your website in production mode.
+**For Windows Users (one click!):**
+Just double-click the **`start_server.bat`** file in your APMS folder. It does everything by itself:
+1. Checks that Node.js is installed
+2. Creates your `.env` settings file on the very first run (and tells you what to fill in)
+3. Installs all the building blocks
+4. Gets the database ready (creates missing tables, never breaks your data)
+5. Packs the website into its race-car box and starts the engine! 🏁
 
 **For Mac/Linux Users (or manual Windows):**
 1. Go to your black Terminal box and press `Ctrl + C` to turn the engine off.
@@ -204,7 +209,7 @@ If you already have the application running and need to update the code to the l
    ```
 5. Apply database schema changes safely (this preserves data):
    ```bash
-   npm run db:push
+   npm run db:ensure
    ```
 6. Restart your server!
 
@@ -219,6 +224,6 @@ If you already have the application running and need to update the code to the l
    ```
 6. Apply database schema changes safely:
    ```bash
-   npm run db:push
+   npm run db:ensure
    ```
 7. Start your server! (You can safely delete the old folder once you verify everything works).

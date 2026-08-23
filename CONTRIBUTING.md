@@ -27,7 +27,7 @@ If you prefer to set up manually:
 
 4. **Push the database schema:**
    ```bash
-   npm run db:push
+   npm run db:ensure
    ```
 
 5. **Start the dev server:**
@@ -64,8 +64,8 @@ If you prefer to set up manually:
 
 - **TypeScript** — All code must be type-safe. Avoid `any`.
 - **Components** — Use shadcn/ui primitives from `client/src/components/ui/`.
-- **API Routes** — Follow the pattern in `server/routes.ts` with proper RBAC via `requireRole()`.
-- **Schema Changes** — Modify `shared/schema.ts` and run `npm run db:push`.
+- **API Routes** — Add modular registrars under `server/routes/` with proper RBAC via `requireRole()` and ownership checks for user-scoped resources.
+- **Schema Changes** — Modify `shared/schema.ts` and run `npm run db:ensure`.
 - **Naming** — camelCase for variables/functions, PascalCase for components/types.
 
 ## Reporting Issues

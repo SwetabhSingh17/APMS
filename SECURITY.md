@@ -6,8 +6,22 @@ Currently, the following versions of this project are actively supported with se
 
 | Version | Supported          |
 | ------- | ------------------ |
-| v1.5.x  | :white_check_mark: |
-| < v1.0  | :x:                |
+| v1.6.x  | :white_check_mark: |
+| v1.5.x  | :x:                |
+| < v1.5  | :x:                |
+
+## Security Posture (v1.6.0)
+
+APMS ships with the following protections in place:
+
+- **Authentication** — Passport.js local strategy with scrypt password hashing; PostgreSQL-backed sessions with a 15-minute rolling inactivity expiry.
+- **Authorization** — Role-based access control (Admin / Coordinator / Supervisor / Student) enforced server-side via `requireRole()` plus per-resource ownership checks (projects, assessments, notifications).
+- **Rate Limiting** — `express-rate-limit` on `/api/login` and `/api/register`.
+- **Security Headers** — Helmet middleware (CSP enabled in production).
+- **Soft Deletes** — Users and topics are retained via an `is_deleted` flag; queries filter them automatically.
+- **Session-Authenticated WebSockets** — Real-time notification sockets validate the signed session cookie server-side; identity cannot be spoofed via query parameters.
+- **Hardened Destructive Operations** — Database reset requires the admin to re-enter their password (verified against the scrypt hash) and fully destroys the server session afterward.
+- **No Hash Leakage** — Password hashes are stripped from every API response, including legacy compatibility endpoints.
 
 ## Reporting a Vulnerability
 

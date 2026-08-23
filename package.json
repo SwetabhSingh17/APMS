@@ -1,6 +1,6 @@
 {
   "name": "rest-express",
-  "version": "1.1.1",
+  "version": "1.6.0",
   "type": "module",
   "license": "MIT",
   "scripts": {
@@ -14,6 +14,7 @@
     "db:backup:schema-only": "tsx scripts/backup_schema.ts --schema-only",
     "db:restore": "tsx scripts/restore_schema.ts",
     "db:setup": "tsx scripts/setup_db.ts",
+    "db:ensure": "tsx scripts/ensure_db.ts",
     "db:hard-reset": "npm run db:setup"
   },
   "dependencies": {

@@ -24,23 +24,27 @@ All items below were verified directly against the current codebase. Fix in this
 
 ### 🟠 HIGH
 
-- [ ] **Notification Inbox Is Non-Functional End-to-End** — multiple files
-  There is **no `GET /api/notifications` endpoint anywhere on the server**, yet:
-  - The WebSocket hook invalidates that exact query key (`client/src/hooks/use-notifications.tsx:39`)
-  - The `/notifications` page renders a hardcoded mock array (`client/src/pages/notifications.tsx:26`)
-  - The header bell dropdown also renders hardcoded mocks (`client/src/components/notifications/notification-dropdown.tsx:25`)
-  Real notifications persist to the DB but are never visible except as transient ContextPill toasts; unread counts grow forever.
-  *Fix:* Implement paginated `GET /api/notifications`, `PATCH .../:id/read`, and mark-all-read endpoints; wire both UI components to TanStack Query.
+- [x] **Notification Inbox Is Non-Functional End-to-End** — multiple files — **FIXED**
+  There was no `GET /api/notifications` endpoint anywhere on the server, yet the WebSocket hook invalidated that exact query key, and both the `/notifications` page and header bell rendered hardcoded mock arrays. Real notifications persisted to the DB but were never visible except as transient ContextPill toasts.
+  *Resolution:* Added `GET /api/notifications`, `PATCH /api/notifications/:id/read` (ownership-enforced), `POST /api/notifications/read-all`, and `DELETE /api/notifications`. Storage gained `markNotificationAsReadForUser`, `markAllNotificationsAsRead`, and `deleteAllNotificationsForUser`. Both UI components now use TanStack Query against the live API; live WebSocket pushes still invalidate the cache.
 
-- [ ] **IDOR on Project Progress** — `server/routes/projects.ts:308`
-  `PUT /api/projects/:id/progress` checks only that *some* user is logged in — **any authenticated user can set any project's progress** (0–100) by ID, including other students' projects.
-  *Fix:* Restrict to the project owner, an assigned supervisor, or Coordinator/Admin.
+- [x] **IDOR on Project Progress** — `server/routes/projects.ts` — **FIXED**
+  `PUT /api/projects/:id/progress` checked only that *some* user was logged in — any authenticated user could set any project's progress by ID.
+  *Resolution:* Now requires authentication plus role-based ownership: the project owner (student), the supervising faculty (topic proposer **or** current group supervisor), or Coordinator/Admin. Removed the request-body console logging.
 
-- [ ] **WebSocket Identity Spoofing** — `server/websocket.ts:12`
-  Clients self-declare identity via `/ws?userId=N` with zero verification. Any user can connect as another user's ID and silently receive their real-time notifications.
-  *Fix:* Authenticate the handshake — validate the express-session cookie server-side and derive `userId` from it instead of trusting the query string.
+- [x] **WebSocket Identity Spoofing** — `server/websocket.ts` — **FIXED**
+  Clients self-declared identity via `/ws?userId=N` with zero verification — anyone could subscribe to another user's real-time notifications.
+  *Resolution:* The handshake now validates the signed `connect.sid` session cookie against the PostgreSQL session store (timing-safe un-signing, same secret as `setupAuth`) and derives the userId server-side. The query parameter is ignored; unauthenticated handshakes are closed with code 1008.
+
+- [x] **Unauthenticated Dashboard Statistics** — `server/routes/stats.ts` — **FIXED** *(found during the follow-up audit)*
+  `GET /api/stats` had no auth guard, leaking institution-wide statistics (student counts, project progress, department stats) to anonymous users.
+  *Resolution:* Added `isAuthenticatedRequest` guard (all roles may read; data is course-filtered per existing logic).
 
 ### 🟡 MEDIUM
+
+- [ ] **Anonymous Access to Approved Topics List** — `server/routes/topics.ts:23`
+  `GET /api/topics/approved` serves the full paginated topic list (titles, descriptions, technologies, supervisor attribution) to **unauthenticated** callers via its non-student branch, and sets `Cache-Control: public, max-age=60` on the response. Students legitimately need this endpoint, but anonymous access is an unnecessary data exposure.
+  *Fix:* Require authentication for the non-student branch (or the entire endpoint).
 
 - [ ] **Coordinator User-Edits Silently Fail (Route Shadowing)** — `server/auth.ts:238` vs `server/routes/admin.ts:117`
   `setupAuth()` registers `PATCH /api/admin/users/:id` (Admin-only) at app level **before** `registerRoutes()` mounts the intended Admin+Coordinator version. Express matches the first handler, so Coordinator edits always return 403 and the admin.ts handler is unreachable dead code.
@@ -145,6 +149,30 @@ All items below were verified directly against the current codebase. Fix in this
 ### Bug Fixes
 - [x] **Frontend Array Mapping Crash (`.map is not a function`)**: Fixed a downstream bug caused by v1.4.0 server-side pagination. Frontend tables (`projects.tsx`, `user-management.tsx`, `track-progress.tsx`, etc.) were expecting arrays but received `PaginatedResponse` objects. Updated the React Query `queryFn` extractors to safely parse `.data || data`.
 - [x] **Vite Build Configuration Error**: Fixed a build failure caused by `react-router-dom` missing from dependencies despite being included in `vite.config.ts` manual chunks. Replaced with `wouter` to match the project's actual router.
+
+---
+
+## ✅ Completed (v1.6.0)
+
+### Critical Security Fixes
+- [x] **Privilege Escalation via `/auth/register`** — Shadow registration endpoint deleted; all registration flows through `/api/register` with single-Admin/Coordinator enforcement.
+- [x] **Password Hash Exposure** — `/auth/login` sanitized; `GET /api/supervisors` now requires authentication and returns a safe projection only.
+- [x] **Progress IDOR** — `PUT /api/projects/:id/progress` now enforces role-based ownership (owner / topic supervisor / group supervisor / Coordinator+Admin).
+
+### High Priority Fixes
+- [x] **Notification Inbox** — Full persistent notification API (`GET`, mark-read, read-all, clear) with ownership enforcement; header bell and `/notifications` page wired to live data instead of hardcoded mocks.
+- [x] **WebSocket Identity Spoofing** — Handshake authenticates via the signed session cookie; userId is derived server-side.
+- [x] **Unauthenticated `/api/stats`** — Guard added.
+
+### Hard Reset & Backup Integrity
+- [x] **True Fresh-Install Reset** — Transactional `TRUNCATE ... RESTART IDENTITY`; sequences restart at 1; default admin recreated via canonical seeding; live WebSocket sockets disconnected; admin password verified before wipe; session destroyed + cookie cleared.
+- [x] **Import Safety** — Sequences re-synced past imported `MAX(id)` (no silent PK collisions); importer session preserved.
+
+### Production Deployment (Windows Server)
+- [x] **Fail-Fast Schema Verification** — Startup now verifies all 9 core tables exist; a fresh database no longer boots into a broken state (`relation "users" does not exist`).
+- [x] **Unified DB Configuration** — `DATABASE_URL` is the single source of truth across the runtime, drizzle-kit, and bootstrap tooling; `DB_*` variables supported as fallback. Split-brain (schema tooling and server targeting different databases) is impossible by construction.
+- [x] **`npm run db:ensure`** — Non-destructive bootstrap: connectivity diagnostics, schema creation only when missing, safe schema sync on updates.
+- [x] **One-Click `start_server.bat`** — Node check, `.env` bootstrap, dependency install, database preparation, build, and start with full error trapping (previous version could not chain commands).
 
 ---
 

@@ -41,16 +41,17 @@ The repository is structured as a monorepo-style full-stack application:
 - `server/`: Backend Express API.
   - `index.ts`: Application entry point.
   - `auth.ts`: Authentication, passport setup, and rate-limiting.
-  - `routes/`: Modular API route files (`auth.ts`, `users.ts`, `projects.ts`, `groups.ts`, `topics.ts`).
-  - `db.ts`: Database connection and startup connectivity validation.
+  - `routes/`: Modular API route files (`auth.ts`, `users.ts`, `projects.ts`, `topics.ts`, `groups.ts`, `stats.ts`, `admin.ts`, `notifications.ts`).
+  - `db.ts`: Database connection with unified config resolution (`DATABASE_URL` takes precedence over `DB_*` variables), plus boot-time schema verification (`runMigrations()` fails fast if any of the 9 core tables are missing).
   - `db-storage.ts`: Database interaction layer using Drizzle ORM (repository pattern).
-  - `websocket.ts`: WebSocket server for real-time notification delivery.
+  - `websocket.ts`: Session-authenticated WebSocket server for real-time notification delivery. The handshake validates the signed `connect.sid` cookie against the PostgreSQL session store and derives the userId server-side — the client-supplied `?userId=` query parameter is ignored.
 - `shared/`: Types and schemas shared between client and server.
   - `schema.ts`: Core Drizzle tables, Zod schemas, and TypeScript interfaces.
 - `scripts/`: DB seeding, backup, restore, setup, and reset scripts.
-  - `setup_db.ts`: Unified database installation (wipes public schema, pushes tables, inits default admin).
-  - `hard_reset.ts`: Aliased to setup_db.ts for safe resetting.
+  - `ensure_db.ts`: Production-safe bootstrap used by `start_server.bat` (`npm run db:ensure`) — verifies connectivity with actionable diagnostics, creates missing tables + default admin, syncs pending schema changes. NEVER wipes data.
+  - `setup_db.ts`: Full destructive reset (wipes schema, pushes tables, seeds admin). Aliased as `db:hard-reset`.
 ---
+
 
 ## 4. Database Schema (drizzle)
 The application relies on several core tables defined in `shared/schema.ts`:
@@ -67,9 +68,10 @@ The application relies on several core tables defined in `shared/schema.ts`:
 ---
 
 ## 5. Real-Time Notification System & Routing Logic
-APMS includes a robust real-time notification system powered by WebSockets.
-- **Infrastructure**: A `WebSocketServer` runs on the same HTTP port (path `/ws`). Clients connect and pass their `userId`. The system broadcasts `NOTIFICATION` events strictly to the target user's active socket connections.
-- **Frontend Integration**: The `useNotifications` hook in `client/src/App.tsx` establishes the connection. When a notification is received, it triggers a UI `toast()` popup ("notification blob") and automatically invalidates the `["/api/notifications"]` TanStack Query cache to instantly refresh the notification drawer.
+APMS includes a robust real-time notification system powered by WebSockets with a persistent per-user inbox.
+- **Infrastructure**: A `WebSocketServer` runs on the same HTTP port (path `/ws`). The handshake is session-authenticated: the server un-signs the `connect.sid` cookie (timing-safe, same secret as `setupAuth`), loads the session from PostgreSQL, and derives the userId from `session.passport.user`. Unauthenticated handshakes are closed with code 1008. The system broadcasts `NOTIFICATION` events strictly to the target user's active socket connections.
+- **Persistence & API**: Notifications are stored in the `notifications` table and served via `GET /api/notifications` (newest first). Supporting endpoints: `PATCH /api/notifications/:id/read` (ownership-enforced), `POST /api/notifications/read-all`, and `DELETE /api/notifications` (clear own). The header bell dropdown and the `/notifications` page consume these via TanStack Query.
+- **Frontend Integration**: The `useNotifications` hook in `client/src/App.tsx` establishes the connection. When a notification is received, it triggers a UI `toast()` popup ("notification blob") and automatically invalidates the `["/api/notifications"]` TanStack Query cache to instantly refresh the bell dropdown and notifications page.
 - **Advanced Routing Rules**: Only relevant stakeholders receive notifications.
   - *Supervisor Allocation*: When a Supervisor is assigned or reassigned to a Project Team, the newly assigned, previously assigned, and specific group's Students are notified.
   - *Topic Approvals*: When a Coordinator approves a topic, the Supervisor who proposed it and all Admins receive notifications. Students are not notified.
@@ -92,7 +94,9 @@ APMS includes a robust real-time notification system powered by WebSockets.
    - *Holographic Data Grids*: Tables featuring perspective tilting via Framer Motion 3D transforms.
    - *Physics-Based Micro-Interactions*: Spring animations for button presses, hover states, and modals.
 8. **Performance & Caching**: Cache headers are implemented for read-heavy API endpoints to reduce database queries.
-9. **Documentation & Future Roadmap**: `Fixes_required.md` serves as the backlog for architectural and feature proposals (e.g., Background Jobs, Advanced Rate Limiting, OpenAPI generation, Multi-Department Support, PDF generation).
+9. **Database Configuration & Bootstrap**: `DATABASE_URL` is the single source of truth — parsed by the runtime (`server/db.ts`), `drizzle.config.ts`, and `scripts/ensure_db.ts`. The `DB_*` variables act as a fallback style. `ensure_db.ts` injects the runtime-resolved URL into drizzle-kit child processes, so schema operations can never target a different database than the running server. `npm run db:ensure` is safe to run on every start (creates missing tables + default admin, syncs schema changes, never wipes).
+10. **Destructive Operations**: The hard reset (`POST /api/admin/reset`) requires the admin's password (verified via scrypt) and performs a transactional `TRUNCATE ... RESTART IDENTITY CASCADE` — sequences restart at 1 and the default admin is recreated, yielding exact `npm run db:setup` parity. Backup import re-syncs table sequences past imported `MAX(id)` values to prevent PK collisions.
+11. **Documentation & Future Roadmap**: `Fixes_required.md` serves as the backlog for architectural and feature proposals (e.g., Background Jobs, Advanced Rate Limiting, OpenAPI generation, Multi-Department Support, PDF generation).
 
 ---
 

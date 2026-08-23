@@ -1,6 +1,28 @@
 # Version History
 
-## Version 1.5.0 (Current)
+## Version 1.6.0 (Current)
+### Critical & High Security Fixes
+1. **Privilege Escalation Removed** — Deleted the shadow `/auth/register` endpoint that allowed anonymous users to create admin accounts with arbitrary roles. All registration now flows through `/api/register`, which enforces the single-Admin/single-Coordinator rule.
+2. **Password Hash Exposure Patched** — `/auth/login` no longer returns the scrypt password hash. The unauthenticated `GET /api/supervisors` endpoint now requires authentication and returns only a safe projection (`id`, `firstName`, `lastName`, `email`).
+3. **Progress IDOR Fixed** — `PUT /api/projects/:id/progress` now enforces role-based ownership: project owner (student), topic-proposing supervisor, current group supervisor, or Coordinator/Admin.
+4. **WebSocket Identity Spoofing Fixed** — The `/ws` handshake validates the signed `connect.sid` session cookie against the PostgreSQL session store and derives the userId server-side. The client-supplied `?userId=` parameter is ignored; unauthenticated sockets are closed with code 1008.
+5. **Dashboard Statistics Guarded** — `GET /api/stats` now requires authentication (previously leaked institution-wide statistics to anonymous callers).
+
+### Functional Fixes
+1. **Notification Inbox Now Works End-to-End** — Added `GET /api/notifications`, `PATCH /api/notifications/:id/read` (ownership-enforced), `POST /api/notifications/read-all`, and `DELETE /api/notifications`. The header bell dropdown and `/notifications` page were previously rendering hardcoded mock data; both now use the live API with real-time WebSocket cache invalidation.
+2. **Hard Reset = True Fresh Install** — Rewritten as a transactional `TRUNCATE ... RESTART IDENTITY CASCADE`: all ID sequences restart at 1, the default admin is recreated through the canonical seeding path (admin id=1), all WebSocket connections are dropped, the admin's session is destroyed, and the confirmation password is now actually verified server-side. The UI shows an "Export your data first" popup when reset is clicked.
+3. **Backup Import Hardened** — Table ID sequences are re-synced past imported `MAX(id)` values after a restore, preventing silent primary-key collisions. Imports no longer terminate the importing admin's session.
+
+### Production Deployment (Windows Server)
+1. **One-Click `start_server.bat`** — Fully rewritten: verifies Node.js, bootstraps `.env` from the template on first run, installs dependencies, prepares the database, builds, and starts — with error trapping at every step. (The previous version invoked `npm` without `call`, so it could never chain commands.)
+2. **New `npm run db:ensure`** — Production-safe database bootstrap: verifies connectivity with actionable diagnostics, creates the schema + default admin **only if missing**, and safely syncs pending schema changes on updates. Never wipes data (unlike `db:setup`).
+3. **Fail-Fast Startup** — `runMigrations()` now verifies all 9 core tables exist before serving traffic. A fresh database previously passed the connectivity-only check and then served `relation "users" does not exist` errors on every request.
+4. **Unified Database Configuration** — `DATABASE_URL` is now the single source of truth (parsed by the runtime server, drizzle-kit, and `ensure_db`). The `DB_*` variables work as a fallback style. A conflicting `.env` can no longer point the schema tooling and the server at different databases. `drizzle.config.ts` and `.env.example` updated accordingly.
+
+### Documentation
+1. Updated README, Installation Guide, Security Policy, AI Context, and this changelog to reflect v1.6.0 architecture and workflows.
+
+## Version 1.5.0
 ### Cybertruck Spatial UI Enhancements
 1. **Spatial / Glassmorphic UI**: Overhauled the design system with dynamic backdrop filters, glassmorphism, and fluid micro-animations for a modern Spatial OS feel.
 2. **Animated Auth Splash Screens**: Added professional, cinematic splash screens (e.g., "WELCOME_ [USERNAME]") that intercept login and logout events with a 2.5s delay.
