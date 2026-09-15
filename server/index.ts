@@ -106,8 +106,8 @@ async function startServer(): Promise<void> {
     }
 
     // 4. Begin accepting incoming requests
-    server.listen(Number(port), '0.0.0.0', async () => {
-      log(`Server running on http://0.0.0.0:${port}`);
+    server.listen(Number(port), async () => {
+      log(`Server running on port ${port}`);
       log(`Local: http://localhost:${port}`);
 
       // Probe OS interfaces for broadcast IP

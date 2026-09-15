@@ -8,11 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, UserPlus, UserCog, Edit, Trash2, Eye, EyeOff } from "lucide-react";
+import { Search, UserPlus, UserCog, Edit, Trash2, Eye, EyeOff, Download, FileSpreadsheet } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { InsertUser, UserRole } from "@shared/schema";
+import { BulkOnboardingModal } from "@/components/admin/bulk-onboarding-modal";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertUserSchema } from "@shared/schema";
@@ -68,6 +69,7 @@ export default function UserManagement() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  const [isBulkOnboardOpen, setIsBulkOnboardOpen] = useState(false);
   const [isEditUserOpen, setIsEditUserOpen] = useState(false);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -76,11 +78,47 @@ export default function UserManagement() {
 
   const { courseFilter, getCourseQuery } = useCourseFilter();
 
+  // Safely download demo Excel template using authenticated credentials
+  const handleDownloadDemoTemplate = async () => {
+    try {
+      toast({
+        title: "Downloading Demo Template",
+        description: "Generating official APMS_Student_Onboarding_Demo_Format.xlsx...",
+      });
+      const res = await fetch("/api/admin/onboarding/demo-template", {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        throw new Error(res.status === 401 ? "Unauthorized. Please log in as Admin or Coordinator." : "Failed to download demo template");
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "APMS_Student_Onboarding_Demo_Format.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast({
+        title: "Download Started",
+        description: "Official demo template downloaded successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Download Failed",
+        description: error.message || "Failed to download demo format.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const userQueryParam = getCourseQuery() ? `?${getCourseQuery()}&limit=all` : '?limit=all';
   const { data: users, isLoading } = useQuery<UserData[]>({
     queryKey: [`/api/users${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
     enabled: !!user && (user.role === UserRole.ADMIN || user.role === UserRole.COORDINATOR),
     queryFn: async () => {
-      const response = await apiRequest("GET", `/api/users${getCourseQuery() ? `?${getCourseQuery()}` : ''}`);
+      const response = await apiRequest("GET", `/api/users${userQueryParam}`);
       const data = await response.json();
       return data.data || data;
     }
@@ -346,15 +384,40 @@ export default function UserManagement() {
               Manage user accounts and permissions
             </CardDescription>
           </div>
-          <Button
-            onClick={() => {
-              form.reset();
-              setIsAddUserOpen(true);
-            }}
-          >
-            <UserPlus className="mr-2 h-4 w-4" />
-            Add User
-          </Button>
+          {/* Action buttons: Download demo template, bulk onboarding, and single user creation */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="default"
+              type="button"
+              onClick={handleDownloadDemoTemplate}
+              className="gap-1.5 border-border hover:bg-muted font-medium text-xs sm:text-sm"
+            >
+              <Download className="h-4 w-4 text-primary" />
+              <span>Download Demo Format</span>
+            </Button>
+
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={() => setIsBulkOnboardOpen(true)}
+              className="gap-1.5 border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary font-semibold text-xs sm:text-sm"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              <span>Bulk Onboarding</span>
+            </Button>
+
+            <Button
+              onClick={() => {
+                form.reset();
+                setIsAddUserOpen(true);
+              }}
+              className="gap-1.5 text-xs sm:text-sm"
+            >
+              <UserPlus className="h-4 w-4" />
+              <span>Add User</span>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="mb-6 flex flex-col md:flex-row gap-4">
@@ -387,259 +450,286 @@ export default function UserManagement() {
             </div>
           </div>
 
-          <Tabs defaultValue="all-users">
-            <TabsList className="mb-4">
-              <TabsTrigger value="all-users">All Users</TabsTrigger>
-              <TabsTrigger value="supervisors">Supervisors</TabsTrigger>
-              <TabsTrigger value="students">Students</TabsTrigger>
-              <TabsTrigger value="coordinators">Coordinators</TabsTrigger>
-            </TabsList>
+          {(() => {
+            const supervisorsList = filteredUsers ? filteredUsers.filter(u => u.role === UserRole.SUPERVISOR) : [];
+            const studentsList = filteredUsers ? filteredUsers.filter(u => u.role === UserRole.STUDENT) : [];
+            const coordinatorsList = filteredUsers ? filteredUsers.filter(u => u.role === UserRole.COORDINATOR) : [];
+            const allUsersCount = filteredUsers ? filteredUsers.length : 0;
 
-            <TabsContent value="all-users">
-              {isLoading ? (
-                <Skeleton className="h-64 w-full" />
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Username</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredUsers && filteredUsers.length > 0 ? (
-                        filteredUsers.map((user) => (
-                          <TableRow key={user.id} className="hover:bg-muted/50">
-                            <TableCell>
-                              <div className="flex items-center space-x-2">
-                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                  <span className="text-primary font-medium text-sm">
-                                    {user.firstName.charAt(0)}
-                                    {user.lastName.charAt(0)}
+            return (
+              <Tabs defaultValue="all-users">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="all-users">All Users ({allUsersCount})</TabsTrigger>
+                  <TabsTrigger value="supervisors">Supervisors ({supervisorsList.length})</TabsTrigger>
+                  <TabsTrigger value="students">Students ({studentsList.length})</TabsTrigger>
+                  <TabsTrigger value="coordinators">Coordinators ({coordinatorsList.length})</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="all-users">
+                  {isLoading ? (
+                    <Skeleton className="h-64 w-full" />
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Username</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Role</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredUsers && filteredUsers.length > 0 ? (
+                            filteredUsers.map((user) => (
+                              <TableRow key={user.id} className="hover:bg-muted/50">
+                                <TableCell>
+                                  <div className="flex items-center space-x-2">
+                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                      <span className="text-primary font-medium text-sm">
+                                        {user.firstName.charAt(0)}
+                                        {user.lastName.charAt(0)}
+                                      </span>
+                                    </div>
+                                    <span>{user.firstName} {user.lastName}</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>{user.username}</TableCell>
+                                <TableCell>{user.email}</TableCell>
+                                <TableCell>
+                                  <span className={`px-2 py-1 text-xs rounded-full ${getRoleBadgeClasses(user.role)}`}>
+                                    {getRoleDisplay(user.role)}
                                   </span>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex space-x-2 justify-end">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleEditUser(user)}
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="text-destructive hover:text-destructive"
+                                      onClick={() => handleDeleteUser(user)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          ) : (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                {searchQuery || filterRole !== "all"
+                                  ? "No users match your filters"
+                                  : "No users found"}
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="supervisors">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Topics Submitted</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {supervisorsList.length > 0 ? (
+                          supervisorsList.map((user) => (
+                            <TableRow key={user.id} className="hover:bg-muted/50">
+                              <TableCell>
+                                <div className="flex items-center space-x-2">
+                                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                    <span className="text-primary font-medium text-sm">
+                                      {user.firstName.charAt(0)}
+                                      {user.lastName.charAt(0)}
+                                    </span>
+                                  </div>
+                                  <span>{user.firstName} {user.lastName}</span>
                                 </div>
-                                <span>{user.firstName} {user.lastName}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>{user.username}</TableCell>
-                            <TableCell>{user.email}</TableCell>
-                            <TableCell>
-                              <span className={`px-2 py-1 text-xs rounded-full ${getRoleBadgeClasses(user.role)}`}>
-                                {getRoleDisplay(user.role)}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex space-x-2 justify-end">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleEditUser(user)}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-destructive hover:text-destructive"
-                                  onClick={() => handleDeleteUser(user)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
+                              </TableCell>
+                              <TableCell>{user.email}</TableCell>
+                              <TableCell>
+                                {user.topicsCount || 0} topics
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex space-x-2 justify-end">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleEditUser(user)}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={() => handleDeleteUser(user)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                              No supervisors found
                             </TableCell>
                           </TableRow>
-                        ))
-                      ) : (
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="students">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                            {searchQuery || filterRole !== "all"
-                              ? "No users match your filters"
-                              : "No users found"}
-                          </TableCell>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Enrollment #</TableHead>
+                          <TableHead>Project Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </TabsContent>
+                      </TableHeader>
+                      <TableBody>
+                        {studentsList.length > 0 ? (
+                          studentsList.map((user) => (
+                            <TableRow key={user.id} className="hover:bg-muted/50">
+                              <TableCell>
+                                <div className="flex items-center space-x-2">
+                                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                    <span className="text-primary font-medium text-sm">
+                                      {user.firstName.charAt(0)}
+                                      {user.lastName.charAt(0)}
+                                    </span>
+                                  </div>
+                                  <span>{user.firstName} {user.lastName}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>{user.email}</TableCell>
+                              <TableCell>{user.enrollmentNumber || 'N/A'}</TableCell>
+                              <TableCell>
+                                {user.projectStatus
+                                  ? <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Active</span>
+                                  : <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">No Project</span>
+                                }
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex space-x-2 justify-end">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleEditUser(user)}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={() => handleDeleteUser(user)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                              No students found
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </TabsContent>
 
-            <TabsContent value="supervisors">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Topics Submitted</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredUsers && filteredUsers
-                      .filter(user => user.role === UserRole.SUPERVISOR)
-                      .map((user) => (
-                        <TableRow key={user.id} className="hover:bg-muted/50">
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                <span className="text-primary font-medium text-sm">
-                                  {user.firstName.charAt(0)}
-                                  {user.lastName.charAt(0)}
-                                </span>
-                              </div>
-                              <span>{user.firstName} {user.lastName}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>{user.email}</TableCell>
-                          <TableCell>
-                            {user.topicsCount || 0} topics
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex space-x-2 justify-end">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleEditUser(user)}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-destructive hover:text-destructive"
-                                onClick={() => handleDeleteUser(user)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
+                <TabsContent value="coordinators">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="students">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Enrollment #</TableHead>
-                      <TableHead>Project Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredUsers && filteredUsers
-                      .filter(user => user.role === UserRole.STUDENT)
-                      .map((user) => (
-                        <TableRow key={user.id} className="hover:bg-muted/50">
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                <span className="text-primary font-medium text-sm">
-                                  {user.firstName.charAt(0)}
-                                  {user.lastName.charAt(0)}
-                                </span>
-                              </div>
-                              <span>{user.firstName} {user.lastName}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>{user.email}</TableCell>
-                          <TableCell>{user.enrollmentNumber || 'N/A'}</TableCell>
-                          <TableCell>
-                            {user.projectStatus
-                              ? <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Active</span>
-                              : <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">No Project</span>
-                            }
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex space-x-2 justify-end">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleEditUser(user)}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-destructive hover:text-destructive"
-                                onClick={() => handleDeleteUser(user)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="coordinators">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredUsers && filteredUsers
-                      .filter(user => user.role === UserRole.COORDINATOR)
-                      .map((user) => (
-                        <TableRow key={user.id} className="hover:bg-muted/50">
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                <span className="text-primary font-medium text-sm">
-                                  {user.firstName.charAt(0)}
-                                  {user.lastName.charAt(0)}
-                                </span>
-                              </div>
-                              <span>{user.firstName} {user.lastName}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>{user.email}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex space-x-2 justify-end">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleEditUser(user)}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-destructive hover:text-destructive"
-                                onClick={() => handleDeleteUser(user)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </TabsContent>
-          </Tabs>
+                      </TableHeader>
+                      <TableBody>
+                        {coordinatorsList.length > 0 ? (
+                          coordinatorsList.map((user) => (
+                            <TableRow key={user.id} className="hover:bg-muted/50">
+                              <TableCell>
+                                <div className="flex items-center space-x-2">
+                                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                    <span className="text-primary font-medium text-sm">
+                                      {user.firstName.charAt(0)}
+                                      {user.lastName.charAt(0)}
+                                    </span>
+                                  </div>
+                                  <span>{user.firstName} {user.lastName}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>{user.email}</TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex space-x-2 justify-end">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleEditUser(user)}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={() => handleDeleteUser(user)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                              No coordinators found
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            );
+          })()}
         </CardContent>
       </Card>
 
@@ -1057,6 +1147,12 @@ export default function UserManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk student onboarding and team formation modal */}
+      <BulkOnboardingModal
+        isOpen={isBulkOnboardOpen}
+        onClose={() => setIsBulkOnboardOpen(false)}
+      />
     </MainLayout>
   );
 }

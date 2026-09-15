@@ -2,11 +2,12 @@
 import {
   User, ProjectTopic, StudentProject, StudentGroup, ProjectMilestone, ProjectAssessment, Notification, UserRole,
   InsertUser, InsertProjectTopic, InsertStudentProject, InsertStudentGroup, InsertProjectAssessment, InsertNotification,
-  users, projectTopics, studentProjects, studentGroups, projectAssessments, notifications, projectMilestones, studentGroupMembers
+  users, projectTopics, studentProjects, studentGroups, projectAssessments, notifications, projectMilestones, studentGroupMembers,
+  IStudentOnboardingRow, IOnboardingResult, IOnboardingProgress
 } from "@shared/schema";
 import { db } from "./db";
 import { notifyUser, disconnectAllClients } from "./websocket";
-import { eq, and, desc, sql, inArray, not, ne, aliasedTable, SQL } from "drizzle-orm";
+import { eq, and, or, asc, desc, sql, inArray, not, ne, aliasedTable, SQL } from "drizzle-orm";
 import connectPg from "connect-pg-simple";
 import session from "express-session";
 import { pool } from "./db";
@@ -99,14 +100,18 @@ export class DBStorage {
 
   async getAllUsers(course?: string): Promise<User[]> {
     if (course) {
+      const normalizedCourse = course.trim().toUpperCase();
       return (await db.select().from(users).where(
         and(
           eq(users.isDeleted, false),
-          eq(users.course, course)
+          or(
+            eq(sql`UPPER(${users.course})`, normalizedCourse),
+            eq(users.role, UserRole.ADMIN)
+          )
         )
-      )) as User[];
+      ).orderBy(asc(users.id))) as User[];
     }
-    return (await db.select().from(users).where(eq(users.isDeleted, false))) as User[];
+    return (await db.select().from(users).where(eq(users.isDeleted, false)).orderBy(asc(users.id))) as User[];
   }
 
   async getUserProfile(id: number): Promise<User | undefined> {
@@ -530,6 +535,7 @@ export class DBStorage {
           email: m.email,
           enrollmentNumber: m.enrollmentNumber,
           role: m.role,
+          course: m.course,
         })),
         supervisor: supervisor ? {
           id: supervisor.id,
@@ -869,12 +875,18 @@ export class DBStorage {
 
   async getPaginatedUsers(page: number, limit: number, course?: string): Promise<import('@shared/schema').PaginatedResponse<User>> {
     const conditions = [eq(users.isDeleted, false)];
-    if (course) conditions.push(eq(users.course, course));
+    if (course) {
+      const normalizedCourse = course.trim().toUpperCase();
+      conditions.push(or(
+        eq(sql`UPPER(${users.course})`, normalizedCourse),
+        eq(users.role, UserRole.ADMIN)
+      )!);
+    }
     
     const countQuery = await db.select({ count: sql<number>`count(*)` }).from(users).where(and(...conditions));
     const total = Number(countQuery[0].count);
     
-    const data = await db.select().from(users).where(and(...conditions)).limit(limit).offset((page - 1) * limit) as User[];
+    const data = await db.select().from(users).where(and(...conditions)).orderBy(asc(users.id)).limit(limit).offset((page - 1) * limit) as User[];
     
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
@@ -955,7 +967,288 @@ export class DBStorage {
 
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
-}
 
+  // Method to update the force password reset flag
+  // Required to remove the first-login security block once the student changes their password
+  async setUserForcePasswordReset(userId: number, forceReset: boolean): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set({ forcePasswordReset: forceReset, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated as User | undefined;
+  }
+
+  // Bulk provisioning of student accounts and automated formation of project teams
+  // Guarantees strict course data isolation and enforces first-login mandatory password change
+  // Supports real-time progress callbacks for streaming telemetry to the frontend
+  async bulkOnboardStudentsAndTeams(
+    studentRows: IStudentOnboardingRow[],
+    course: "BCA" | "MCA",
+    creatorId: number,
+    onProgress?: (progress: IOnboardingProgress) => void
+  ): Promise<IOnboardingResult> {
+    const result: IOnboardingResult = {
+      success: true,
+      message: "",
+      course,
+      totalSheetsParsed: 0,
+      totalStudentsProcessed: 0,
+      totalTeamsCreated: 0,
+      sheetNames: [],
+      teams: [],
+      errors: [],
+    };
+
+    if (studentRows.length === 0) {
+      result.message = "No valid student rows were found in the uploaded workbook.";
+      onProgress?.({
+        stage: "error",
+        percent: 100,
+        message: result.message,
+      });
+      return result;
+    }
+
+    // Step 1: Identify unique worksheet names processed
+    const sheetsSet = new Set<string>();
+    studentRows.forEach(row => {
+      if (row.sheetName) sheetsSet.add(row.sheetName);
+    });
+    result.sheetNames = Array.from(sheetsSet);
+    result.totalSheetsParsed = result.sheetNames.length;
+
+    onProgress?.({
+      stage: "parsing",
+      percent: 20,
+      message: `Extracted ${studentRows.length} student records from ${result.totalSheetsParsed} worksheets.`,
+      current: 0,
+      total: studentRows.length,
+      detail: `Sheets: ${result.sheetNames.join(", ")}`
+    });
+
+    // Step 2: Preload existing users to optimize lookup time from O(N) database calls to O(1) in-memory
+    const existingUsersList = await db.select().from(users);
+    const existingByEnrollment = new Map<string, User>();
+    const existingByUsername = new Map<string, User>();
+    const existingEmails = new Set<string>();
+
+    for (const u of existingUsersList) {
+      if (u.enrollmentNumber) existingByEnrollment.set(u.enrollmentNumber.trim(), u as User);
+      if (u.username) existingByUsername.set(u.username.trim(), u as User);
+      if (u.email) existingEmails.add(u.email.trim().toLowerCase());
+    }
+
+    // Process students in concurrent batches of 15 for optimal performance and steady progress updates
+    const studentMap = new Map<string, User>();
+    const validRows = studentRows.filter(r => String(r.enrollmentNumber || "").trim().length > 0);
+    const totalStudents = validRows.length;
+    const BATCH_SIZE = 15;
+    let processedSoFar = 0;
+
+    for (let i = 0; i < totalStudents; i += BATCH_SIZE) {
+      const batch = validRows.slice(i, i + BATCH_SIZE);
+
+      await Promise.all(batch.map(async (row) => {
+        const cleanEnrollment = String(row.enrollmentNumber).trim();
+
+        const rawName = (row.studentName || "").trim();
+        const nameParts = rawName.split(/\s+/).filter(Boolean);
+        const firstName = nameParts[0] || `Student`;
+        const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : ".";
+
+        let rawEmail = (row.emailId || "").trim().toLowerCase();
+
+        try {
+          const existingStudent = existingByEnrollment.get(cleanEnrollment) || existingByUsername.get(cleanEnrollment);
+
+          if (existingStudent) {
+            let finalEmail = existingStudent.email;
+            if (rawEmail && rawEmail.includes("@") && rawEmail !== existingStudent.email.toLowerCase()) {
+              if (!existingEmails.has(rawEmail)) {
+                finalEmail = rawEmail;
+                existingEmails.add(rawEmail);
+              }
+            }
+
+            const [updatedStudent] = await db.update(users)
+              .set({
+                course,
+                firstName: firstName || existingStudent.firstName,
+                lastName: lastName !== "." ? lastName : existingStudent.lastName,
+                email: finalEmail,
+                updatedAt: new Date()
+              })
+              .where(eq(users.id, existingStudent.id))
+              .returning();
+
+            studentMap.set(cleanEnrollment, updatedStudent as User);
+            existingByEnrollment.set(cleanEnrollment, updatedStudent as User);
+          } else {
+            let newEmail = (rawEmail && rawEmail.includes("@") && !existingEmails.has(rawEmail))
+              ? rawEmail
+              : `${cleanEnrollment.toLowerCase()}@student.iul.ac.in`;
+
+            if (existingEmails.has(newEmail)) {
+              newEmail = `${cleanEnrollment.toLowerCase()}.${cleanEnrollment.slice(-4)}@student.iul.ac.in`;
+            }
+            existingEmails.add(newEmail);
+
+            const initialHashedPassword = await hashPassword(cleanEnrollment);
+
+            const [newStudent] = await db.insert(users).values({
+              username: cleanEnrollment,
+              password: initialHashedPassword,
+              firstName,
+              lastName,
+              email: newEmail,
+              role: UserRole.STUDENT,
+              enrollmentNumber: cleanEnrollment,
+              course,
+              forcePasswordReset: true,
+              isDeleted: false,
+            }).returning();
+
+            studentMap.set(cleanEnrollment, newStudent as User);
+            existingByEnrollment.set(cleanEnrollment, newStudent as User);
+            existingByUsername.set(cleanEnrollment, newStudent as User);
+          }
+        } catch (userErr: any) {
+          result.errors?.push(`Error provisioning student ${cleanEnrollment}: ${userErr.message}`);
+        }
+      }));
+
+      processedSoFar += batch.length;
+      result.totalStudentsProcessed = studentMap.size;
+
+      onProgress?.({
+        stage: "provisioning",
+        percent: 20 + Math.round((processedSoFar / totalStudents) * 55),
+        message: `Provisioning student credentials (${processedSoFar} of ${totalStudents})...`,
+        current: processedSoFar,
+        total: totalStudents,
+        detail: `Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${processedSoFar}/${totalStudents} students verified`
+      });
+    }
+
+    // Step 3: Group students by their parsed ProjectTeam ID
+    const teamGroupsMap = new Map<string, string[]>();
+    for (const row of studentRows) {
+      const cleanEnrollment = String(row.enrollmentNumber).trim();
+      const teamId = (row.projectTeamId || "").trim();
+      if (!cleanEnrollment || !teamId) continue;
+
+      if (!teamGroupsMap.has(teamId)) {
+        teamGroupsMap.set(teamId, []);
+      }
+      const list = teamGroupsMap.get(teamId)!;
+      if (!list.includes(cleanEnrollment)) {
+        list.push(cleanEnrollment);
+      }
+    }
+
+    const maxGroupSize = course === "BCA" ? 5 : 2;
+    const totalTeams = teamGroupsMap.size;
+    let teamsCreatedCount = 0;
+
+    // Preload existing student groups for this course
+    const existingGroupsList = await db.select().from(studentGroups)
+      .where(eq(studentGroups.course, course));
+    const existingGroupsMap = new Map<string, StudentGroup>();
+    for (const g of existingGroupsList) {
+      if (g.projectTeamId) existingGroupsMap.set(g.projectTeamId.trim(), g as StudentGroup);
+    }
+
+    for (const [teamId, enrollmentNumbers] of Array.from(teamGroupsMap.entries())) {
+      try {
+        const existingGroup = existingGroupsMap.get(teamId);
+        let currentGroupId: number;
+
+        if (existingGroup) {
+          currentGroupId = existingGroup.id;
+        } else {
+          const [createdGroup] = await db.insert(studentGroups).values({
+            name: `Project Team ${teamId}`,
+            description: `Auto-provisioned project team for ${course} program (${teamId})`,
+            course,
+            projectTeamId: teamId,
+            maxSize: maxGroupSize,
+            createdById: creatorId,
+          }).returning();
+
+          currentGroupId = createdGroup.id;
+          existingGroupsMap.set(teamId, createdGroup as StudentGroup);
+          result.totalTeamsCreated++;
+        }
+
+        // Set each student's groupId in users table and ensure accepted membership
+        for (const enroll of enrollmentNumbers) {
+          const student = studentMap.get(enroll);
+          if (!student) continue;
+
+          await db.update(users)
+            .set({ groupId: currentGroupId, updatedAt: new Date() })
+            .where(eq(users.id, student.id));
+
+          const [existingMember] = await db.select().from(studentGroupMembers)
+            .where(and(
+              eq(studentGroupMembers.userId, student.id),
+              eq(studentGroupMembers.groupId, currentGroupId)
+            ));
+
+          if (!existingMember) {
+            await db.insert(studentGroupMembers).values({
+              userId: student.id,
+              groupId: currentGroupId,
+              status: 'accepted'
+            });
+          } else if (existingMember.status !== 'accepted') {
+            await db.update(studentGroupMembers)
+              .set({ status: 'accepted', updatedAt: new Date() })
+              .where(eq(studentGroupMembers.id, existingMember.id));
+          }
+        }
+
+        result.teams.push({
+          teamId,
+          studentCount: enrollmentNumbers.length,
+          enrollmentNumbers,
+        });
+
+        teamsCreatedCount++;
+        if (teamsCreatedCount % 5 === 0 || teamsCreatedCount === totalTeams) {
+          onProgress?.({
+            stage: "teams",
+            percent: 75 + Math.round((teamsCreatedCount / totalTeams) * 20),
+            message: `Forming project teams (${teamsCreatedCount} of ${totalTeams})...`,
+            current: teamsCreatedCount,
+            total: totalTeams,
+            detail: `Team ${teamId}: assigned ${enrollmentNumbers.length} student(s)`
+          });
+        }
+      } catch (teamErr: any) {
+        result.errors?.push(`Error creating team ${teamId}: ${teamErr.message}`);
+      }
+    }
+
+    onProgress?.({
+      stage: "finalizing",
+      percent: 98,
+      message: "Finalizing and preparing summary metrics...",
+      current: totalTeams,
+      total: totalTeams
+    });
+
+    result.message = `Bulk onboarding completed successfully. ${result.totalStudentsProcessed} students provisioned across ${result.teams.length} teams for ${course}.`;
+
+    onProgress?.({
+      stage: "completed",
+      percent: 100,
+      message: result.message,
+      result
+    });
+
+    return result;
+  }
+}
 
 export const storage = new DBStorage();

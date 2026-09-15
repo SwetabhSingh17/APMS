@@ -19,37 +19,45 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
         }
     });
 
-    // Get all approved topics (with categorization for students)
+    // Get all approved topics with strict program isolation and categorization for students
+    // BCA students can only see BCA topics; MCA students can only see MCA topics
     router.get("/api/topics/approved", async (req: Request, res: Response) => {
         try {
-            // Set Cache-Control for read-heavy endpoint
-            res.setHeader('Cache-Control', 'public, max-age=60');
+            if (!isAuthenticatedRequest(req)) {
+                return res.status(401).json({ message: "Unauthorized" });
+            }
 
             const courseFilter = req.query.course as string | undefined;
 
-            // If the user is a student, auto-filter by their course
-            if (isAuthenticatedRequest(req) && req.user?.role === UserRole.STUDENT) {
+            // If the requesting user is a student, strictly isolate by their enrolled course
+            if (req.user?.role === UserRole.STUDENT) {
+                // Disable public caching to prevent cross-course data leakage
+                res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+
                 let topics = await storage.getApprovedTopics();
                 const studentId = req.user.id;
                 const studentCourse = (req.user as any).course;
 
-                // Only show topics matching the student's course
-                if (studentCourse) {
+                // Strict course visibility rule: BCA students see only BCA; MCA students see only MCA
+                if (studentCourse && (studentCourse === "BCA" || studentCourse === "MCA")) {
                     topics = topics.filter(t => (t as any).course === studentCourse);
+                } else {
+                    // If no course is assigned, expose no topics to prevent accidental information leak
+                    topics = [];
                 }
 
-                // Check if student has selected a topic (has a project)
+                // Check if the student or their group has already selected a topic
                 const studentProjects = await storage.getStudentProjects(studentId);
                 const hasSelectedTopic = studentProjects.length > 0;
                 const myTopicId = hasSelectedTopic ? studentProjects[0].topicId : null;
 
-                // Get all projects to identify taken topics
+                // Retrieve projects to identify topics already claimed by other groups
                 const allProjects = await storage.getAllProjects();
                 const takenTopicIds = allProjects
                     .filter(p => p.topicId !== myTopicId)
                     .map(p => p.topicId);
 
-                // Categorize topics
+                // Categorize available vs taken topics
                 const myTopic = myTopicId ? topics.find(t => t.id === myTopicId) : null;
                 const availableTopics = topics.filter(
                     t => !takenTopicIds.includes(t.id) && t.id !== myTopicId
@@ -65,7 +73,8 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
                     takenTopics
                 });
             } else {
-                // Admin or other roles - Paginate response
+                // Admins, coordinators, or supervisors: paginated response with optional course filter
+                res.setHeader('Cache-Control', 'public, max-age=60');
                 const page = parseInt(req.query.page as string) || 1;
                 const limit = parseInt(req.query.limit as string) || 50;
                 const paginatedTopics = await storage.getPaginatedApprovedTopics(page, limit, courseFilter);
@@ -73,6 +82,31 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
             }
         } catch (error) {
             res.status(500).json({ message: "Failed to fetch approved topics" });
+        }
+    });
+
+    // Get specific topic details with course isolation validation for students
+    router.get("/api/topics/:id", async (req: Request, res: Response) => {
+        try {
+            const topicId = parseInt(req.params.id);
+            const topic = await storage.getProjectTopic(topicId);
+            if (!topic) {
+                return res.status(404).json({ message: "Project topic not found" });
+            }
+
+            // If requester is a student, verify topic belongs to their academic program
+            if (isAuthenticatedRequest(req) && req.user?.role === UserRole.STUDENT) {
+                const studentCourse = (req.user as any).course;
+                if (topic.course !== studentCourse) {
+                    return res.status(403).json({
+                        message: "Access denied: Topic belongs to a different academic program",
+                    });
+                }
+            }
+
+            res.json(topic);
+        } catch (error) {
+            res.status(500).json({ message: "Failed to fetch topic" });
         }
     });
 

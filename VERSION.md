@@ -1,6 +1,40 @@
 # Version History
 
-## Version 1.6.0 (Current)
+## Version 1.7.1 (Current)
+### Stability & Bug Fixes
+1. **Resolved React Dispatcher Collision (`dispatcher.useMemo`)** — Fixed the `null is not an object (evaluating 'dispatcher.useMemo')` runtime error during bulk upload file submission:
+   - Added Vite deduplication (`dedupe: ["react", "react-dom"]`) in `vite.config.ts` to prevent multiple React instance hook collisions.
+   - Replaced context-heavy `@radix-ui/react-progress` with a native accessible progress bar in `bulk-onboarding-modal.tsx`.
+   - Consolidated 5 discrete streaming state updates into a single atomic `IProgressState` object to eliminate React 18 render queue interleaving during SSE reads.
+   - Replaced `@radix-ui/react-switch` with a native accessible toggle.
+2. **User Management Full Account Visibility** — Resolved account truncation where User Management only displayed 50 records:
+   - Modified `GET /api/users` in `server/routes/admin.ts` to return all accounts via `storage.getAllUsers(course)` when pagination is not requested or when `limit=all` is specified.
+   - Updated `client/src/pages/user-management.tsx` with live dynamic count indicators on each tab (`All Users (${allUsersCount})`, `Supervisors (${supervisorsList.length})`, `Students (${studentsList.length})`, `Coordinators (${coordinatorsList.length})`) and clean empty-state rows.
+3. **Course Filter Data Isolation (BCA & MCA)** — Fixed issue where selecting "BCA" or "MCA" in the header course filter returned 0 accounts or groups:
+   - Updated `storage.getAllUsers(course)` and `getPaginatedUsers` in `server/db-storage.ts` to perform case-insensitive course matching (`UPPER(users.course) = UPPER(course)`) while preserving administrator visibility.
+   - Fixed `storage.getAllStudentGroups` to include `course: m.course` in group member projections.
+   - Updated `GET /api/student-groups` in `server/routes/groups.ts` to check both group-level course and member-level courses case-insensitively, correctly populating all 157 BCA groups and 2 MCA groups.
+
+## Version 1.7.0
+### Bulk Excel Onboarding & Automated Provisioning
+1. **Multi-Sheet Excel Parser with ExcelJS** — Added `server/services/onboarding-parser.ts` to parse multi-sheet workbooks. Dynamically detects header rows, handles merged cells (`MergeValue`), extracts hyperlinks (avoiding `[object Object]` crashes), and extracts student details (`Enrollment Number`, `Student Name`, `Project TeamID`, `Mobile No.`, `Email Id`).
+2. **Automated Account & Team Provisioning** — Implemented `bulkOnboardStudentsAndTeams` in `server/db-storage.ts`: provisions student accounts (`username = enrollmentNumber`, initial password = enrollment number hashed with scrypt, `forcePasswordReset = true`), automatically forms project teams in `student_groups`, and associates members in `student_group_members`. Optimized with O(1) in-memory maps and concurrent batching, executing 702 student imports in **under 1 second** (a 23x performance improvement).
+3. **Real-Time Progress Bar & SSE Telemetry** — Added a real-time progress bar powered by Server-Sent Events (SSE) streaming updates from the server. Features an interactive toggle switch, live status messages, 4-step pipeline indicators, and a collapsible dark-mode live event terminal.
+4. **Downloadable Demo Template** — Added `GET /api/admin/onboarding/demo-template` generating a styled multi-sheet Excel file with instructions, sample data, and guidelines with authenticated blob streaming.
+5. **Mandatory Course Isolation Modal** — Created `BulkOnboardingModal` enforcing selection of `BCA` vs `MCA` before file processing to guarantee strict cohort isolation. Enforced `credentials: "include"` across all network requests.
+
+### First-Login Security Enforcement
+1. **Express Security Interceptor** — Middleware in `server/auth.ts` intercepts authenticated student requests when `forcePasswordReset === true`. Restricts access to `/api/user`, `/api/user/change-password`, and `/api/logout`, returning HTTP 403 `PASSWORD_RESET_REQUIRED` on all other endpoints.
+2. **Non-Dismissible Password Reset Dialog** — Global `ForcePasswordResetModal` in React intercepts the session on first login. Validates current password, enforces minimum length of 6 characters, and updates password via `/api/user/change-password` which clears the flag.
+
+### Strict Topic Visibility & Program Isolation
+1. **Course-Enforced Topic Visibility** — `GET /api/topics/approved` strictly isolates approved topics based on the student's enrolled course (`BCA` or `MCA`), disabling public caching to prevent cross-course leakage.
+2. **Individual Topic Guard** — `GET /api/topics/:id` verifies the topic belongs to the student's program and returns HTTP 403 if attempting to access another course's topic.
+
+### Codebase & Documentation Standardization
+1. **Standardized English** — Converted all comments, docstrings, UI labels, toasts, and API messages across the codebase to English.
+
+## Version 1.6.0
 ### Critical & High Security Fixes
 1. **Privilege Escalation Removed** — Deleted the shadow `/auth/register` endpoint that allowed anonymous users to create admin accounts with arbitrary roles. All registration now flows through `/api/register`, which enforces the single-Admin/single-Coordinator rule.
 2. **Password Hash Exposure Patched** — `/auth/login` no longer returns the scrypt password hash. The unauthenticated `GET /api/supervisors` endpoint now requires authentication and returns only a safe projection (`id`, `firstName`, `lastName`, `email`).

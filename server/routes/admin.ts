@@ -1,23 +1,43 @@
 import { Router, Request, Response } from "express";
 import { DBStorage } from "../db-storage";
-import { UserRole } from "@shared/schema";
-import { requireRole, comparePasswords } from "../auth";
+import { UserRole, IOnboardingProgress } from "@shared/schema";
+import { requireRole, comparePasswords, hashPassword } from "../auth";
 import { isAuthenticatedRequest } from "./utils";
-import { hashPassword } from "../auth";
+import multer from "multer";
+import { generateDemoFormatExcel, parseStudentOnboardingExcel } from "../services/onboarding-parser";
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB limit for large workbooks
+});
 
 export function registerAdminRoutes(router: Router, storage: DBStorage) {
-    // User Management
+    // User Management: returns all users when no pagination params are sent (or limit=all),
+    // and returns paginated results when page/limit are provided.
     router.get("/api/users", requireRole([UserRole.ADMIN, UserRole.COORDINATOR]), async (req: Request, res: Response) => {
         try {
             const course = req.query.course as string | undefined;
-            const page = parseInt(req.query.page as string) || 1;
-            const limit = parseInt(req.query.limit as string) || 50;
+            const pageParam = req.query.page as string | undefined;
+            const limitParam = req.query.limit as string | undefined;
 
-            const paginatedUsers = await storage.getPaginatedUsers(page, limit, course);
-            
-            // Remove passwords from response
-            const data = paginatedUsers.data.map(({ password, ...user }) => user);
-            res.json({ ...paginatedUsers, data });
+            if (pageParam || (limitParam && limitParam !== "all")) {
+                const page = parseInt(pageParam || "1") || 1;
+                const limit = parseInt(limitParam || "50") || 50;
+                const paginatedUsers = await storage.getPaginatedUsers(page, limit, course);
+                const data = paginatedUsers.data.map(({ password, ...user }) => user);
+                return res.json({ ...paginatedUsers, data });
+            }
+
+            // If no pagination requested or limit=all, return all users for this course (or all courses)
+            const users = await storage.getAllUsers(course);
+            const data = users.map(({ password, ...user }) => user);
+            return res.json({
+                data,
+                total: data.length,
+                page: 1,
+                limit: data.length,
+                totalPages: 1
+            });
         } catch (error) {
             res.status(500).json({ message: "Failed to fetch users" });
         }
@@ -177,4 +197,127 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
             next(error);
         }
     });
+
+    // Download demo Excel format generated via ExcelJS
+    // Enables coordinators and administrators to acquire the official onboarding template
+    router.get("/api/admin/onboarding/demo-template", requireRole([UserRole.ADMIN, UserRole.COORDINATOR]), async (req: Request, res: Response) => {
+        try {
+            const buffer = await generateDemoFormatExcel();
+            res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            res.setHeader("Content-Disposition", "attachment; filename=APMS_Student_Onboarding_Demo_Format.xlsx");
+            res.send(buffer);
+        } catch (error: any) {
+            console.error("Error generating demo template:", error);
+            res.status(500).json({ message: "Failed to generate Excel demo template" });
+        }
+    });
+
+    // Bulk onboarding of students and teams with mandatory BCA/MCA data isolation
+    // Parses multiple sheets, provisions accounts with forced password reset, and binds teams
+    // Supports SSE / streaming progress updates via ?stream=true or Accept: text/event-stream
+    router.post(
+        "/api/admin/onboarding/upload",
+        requireRole([UserRole.ADMIN, UserRole.COORDINATOR]),
+        upload.single("file"),
+        async (req: Request, res: Response) => {
+            if (!isAuthenticatedRequest(req)) {
+                return res.status(401).json({ message: "Unauthorized" });
+            }
+
+            const isStreaming = req.query.stream === "true" || req.headers.accept === "text/event-stream";
+
+            if (isStreaming) {
+                res.setHeader("Content-Type", "text/event-stream");
+                res.setHeader("Cache-Control", "no-cache, no-transform");
+                res.setHeader("Connection", "keep-alive");
+                res.setHeader("X-Accel-Buffering", "no");
+                res.flushHeaders?.();
+            }
+
+            const sendProgress = (p: IOnboardingProgress) => {
+                if (isStreaming) {
+                    res.write(`data: ${JSON.stringify(p)}\n\n`);
+                }
+            };
+
+            try {
+                if (!req.file) {
+                    const errMsg = "Please select an Excel file (.xlsx) to continue";
+                    if (isStreaming) {
+                        sendProgress({ stage: "error", percent: 100, message: errMsg });
+                        return res.end();
+                    }
+                    return res.status(400).json({ message: errMsg });
+                }
+
+                const targetCourse = req.body.course as "BCA" | "MCA";
+                if (!targetCourse || !["BCA", "MCA"].includes(targetCourse)) {
+                    const errMsg = "Target academic program (BCA or MCA) is required for strict data isolation";
+                    if (isStreaming) {
+                        sendProgress({ stage: "error", percent: 100, message: errMsg });
+                        return res.end();
+                    }
+                    return res.status(400).json({ message: errMsg });
+                }
+
+                sendProgress({
+                    stage: "parsing",
+                    percent: 10,
+                    message: "Analyzing worksheets and workbook structure...",
+                });
+
+                // Multi-sheet parsing using the ExcelJS-based service
+                const parsedData = await parseStudentOnboardingExcel(req.file.buffer);
+
+                if (parsedData.students.length === 0) {
+                    const errMsg = "No valid student records with enrollment numbers found in any sheet";
+                    if (isStreaming) {
+                        sendProgress({ stage: "error", percent: 100, message: errMsg });
+                        return res.end();
+                    }
+                    return res.status(400).json({ message: errMsg });
+                }
+
+                sendProgress({
+                    stage: "parsing",
+                    percent: 20,
+                    message: `Discovered ${parsedData.sheetNames.length} sheet(s) with ${parsedData.students.length} student records`,
+                    current: 0,
+                    total: parsedData.students.length,
+                    detail: `Sheets: ${parsedData.sheetNames.join(", ")}`,
+                });
+
+                // Automated provisioning in database with course and team isolation
+                const result = await storage.bulkOnboardStudentsAndTeams(
+                    parsedData.students,
+                    targetCourse,
+                    req.user.id,
+                    (p) => {
+                        sendProgress(p);
+                    }
+                );
+
+                if (isStreaming) {
+                    sendProgress({
+                        stage: "completed",
+                        percent: 100,
+                        message: result.message,
+                        result
+                    });
+                    return res.end();
+                } else {
+                    return res.status(200).json(result);
+                }
+            } catch (error: any) {
+                console.error("Error during bulk onboarding:", error);
+                const errMsg = `Failed to process Excel file: ${error.message || "Internal server error"}`;
+                if (isStreaming) {
+                    sendProgress({ stage: "error", percent: 100, message: errMsg });
+                    return res.end();
+                } else {
+                    res.status(500).json({ message: errMsg });
+                }
+            }
+        }
+    );
 }

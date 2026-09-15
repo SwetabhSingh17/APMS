@@ -227,3 +227,24 @@ If you already have the application running and need to update the code to the l
    npm run db:ensure
    ```
 7. Start your server! (You can safely delete the old folder once you verify everything works).
+
+---
+
+## 🧪 Step 5: Running System & Verification Tests
+
+To verify that your installation is working properly and all features (Excel bulk onboarding, access control, first-login security enforcement, and cohort isolation) are functional:
+
+1. Check TypeScript compilation:
+   ```bash
+   npm run check
+   ```
+
+2. Run the Onboarding & Access Control test suite:
+   ```bash
+   npx tsx scripts/verify_onboarding_and_access_control.ts
+   ```
+
+3. Run the End-to-End System flow test:
+   ```bash
+   npx tsx scripts/e2e_verify.ts
+   ```

@@ -22,6 +22,7 @@ export default defineConfig({
       "@shared": path.resolve(import.meta.dirname, "shared"),
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
     },
+    dedupe: ["react", "react-dom"],
   },
   root: path.resolve(import.meta.dirname, "client"),
   build: {
@@ -38,7 +39,7 @@ export default defineConfig({
     }
   },
   server: {
-    host: '0.0.0.0', // Explicitly bind to all network interfaces
+    host: true, // Listen on all addresses, including IPv4 and IPv6
     port: 5173,
     strictPort: false,
     allowedHosts: true,

@@ -62,3 +62,7 @@ tunnel_config.txt
 .vercel
 .netlify
 *.tgz
+generate_tests.py
+AccDet.txt
+*.xlsx
+*.xls

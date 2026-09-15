@@ -12,6 +12,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Loader2 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CourseFilterProvider } from "@/hooks/course-filter-context";
+import { ForcePasswordResetModal } from "@/components/auth/force-password-reset-modal";
 
 // Lazy-loaded routes
 const AuthPage = lazy(() => import("@/pages/auth-page"));
@@ -108,6 +109,8 @@ function App() {
           <AuthProvider>
             <CourseFilterProvider>
               <Router />
+              {/* Security interceptor modal for student initial login password reset */}
+              <ForcePasswordResetModal />
             </CourseFilterProvider>
           </AuthProvider>
         </ThemeProvider>

@@ -20,13 +20,15 @@ import { pgTable, text, serial, integer, boolean, timestamp, varchar, pgEnum, in
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Student groups table
+// Student groups table - stores project teams formed for academic projects
 export const studentGroups = pgTable("student_groups", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
   supervisorId: integer("supervisor_id"),
   createdById: integer("created_by_id"),
+  course: text("course"),
+  projectTeamId: text("project_team_id"),
   maxSize: integer("max_size").notNull().default(5),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -38,7 +40,7 @@ export const insertStudentGroupSchema = createInsertSchema(studentGroups).omit({
   updatedAt: true,
 });
 
-// Users table
+// Users table - includes forcePasswordReset flag for mandatory first-login password changes
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -50,6 +52,7 @@ export const users = pgTable("users", {
   enrollmentNumber: text("enrollment_number"),
   course: text("course"),
   groupId: integer("group_id").references(() => studentGroups.id),
+  forcePasswordReset: boolean("force_password_reset").notNull().default(false),
   isDeleted: boolean("is_deleted").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -263,6 +266,55 @@ export enum CourseType {
   MCA = "MCA",
 }
 
+// Interfaces with I-prefix per project style guidelines
+export type IUser = User;
+export type IInsertUser = InsertUser;
+export type IStudentGroup = StudentGroup;
+export type IInsertStudentGroup = InsertStudentGroup;
+export type IProjectTopic = ProjectTopic;
+export type IInsertProjectTopic = InsertProjectTopic;
+export type IStudentProject = StudentProject;
+export type IInsertStudentProject = InsertStudentProject;
+
+// Row extracted from each worksheet of the student onboarding Excel file
+export interface IStudentOnboardingRow {
+  sNo?: number | string;
+  projectTeamId: string;
+  enrollmentNumber: string;
+  studentName: string;
+  mobileNo?: string;
+  emailId?: string;
+  sheetName?: string;
+}
+
+// Summary result returned after processing bulk student onboarding
+export interface IOnboardingResult {
+  success: boolean;
+  message: string;
+  course: "BCA" | "MCA";
+  totalSheetsParsed: number;
+  totalStudentsProcessed: number;
+  totalTeamsCreated: number;
+  sheetNames: string[];
+  teams: Array<{
+    teamId: string;
+    studentCount: number;
+    enrollmentNumbers: string[];
+  }>;
+  errors?: string[];
+}
+
+// Real-time progress update event emitted during bulk onboarding stream
+export interface IOnboardingProgress {
+  stage: "uploading" | "parsing" | "provisioning" | "teams" | "finalizing" | "completed" | "error";
+  percent: number;
+  message: string;
+  current?: number;
+  total?: number;
+  detail?: string;
+  result?: IOnboardingResult;
+}
+
 // Paginated response type
 export interface PaginatedResponse<T> {
   data: T[];
@@ -271,3 +323,4 @@ export interface PaginatedResponse<T> {
   limit: number;
   totalPages: number;
 }
+

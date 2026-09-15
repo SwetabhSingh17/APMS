@@ -296,13 +296,17 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
             const courseFilter = req.query.course as string | undefined;
 
             if (courseFilter) {
-                // Filter groups by the creator's course
-                // Since `groups` already includes a `members` array, we can check the members.
-                // Or we check the first member's course. Since all members must be of the same course now,
-                // any member's course will do.
+                const normalizedFilter = courseFilter.trim().toUpperCase();
                 groups = groups.filter(group => {
-                    if (!group.members || group.members.length === 0) return false;
-                    return group.members.some((m: any) => m.course === courseFilter);
+                    // 1. Check direct course assigned to the group record
+                    if (group.course && group.course.trim().toUpperCase() === normalizedFilter) {
+                        return true;
+                    }
+                    // 2. Check if any member belongs to the filtered course
+                    if (group.members && group.members.length > 0) {
+                        return group.members.some((m: any) => m.course && m.course.trim().toUpperCase() === normalizedFilter);
+                    }
+                    return false;
                 });
             }
 

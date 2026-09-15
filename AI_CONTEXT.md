@@ -15,8 +15,9 @@ APMS is a comprehensive web-based project management system for educational inst
 2. **Project Teams**: Students form groups, invite peers, and select approved topics. Strict course-based size limits are enforced: BCA teams must have 2 to 5 members, while MCA teams must have 1 to 2 members. Admins and Coordinators have the exclusive privilege to create single-member BCA teams and manage team members globally. Admins, Coordinators, and Supervisors can add, edit, or remove members in a team (Supervisors restricted to teams they supervise).
 3. **Mentorship & Tracking**: Supervisor mentors evaluate group progress, grade milestones, and provide final assessments.
 4. **Manage Project (Supervisor Allotment)**: Admins and Coordinators can view all project teams and manually reassign their supervisors via the dedicated `/manage-project` page with a searchable dropdown.
-5. **Course Segregation**: The system strictly segregates operations based on the Student's course (BCA or MCA). Students are isolated to their course context, while Admins, Coordinators, and Supervisors use a global UI `CourseFilterContext` toggle to switch contexts.
-6. **Administration**: Admins manage users, generate Excel reports, and oversee system settings (including database backups/resets).
+5. **Course Segregation**: The system strictly segregates operations based on the Student's course (BCA or MCA). Students are isolated to their course context, while Admins, Coordinators, and Supervisors use a global UI `CourseFilterContext` toggle to switch contexts. Course filtering across users, groups, and topics employs case-insensitive matching (`UPPER(course)`) and includes member-level affiliations while preserving administrative visibility.
+6. **Administration**: Admins manage users, generate Excel reports, and oversee system settings (including database backups/resets). User management supports complete roster retrieval (`limit=all`) with real-time tab counters and role segmentation.
+7. **Bulk Excel Onboarding, Real-Time Progress & First-Login Security**: Coordinators and Admins can bulk-provision cohorts from multi-sheet Excel files with live SSE progress streaming (tracking network upload, multi-sheet parsing, cryptographic account batching, and team formation). Built with an atomic progress state and native UI elements to eliminate React hook dispatcher desynchronization. The system automatically provisions accounts with initial passwords set to their enrollment number, forms project teams by `projectTeamId`, and sets `forcePasswordReset = true`. A non-dismissible modal and backend security interceptor enforce a mandatory password change on first login before operational APIs are accessible.
 
 ---
 
@@ -25,9 +26,10 @@ APMS is a comprehensive web-based project management system for educational inst
 - **Backend**: Node.js, Express.js.
 - **Database**: PostgreSQL (Neon Serverless / Vercel Postgres compatible).
 - **ORM & Validation**: Drizzle ORM, Zod, drizzle-zod.
+- **File Parsing & Generation**: ExcelJS (multi-sheet workbook support with merged-cell safety).
 - **Database Sync**: `drizzle-kit push` is used for schema synchronization (no file-based migrations).
 - **Authentication**: Passport.js (Local Strategy), express-session, connect-pg-simple.
-- **Security & Resilience**: Helmet (HTTP headers), express-rate-limit, React Error Boundaries.
+- **Security & Resilience**: Helmet (HTTP headers), express-rate-limit, React Error Boundaries, first-login security interceptor.
 
 ---
 
@@ -36,29 +38,33 @@ The repository is structured as a monorepo-style full-stack application:
 - `client/src/`: Frontend React application.
   - `/pages`: Route-level components.
   - `/components/ui`: Shadcn UI primitives.
+  - `/components/admin`: Admin modals (e.g. `bulk-onboarding-modal.tsx`).
+  - `/components/auth`: Authentication components (e.g. `force-password-reset-modal.tsx`).
   - `/components/layout`: Application shell (sidebar, header).
   - `/lib`: Utilities, Query client, and protected route logic.
 - `server/`: Backend Express API.
   - `index.ts`: Application entry point.
-  - `auth.ts`: Authentication, passport setup, and rate-limiting.
+  - `auth.ts`: Authentication, passport setup, security interceptor, and rate-limiting.
   - `routes/`: Modular API route files (`auth.ts`, `users.ts`, `projects.ts`, `topics.ts`, `groups.ts`, `stats.ts`, `admin.ts`, `notifications.ts`).
+  - `services/`: Service layer (`onboarding-parser.ts` for ExcelJS parsing and demo generation).
   - `db.ts`: Database connection with unified config resolution (`DATABASE_URL` takes precedence over `DB_*` variables), plus boot-time schema verification (`runMigrations()` fails fast if any of the 9 core tables are missing).
-  - `db-storage.ts`: Database interaction layer using Drizzle ORM (repository pattern).
-  - `websocket.ts`: Session-authenticated WebSocket server for real-time notification delivery. The handshake validates the signed `connect.sid` cookie against the PostgreSQL session store and derives the userId server-side — the client-supplied `?userId=` query parameter is ignored.
+  - `db-storage.ts`: Database interaction layer using Drizzle ORM (repository pattern, bulk onboarding provisioning).
+  - `websocket.ts`: Session-authenticated WebSocket server for real-time notification delivery.
 - `shared/`: Types and schemas shared between client and server.
-  - `schema.ts`: Core Drizzle tables, Zod schemas, and TypeScript interfaces.
-- `scripts/`: DB seeding, backup, restore, setup, and reset scripts.
-  - `ensure_db.ts`: Production-safe bootstrap used by `start_server.bat` (`npm run db:ensure`) — verifies connectivity with actionable diagnostics, creates missing tables + default admin, syncs pending schema changes. NEVER wipes data.
+  - `schema.ts`: Core Drizzle tables, Zod schemas, and TypeScript interfaces (`IUser`, `IStudentGroup`, etc.).
+- `scripts/`: DB seeding, backup, restore, setup, reset, and verification scripts.
+  - `ensure_db.ts`: Production-safe bootstrap used by `start_server.bat` (`npm run db:ensure`).
+  - `verify_onboarding_and_access_control.ts`: Automated test suite for bulk onboarding, team linking, and access control.
   - `setup_db.ts`: Full destructive reset (wipes schema, pushes tables, seeds admin). Aliased as `db:hard-reset`.
 ---
 
 
 ## 4. Database Schema (drizzle)
 The application relies on several core tables defined in `shared/schema.ts`:
-- **users**: Stores all accounts with role-based access (`admin`, `coordinator`, `supervisor`, `student`). Student roles have a required `course` column (BCA or MCA). Soft deletes are implemented via an `is_deleted` column.
-- **student_groups**: Student project groups containing `course`, `supervisorId`, `maxSize`, and `createdById`.
-- **student_group_members**: Manages team memberships and invitation statuses.
-- **project_topics**: Topics proposed by supervisors, requiring a `course` property and a `status` (pending/approved/rejected).
+- **users**: Stores all accounts with role-based access (`admin`, `coordinator`, `supervisor`, `student`). Student roles have a required `course` column (`BCA` or `MCA`), `enrollmentNumber`, and `forcePasswordReset` boolean flag. Soft deletes are implemented via an `is_deleted` column.
+- **student_groups**: Student project groups containing `course` (`BCA` or `MCA`), `projectTeamId` (e.g., `A-01`), `supervisorId`, `maxSize`, and `createdById`.
+- **student_group_members**: Manages team memberships and invitation statuses (`pending`, `accepted`, `rejected`).
+- **project_topics**: Topics proposed by supervisors, requiring a `course` property (`BCA` or `MCA`) and a `status` (`pending`/`approved`/`rejected`/`pending_supervisor`).
 - **student_projects**: Maps groups/students to topics with progress tracking.
 - **project_assessments**: Grades and feedback provided by supervisor.
 - **project_milestones**: Distinct checkpoints for student projects.

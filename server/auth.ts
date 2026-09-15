@@ -73,6 +73,26 @@ export function setupAuth(app: Express, storage: DBStorage) {
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // Security interceptor: students with forced password reset can only access profile or change password
+  // Blocks access to all other operational APIs until mandatory password reset is completed
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.isAuthenticated() && req.user?.role === UserRole.STUDENT && req.user?.forcePasswordReset) {
+      const allowedPaths = [
+        "/api/user",
+        "/api/user/change-password",
+        "/api/logout",
+      ];
+      if (req.path.startsWith("/api") && !allowedPaths.includes(req.path)) {
+        return res.status(403).json({
+          message: "You must update your password on your first login before accessing the system.",
+          code: "PASSWORD_RESET_REQUIRED",
+          forcePasswordReset: true,
+        });
+      }
+    }
+    next();
+  });
+
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
@@ -305,10 +325,26 @@ export function setupAuth(app: Express, storage: DBStorage) {
         return res.status(400).json({ message: "Current password is incorrect" });
       }
 
-      const hashedPassword = await hashPassword(newPassword);
-      await storage.updateUser(req.user.id, { password: hashedPassword });
+      if (!newPassword || newPassword.length < 6) {
+        return res.status(400).json({ message: "New password must be at least 6 characters long" });
+      }
 
-      res.status(200).json({ message: "Password updated successfully" });
+      // Generate secure hash for the new password and clear the forced reset flag
+      const hashedPassword = await hashPassword(newPassword);
+      const updatedUser = await storage.updateUser(req.user.id, {
+        password: hashedPassword,
+        forcePasswordReset: false,
+      });
+
+      if (req.user) {
+        (req.user as any).forcePasswordReset = false;
+      }
+
+      const { password, ...userWithoutPassword } = updatedUser || user;
+      res.status(200).json({
+        message: "Password updated successfully",
+        user: { ...userWithoutPassword, forcePasswordReset: false },
+      });
     } catch (error) {
       next(error);
     }

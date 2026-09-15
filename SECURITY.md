@@ -6,18 +6,20 @@ Currently, the following versions of this project are actively supported with se
 
 | Version | Supported          |
 | ------- | ------------------ |
+| v1.7.x  | :white_check_mark: |
 | v1.6.x  | :white_check_mark: |
-| v1.5.x  | :x:                |
-| < v1.5  | :x:                |
+| < v1.6  | :x:                |
 
-## Security Posture (v1.6.0)
+## Security Posture (v1.7.1)
 
 APMS ships with the following protections in place:
 
 - **Authentication** — Passport.js local strategy with scrypt password hashing; PostgreSQL-backed sessions with a 15-minute rolling inactivity expiry.
+- **First-Login Password Reset Interceptor** — Newly provisioned accounts are flagged with `forcePasswordReset: true`. Operational APIs (topic browsing, team interactions, submissions) are intercepted with HTTP 403 `PASSWORD_RESET_REQUIRED` and frontend modals until the default credentials are replaced.
+- **Strict Cohort/Program Isolation** — BCA and MCA topic visibility is strictly partitioned; students are isolated to their registered curriculum to prevent cross-cohort data leakage.
 - **Authorization** — Role-based access control (Admin / Coordinator / Supervisor / Student) enforced server-side via `requireRole()` plus per-resource ownership checks (projects, assessments, notifications).
 - **Rate Limiting** — `express-rate-limit` on `/api/login` and `/api/register`.
-- **Security Headers** — Helmet middleware (CSP enabled in production).
+- **Security Headers** — Helmet middleware with private caching headers on sensitive endpoints to prevent cache poisoning or client leaks.
 - **Soft Deletes** — Users and topics are retained via an `is_deleted` flag; queries filter them automatically.
 - **Session-Authenticated WebSockets** — Real-time notification sockets validate the signed session cookie server-side; identity cannot be spoofed via query parameters.
 - **Hardened Destructive Operations** — Database reset requires the admin to re-enter their password (verified against the scrypt hash) and fully destroys the server session afterward.

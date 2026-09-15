@@ -404,20 +404,62 @@ export default function Topics() {
               )}
             />
 
+            {/* Mandatory academic program selection toggle (BCA or MCA) */}
             <FormField
               control={form.control}
               name="course"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Course</FormLabel>
+                <FormItem className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <FormLabel className="text-xs font-bold uppercase tracking-wider text-foreground">
+                      Target Course (Mandatory)
+                    </FormLabel>
+                    <span className="text-[11px] text-muted-foreground font-medium">
+                      Mandatory isolation
+                    </span>
+                  </div>
                   <FormControl>
-                    <select
-                      {...field}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <option value="BCA">BCA</option>
-                      <option value="MCA">MCA</option>
-                    </select>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => field.onChange("BCA")}
+                        className={`p-3 rounded-lg border text-left transition-all duration-200 flex flex-col justify-between ${
+                          field.value === "BCA"
+                            ? "border-primary bg-primary/10 ring-2 ring-primary/30 shadow-sm"
+                            : "border-input hover:border-primary/40 hover:bg-muted/30"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full mb-1">
+                          <span className="font-bold text-sm text-foreground">BCA</span>
+                          {field.value === "BCA" && (
+                            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                          )}
+                        </div>
+                        <span className="text-[11px] text-muted-foreground">
+                          Bachelor of Computer Applications
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => field.onChange("MCA")}
+                        className={`p-3 rounded-lg border text-left transition-all duration-200 flex flex-col justify-between ${
+                          field.value === "MCA"
+                            ? "border-primary bg-primary/10 ring-2 ring-primary/30 shadow-sm"
+                            : "border-input hover:border-primary/40 hover:bg-muted/30"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full mb-1">
+                          <span className="font-bold text-sm text-foreground">MCA</span>
+                          {field.value === "MCA" && (
+                            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                          )}
+                        </div>
+                        <span className="text-[11px] text-muted-foreground">
+                          Master of Computer Applications
+                        </span>
+                      </button>
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -530,20 +572,62 @@ export default function Topics() {
               )}
             />
 
+            {/* Mandatory academic program selection toggle in edit modal (BCA or MCA) */}
             <FormField
               control={editForm.control}
               name="course"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Course</FormLabel>
+                <FormItem className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <FormLabel className="text-xs font-bold uppercase tracking-wider text-foreground">
+                      Target Course (Mandatory)
+                    </FormLabel>
+                    <span className="text-[11px] text-muted-foreground font-medium">
+                      Mandatory isolation
+                    </span>
+                  </div>
                   <FormControl>
-                    <select
-                      {...field}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <option value="BCA">BCA</option>
-                      <option value="MCA">MCA</option>
-                    </select>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => field.onChange("BCA")}
+                        className={`p-3 rounded-lg border text-left transition-all duration-200 flex flex-col justify-between ${
+                          field.value === "BCA"
+                            ? "border-primary bg-primary/10 ring-2 ring-primary/30 shadow-sm"
+                            : "border-input hover:border-primary/40 hover:bg-muted/30"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full mb-1">
+                          <span className="font-bold text-sm text-foreground">BCA</span>
+                          {field.value === "BCA" && (
+                            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                          )}
+                        </div>
+                        <span className="text-[11px] text-muted-foreground">
+                          Bachelor of Computer Applications
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => field.onChange("MCA")}
+                        className={`p-3 rounded-lg border text-left transition-all duration-200 flex flex-col justify-between ${
+                          field.value === "MCA"
+                            ? "border-primary bg-primary/10 ring-2 ring-primary/30 shadow-sm"
+                            : "border-input hover:border-primary/40 hover:bg-muted/30"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full mb-1">
+                          <span className="font-bold text-sm text-foreground">MCA</span>
+                          {field.value === "MCA" && (
+                            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                          )}
+                        </div>
+                        <span className="text-[11px] text-muted-foreground">
+                          Master of Computer Applications
+                        </span>
+                      </button>
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -42,9 +42,21 @@ All items below were verified directly against the current codebase. Fix in this
 
 ### 🟡 MEDIUM
 
-- [ ] **Anonymous Access to Approved Topics List** — `server/routes/topics.ts:23`
-  `GET /api/topics/approved` serves the full paginated topic list (titles, descriptions, technologies, supervisor attribution) to **unauthenticated** callers via its non-student branch, and sets `Cache-Control: public, max-age=60` on the response. Students legitimately need this endpoint, but anonymous access is an unnecessary data exposure.
-  *Fix:* Require authentication for the non-student branch (or the entire endpoint).
+- [x] **Anonymous Access to Approved Topics List** — `server/routes/topics.ts:24` — **FIXED**
+  `GET /api/topics/approved` previously served topics to unauthenticated callers.
+  *Resolution:* Added `isAuthenticatedRequest` check requiring active authentication. Strict course isolation for students and private cache-control headers are enforced.
+
+- [x] **Bulk Upload Dispatcher Error (`dispatcher.useMemo`)** — `client/src/components/admin/bulk-onboarding-modal.tsx` — **FIXED**
+  Submitting an Excel file for bulk upload intermittently crashed with `null is not an object (evaluating 'dispatcher.useMemo')` due to rapid re-renders of Radix UI context hooks during Server-Sent Event (SSE) streaming updates.
+  *Resolution:* Replaced Radix progress and switch with lightweight accessible native components, consolidated streaming progress into an atomic state object, and added Vite `dedupe: ["react", "react-dom"]`.
+
+- [x] **User Management Truncating Accounts (Page Limit = 50)** — `server/routes/admin.ts` & `client/src/pages/user-management.tsx` — **FIXED**
+  User Management only showed 50 accounts even though 700+ users were present in the database, because `GET /api/users` applied an unrequested default pagination limit.
+  *Resolution:* Modified `GET /api/users` to return all accounts if pagination is not explicitly requested or `limit=all` is specified. User Management now requests all accounts and displays live tab counters.
+
+- [x] **Course Filter (BCA / MCA) Returning Zero Accounts & Groups** — `server/db-storage.ts` & `server/routes/groups.ts` — **FIXED**
+  Selecting "BCA" or "MCA" in the header course filter returned 0 student groups and 0 accounts because member courses were missing from SQL projections and course matching was case-sensitive.
+  *Resolution:* Included member course in `getAllStudentGroups()` projection, added case-insensitive matching across users and groups, and preserved admin accounts in user queries.
 
 - [ ] **Coordinator User-Edits Silently Fail (Route Shadowing)** — `server/auth.ts:238` vs `server/routes/admin.ts:117`
   `setupAuth()` registers `PATCH /api/admin/users/:id` (Admin-only) at app level **before** `registerRoutes()` mounts the intended Admin+Coordinator version. Express matches the first handler, so Coordinator edits always return 403 and the admin.ts handler is unreachable dead code.

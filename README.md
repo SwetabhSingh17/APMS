@@ -31,6 +31,8 @@
 - **Project Assessments** — Supervisor grading with score and feedback  
 - **Real-Time Notifications** — WebSocket-powered instant notifications with role-based routing, plus a persistent per-user inbox (bell dropdown + notifications page with read/unread state)  
 - **User Management** — Admin panel for bulk user operations, role changes, password resets  
+- **Excel Bulk Onboarding & Real-Time Progress Streaming** — Coordinators and Admins can upload multi-sheet Excel files (`.xlsx`) to provision entire cohorts at once. Features real-time SSE progress telemetry with a smooth progress bar and collapsible live event terminal, automatic team linking by `projectTeamId`, institutional email generation, high-performance in-memory batching (700+ accounts provisioned in <1s), and downloadable demo Excel templates.
+- **First-Login Security Enforcement** — Students onboarded via Excel receive temporary initial passwords matching their enrollment number; upon first login, a non-dismissible modal and backend security interceptor enforce a mandatory password change before granting system access.
 - **System Management** — Database export/import, Excel reports, full reset capabilities  
 - **Security Hardened** — Helmet HTTP headers, rate-limited auth endpoints, soft-delete data retention, session-authenticated WebSockets, per-resource ownership checks, and password-verified destructive operations  
 - **Error Resilient** — Global React Error Boundaries with graceful fallback UI  
@@ -232,6 +234,9 @@ All configuration is managed through a `.env` file at the project root.
 | `npm run build` | Build for production (client + server) |
 | `npm start` | Start production server |
 | `npm run check` | Run TypeScript type checking |
+| `npm test` | Run TypeScript check and onboarding test suite |
+| `npm run test:onboarding` | Run automated Excel onboarding and access control verification suite |
+| `npm run test:e2e` | Run end-to-end integration flow tests |
 | `npm run db:ensure` | ✅ Safe database bootstrap — verifies connectivity, creates missing tables + default admin, syncs schema changes. Never wipes data |
 | `npm run db:setup` | Clean install schema and initialize default admin (⚠️ wipes all data) |
 | `npm run db:push` | Push non-destructive schema changes to existing database |
