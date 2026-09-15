@@ -17,10 +17,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { User, StudentGroup } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, UserPlus, Users, UserX, Info, Check, X } from "lucide-react";
+import { Loader2, UserPlus, Users, Info, Check, X } from "lucide-react";
 
 // Create group form schema
 const createGroupSchema = z.object({
@@ -43,7 +42,6 @@ type JoinGroupFormValues = z.infer<typeof joinGroupSchema>;
 export default function StudentGroups() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [openLeaveDialog, setOpenLeaveDialog] = useState(false);
   const [openInfoDialog, setOpenInfoDialog] = useState(false);
   const [enrollmentNumbers, setEnrollmentNumbers] = useState<string[]>([]);
 
@@ -106,29 +104,6 @@ export default function StudentGroups() {
     },
   });
 
-  // Leave group mutation
-  const leaveGroupMutation = useMutation({
-    mutationFn: async () => {
-      if (!userGroup) throw new Error("You are not in a group");
-      const res = await apiRequest("POST", `/api/student-groups/${userGroup.id}/leave`, {});
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Group left",
-        description: "You have left the group successfully.",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/student-groups/my-group"] });
-      setOpenLeaveDialog(false);
-    },
-    onError: (error) => {
-      toast({
-        title: "Failed to leave group",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
 
   // Accept Invite Mutation
   const acceptInviteMutation = useMutation({
@@ -193,10 +168,6 @@ export default function StudentGroups() {
       // Filter out user's own enrollment number in case it was added manually? 
       // User's own enrollmentNumber is added here, checking user input validation is already done by UI and backend.
     });
-  };
-
-  const handleLeaveGroup = () => {
-    leaveGroupMutation.mutate();
   };
 
 
@@ -472,23 +443,9 @@ export default function StudentGroups() {
                 <div className="text-sm text-muted-foreground">
                   Project Team ID: #{userGroup.id}
                 </div>
-                <AlertDialog open={openLeaveDialog} onOpenChange={setOpenLeaveDialog}>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm">Leave Project Team</Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This action cannot be undone. You will be removed from the project team.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleLeaveGroup}>Leave Project Team</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                <Badge variant="outline" className="text-xs text-muted-foreground">
+                  {userGroup.course ? `${userGroup.course} Cohort` : "Project Team"}
+                </Badge>
               </CardFooter>
             </Card>
           </div>

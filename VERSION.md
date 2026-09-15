@@ -1,6 +1,14 @@
 # Version History
 
-## Version 1.7.1 (Current)
+## Version 1.7.2 (Current)
+### Team Access Control & Permission Hardening
+1. **Removed "Leave Project Team" Entirely** — Removed the "Leave Project Team" button and confirmation dialog from the student portal (`client/src/pages/student-groups.tsx`). Students in a team can now only view their assigned team, members, and project mentor without any option to leave.
+2. **Restricted Team Modifications to Admins & Coordinators** —
+   - `PATCH /api/student-groups/:groupId/members` in `server/routes/groups.ts` now strictly enforces `[UserRole.ADMIN, UserRole.COORDINATOR]`. Supervisors are completely blocked from modifying team members.
+   - `POST /api/student-groups/:groupId/leave` is now permanently blocked with HTTP 403 Forbidden for students and supervisors.
+   - Administrators and Coordinators retain exclusive authority to modify team rosters and reassign supervisors via the Manage Project console.
+
+## Version 1.7.1
 ### Stability & Bug Fixes
 1. **Resolved React Dispatcher Collision (`dispatcher.useMemo`)** — Fixed the `null is not an object (evaluating 'dispatcher.useMemo')` runtime error during bulk upload file submission:
    - Added Vite deduplication (`dedupe: ["react", "react-dom"]`) in `vite.config.ts` to prevent multiple React instance hook collisions.

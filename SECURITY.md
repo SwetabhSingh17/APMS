@@ -10,13 +10,14 @@ Currently, the following versions of this project are actively supported with se
 | v1.6.x  | :white_check_mark: |
 | < v1.6  | :x:                |
 
-## Security Posture (v1.7.1)
+## Security Posture (v1.7.2)
 
 APMS ships with the following protections in place:
 
 - **Authentication** — Passport.js local strategy with scrypt password hashing; PostgreSQL-backed sessions with a 15-minute rolling inactivity expiry.
 - **First-Login Password Reset Interceptor** — Newly provisioned accounts are flagged with `forcePasswordReset: true`. Operational APIs (topic browsing, team interactions, submissions) are intercepted with HTTP 403 `PASSWORD_RESET_REQUIRED` and frontend modals until the default credentials are replaced.
 - **Strict Cohort/Program Isolation** — BCA and MCA topic visibility is strictly partitioned; students are isolated to their registered curriculum to prevent cross-cohort data leakage.
+- **Team Access Control & Integrity** — Students and Supervisors are prohibited from modifying or leaving project teams. Only Administrators and Coordinators have authorization to modify team rosters or reassign supervisor mentorship.
 - **Authorization** — Role-based access control (Admin / Coordinator / Supervisor / Student) enforced server-side via `requireRole()` plus per-resource ownership checks (projects, assessments, notifications).
 - **Rate Limiting** — `express-rate-limit` on `/api/login` and `/api/register`.
 - **Security Headers** — Helmet middleware with private caching headers on sensitive endpoints to prevent cache poisoning or client leaks.

@@ -102,8 +102,8 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
         }
     });
 
-    // Update team members directly (Admin, Coordinator, Supervisor)
-    router.patch("/api/student-groups/:groupId/members", requireRole([UserRole.ADMIN, UserRole.COORDINATOR, UserRole.SUPERVISOR]), async (req: Request, res: Response) => {
+    // Update team members directly (Admin and Coordinator only)
+    router.patch("/api/student-groups/:groupId/members", requireRole([UserRole.ADMIN, UserRole.COORDINATOR]), async (req: Request, res: Response) => {
         if (!isAuthenticatedRequest(req)) {
             return res.status(401).json({ message: "Unauthorized" });
         }
@@ -114,11 +114,6 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
 
             const group = await storage.getGroup(groupId);
             if (!group) return res.status(404).json({ message: "Team not found" });
-
-            // If Supervisor, verify they are supervising this team
-            if (req.user.role === UserRole.SUPERVISOR && group.supervisorId !== req.user.id) {
-                return res.status(403).json({ message: "You can only edit members of your own teams." });
-            }
 
             // Validate all enrollment numbers are students of the same course
             let teamCourse: string | null = null;
@@ -259,34 +254,11 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
         }
     });
 
-    // Leave a group
-    router.post("/api/student-groups/:groupId/leave", requireRole([UserRole.STUDENT]), async (req: Request, res: Response) => {
-        if (!isAuthenticatedRequest(req)) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
-
-        try {
-            const groupId = parseInt(req.params.groupId);
-            const group = await storage.getGroup(groupId);
-
-            if (!group) {
-                return res.status(404).json({ message: "Group not found" });
-            }
-
-            // Check if user is in the group
-            const userGroup = await storage.getUserGroup(req.user.id);
-            if (!userGroup || userGroup.id !== groupId) {
-                return res.status(400).json({ message: "You are not a member of this group" });
-            }
-
-            // Remove user from group
-            await storage.removeStudentFromGroup(req.user.id, groupId);
-
-            res.json({ message: "Successfully left the group" });
-        } catch (error) {
-            console.error("Error leaving group:", error);
-            res.status(500).json({ message: "Failed to leave group" });
-        }
+    // Leave a group - students and supervisors are not permitted to leave or modify teams
+    router.post("/api/student-groups/:groupId/leave", async (req: Request, res: Response) => {
+        return res.status(403).json({
+            message: "Students and supervisors are not permitted to leave or modify project teams. Only Administrators and Coordinators can modify team memberships."
+        });
     });
 
     // Get all student groups (for coordinators and admins)
