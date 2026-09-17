@@ -6,13 +6,12 @@ import MainLayout from "@/components/layout/main-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User, UserRole } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Users, Search, ArrowRightLeft, UserPlus, FolderGit2, Clock, CheckCircle2 } from "lucide-react";
+import { Loader2, Users, Search, ArrowRightLeft, UserPlus, FolderGit2, Clock, CheckCircle2, Check } from "lucide-react";
 import { useCourseFilter } from "@/hooks/course-filter-context";
 import { CreateTeamDialog } from "@/components/create-team-dialog";
 import { ManageMembersDialog } from "@/components/manage-members-dialog";
@@ -24,6 +23,7 @@ export default function ManageProject() {
   const [changeSupervisorGroupId, setChangeSupervisorGroupId] = useState<number | null>(null);
   const [manageMembersGroupId, setManageMembersGroupId] = useState<number | null>(null);
   const [selectedSupervisorId, setSelectedSupervisorId] = useState<string>("");
+  const [supervisorSearchQuery, setSupervisorSearchQuery] = useState<string>("");
   const { courseFilter, getCourseQuery } = useCourseFilter();
 
   // Fetch all supervisors
@@ -70,6 +70,7 @@ export default function ManageProject() {
       });
       setChangeSupervisorGroupId(null);
       setSelectedSupervisorId("");
+      setSupervisorSearchQuery("");
     },
     onError: (error) => {
       toast({
@@ -103,6 +104,23 @@ export default function ManageProject() {
   // Split into Pending (no project selected) and Assigned (project selected)
   const pendingGroups = filteredGroups.filter((group: any) => !group.project);
   const assignedGroups = filteredGroups.filter((group: any) => !!group.project);
+
+  // Filter supervisors in the change supervisor dialog
+  const filteredSupervisors = (supervisors || []).filter((s: User) => {
+    if (!supervisorSearchQuery) return true;
+    const q = supervisorSearchQuery.toLowerCase().trim();
+    const fullName = `${s.prefix ? `${s.prefix} ` : ""}${s.firstName} ${s.lastName}`.toLowerCase();
+    return (
+      fullName.includes(q) ||
+      s.firstName?.toLowerCase().includes(q) ||
+      s.lastName?.toLowerCase().includes(q) ||
+      (s.department?.toLowerCase().includes(q) || false) ||
+      (s.designation?.toLowerCase().includes(q) || false) ||
+      (s.email?.toLowerCase().includes(q) || false)
+    );
+  });
+
+  const targetGroup = allGroups.find((g: any) => g.id === changeSupervisorGroupId);
 
   const renderGroupCard = (group: any) => (
     <Card key={group.id} className="overflow-hidden">
@@ -138,81 +156,19 @@ export default function ManageProject() {
               </p>
             </div>
           </div>
-          <Dialog
-            open={changeSupervisorGroupId === group.id}
-            onOpenChange={(open) => {
-              if (open) {
-                setChangeSupervisorGroupId(group.id);
-                setSelectedSupervisorId(group.supervisor?.id?.toString() || "");
-              } else {
-                setChangeSupervisorGroupId(null);
-                setSelectedSupervisorId("");
-              }
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => {
+              setChangeSupervisorGroupId(group.id);
+              setSelectedSupervisorId(group.supervisor?.id?.toString() || "");
+              setSupervisorSearchQuery("");
             }}
           >
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <ArrowRightLeft className="h-4 w-4" />
-                Change Supervisor
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Change Supervisor for "{group.name}"</DialogTitle>
-                <DialogDescription>
-                  Select a new supervisor to assign to this project team. Both the new and previous supervisor will be notified.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Select Supervisor</label>
-                  <Select
-                    value={selectedSupervisorId}
-                    onValueChange={setSelectedSupervisorId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a supervisor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {supervisors?.map((s: User) => (
-                        <SelectItem key={s.id} value={s.id.toString()}>
-                          {s.prefix ? `${s.prefix} ` : ""}{s.firstName} {s.lastName} — {s.department || s.email}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex justify-end gap-3 pt-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setChangeSupervisorGroupId(null);
-                      setSelectedSupervisorId("");
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      if (selectedSupervisorId) {
-                        changeSupervisorMutation.mutate({
-                          groupId: group.id,
-                          supervisorId: parseInt(selectedSupervisorId),
-                        });
-                      }
-                    }}
-                    disabled={!selectedSupervisorId || changeSupervisorMutation.isPending}
-                  >
-                    {changeSupervisorMutation.isPending ? (
-                      <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...</>
-                    ) : (
-                      "Save Changes"
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+            <ArrowRightLeft className="h-4 w-4" />
+            Change Supervisor
+          </Button>
         </div>
 
         {/* Selected Project Info */}
@@ -360,6 +316,167 @@ export default function ManageProject() {
             </TabsContent>
           </Tabs>
         )}
+
+        {/* Change Supervisor Dialog with Name Search */}
+        <Dialog
+          open={changeSupervisorGroupId !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setChangeSupervisorGroupId(null);
+              setSelectedSupervisorId("");
+              setSupervisorSearchQuery("");
+            }
+          }}
+        >
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Change Supervisor for "{targetGroup?.name}"</DialogTitle>
+              <DialogDescription>
+                Search and select a new supervisor to assign to this project team. Both the new and previous supervisor will be notified.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2">
+              {/* Currently Assigned Card */}
+              {targetGroup?.supervisor && (
+                <div className="flex items-center justify-between px-3 py-2 rounded-md bg-muted/40 border text-xs">
+                  <span className="text-muted-foreground">Currently Assigned:</span>
+                  <span className="font-semibold text-foreground">
+                    {targetGroup.supervisor.prefix ? `${targetGroup.supervisor.prefix} ` : ""}
+                    {targetGroup.supervisor.firstName} {targetGroup.supervisor.lastName}
+                    {targetGroup.supervisor.department ? ` (${targetGroup.supervisor.department})` : ""}
+                  </span>
+                </div>
+              )}
+
+              {/* Search Input */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Search Supervisor Name
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search by supervisor name, prefix, department..."
+                    className="pl-9 pr-8"
+                    value={supervisorSearchQuery}
+                    onChange={(e) => setSupervisorSearchQuery(e.target.value)}
+                    autoFocus
+                  />
+                  {supervisorSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSupervisorSearchQuery("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground p-1"
+                      aria-label="Clear search"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Filtered Supervisor List */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+                  <span>Available Faculty</span>
+                  <span>{filteredSupervisors.length} found</span>
+                </div>
+                <div className="max-h-60 overflow-y-auto space-y-1 border rounded-lg p-1.5 bg-muted/20">
+                  {filteredSupervisors.length === 0 ? (
+                    <div className="py-8 text-center text-muted-foreground">
+                      <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                      <p className="text-sm font-medium">No supervisors found</p>
+                      <p className="text-xs mt-0.5">No supervisor matches "{supervisorSearchQuery}".</p>
+                    </div>
+                  ) : (
+                    filteredSupervisors.map((s: User) => {
+                      const isSelected = selectedSupervisorId === s.id.toString();
+                      const isCurrent = targetGroup?.supervisor?.id === s.id;
+                      return (
+                        <div
+                          key={s.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setSelectedSupervisorId(s.id.toString())}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setSelectedSupervisorId(s.id.toString());
+                            }
+                          }}
+                          className={`flex items-center justify-between p-2.5 rounded-md cursor-pointer transition-all ${
+                            isSelected
+                              ? "bg-primary/15 border border-primary/40 text-primary shadow-xs"
+                              : "hover:bg-muted/80 text-foreground border border-transparent"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                              isSelected
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-primary/10 text-primary"
+                            }`}>
+                              {s.firstName?.[0]}{s.lastName?.[0]}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold truncate leading-tight flex items-center gap-1.5">
+                                <span>{s.prefix ? `${s.prefix} ` : ""}{s.firstName} {s.lastName}</span>
+                                {isCurrent && (
+                                  <Badge variant="outline" className="text-[10px] py-0 h-4 font-normal text-muted-foreground">
+                                    Current
+                                  </Badge>
+                                )}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                {s.department || s.designation || s.email}
+                              </p>
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <div className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center shrink-0 ml-2">
+                              <Check className="w-3 h-3 stroke-[3]" />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setChangeSupervisorGroupId(null);
+                    setSelectedSupervisorId("");
+                    setSupervisorSearchQuery("");
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (selectedSupervisorId && targetGroup) {
+                      changeSupervisorMutation.mutate({
+                        groupId: targetGroup.id,
+                        supervisorId: parseInt(selectedSupervisorId),
+                      });
+                    }
+                  }}
+                  disabled={!selectedSupervisorId || changeSupervisorMutation.isPending || (targetGroup?.supervisor?.id?.toString() === selectedSupervisorId)}
+                >
+                  {changeSupervisorMutation.isPending ? (
+                    <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...</>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );

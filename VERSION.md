@@ -1,6 +1,21 @@
 # Version History
 
-## Version 1.9.3 (Current)
+## Version 1.9.4 (Current)
+### Supervisor Search Bar in Admin & Coordinator Change Supervisor Dialog
+1. **Searchable Supervisor Directory in Change Supervisor Modal (`/manage-project`)** —
+   - Added a real-time name and department search bar to the Change Supervisor dialog accessible by Admin and Coordinator accounts.
+   - Enables instant filtering across 60+ faculty supervisors by full name, prefix (Dr., Prof., Mr., Ms.), first name, last name, department, designation, and email address.
+   - Refactored the UI from individual nested card dialogs to a single unified modal with:
+     - Prominent search input with leading search icon, instant `autoFocus`, and one-click clear button (`✕`).
+     - "Currently Assigned" supervisor banner displaying the team's active supervisor with title and department.
+     - Live count badge showing the number of available faculty matching the query.
+     - Scrollable supervisor directory list with initials avatar, full name with prefix, "Current" badge indicator, and department/email.
+     - Visual active selection state with high-contrast primary border and checkmark (`Check`) icon.
+     - Friendly empty state when no supervisors match the search term.
+     - Full keyboard accessibility (`role="button"`, `tabIndex={0}`, Enter / Space key selection).
+     - Save Changes button disabled when the selected supervisor is already the currently assigned supervisor.
+
+## Version 1.9.3
 ### Supervisor Project View Overhaul, Student Confirmation Dialog & Manage Project Tabs
 1. **Supervisor Projects Overhaul (`/projects`)** —
    - Replaced general topic catalog tabs with an exclusive, dedicated "My Topics & Teams" view for supervisor accounts.

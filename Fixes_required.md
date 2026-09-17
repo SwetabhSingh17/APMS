@@ -6,6 +6,12 @@ This document outlines suggested architectural, security, and maintenance improv
 
 ## 🚨 Priority Bugs to be Resolved
 
+### 🟢 ACTIVE ISSUES RESOLVED (v1.9.4 - Completed & Verified)
+
+- [x] **Supervisor Search Bar in Admin & Coordinator Change Supervisor Dialog** — **COMPLETED**
+  - **Affected Files:** `client/src/pages/manage-project.tsx`
+  - **Resolution:** Refactored the supervisor reassignment interface to a single high-performance dialog equipped with a real-time search input. Admins and Coordinators can search across all 60+ supervisors by name, title prefix, department, designation, and email address, with visual selection states, current assignment indicators, and keyboard accessibility.
+
 ### 🟢 ACTIVE ISSUES RESOLVED (v1.9.3 - Completed & Verified)
 
 - [x] **Supervisor Project section overhaul: show only own submitted topics & team details** — **COMPLETED**
