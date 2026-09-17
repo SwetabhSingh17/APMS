@@ -6,6 +6,20 @@ This document outlines suggested architectural, security, and maintenance improv
 
 ## 🚨 Priority Bugs to be Resolved
 
+### 🟢 ACTIVE ISSUES RESOLVED (v1.9.3 - Completed & Verified)
+
+- [x] **Supervisor Project section overhaul: show only own submitted topics & team details** — **COMPLETED**
+  - **Affected Files:** `server/db-storage.ts`, `server/routes/projects.ts`, `client/src/pages/projects.tsx`
+  - **Resolution:** Implemented `getSupervisorTopicsWithTeams(supervisorId)` query in `db-storage.ts` and `GET /api/projects/supervisor/my-topics` endpoint. Replaced multi-tab view with dedicated "My Topics & Teams" view displaying topic status, PUGID code, course, complexity, and allotted team details. General project topics catalog removed from supervisor view.
+
+- [x] **Student Topic Selection Confirmation Popup** — **COMPLETED**
+  - **Affected Files:** `client/src/pages/student-topics.tsx`
+  - **Resolution:** Added `AlertDialog` confirmation dialog before BCA students can finalize selecting a topic, stating project title, group allotment, irreversibility warning, and coordinator contact instructions.
+
+- [x] **Manage Project Tabs: Pending & Assigned for Admin & Coordinator** — **COMPLETED**
+  - **Affected Files:** `client/src/pages/manage-project.tsx`
+  - **Resolution:** Added two dedicated tabs (`Pending` for teams with no project selected and `Assigned` for teams with a project selected) with live count badges, status icons, and search filtering across both tabs.
+
 ### 🟢 ACTIVE ISSUES RESOLVED (v1.9.2 - Completed & Verified)
 
 - [x] **As soon as start_server.bat runs for step 5, cmd closes instantly.** — **FIXED**

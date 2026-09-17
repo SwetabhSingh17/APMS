@@ -1,6 +1,23 @@
 # Version History
 
-## Version 1.9.2 (Current)
+## Version 1.9.3 (Current)
+### Supervisor Project View Overhaul, Student Confirmation Dialog & Manage Project Tabs
+1. **Supervisor Projects Overhaul (`/projects`)** —
+   - Replaced general topic catalog tabs with an exclusive, dedicated "My Topics & Teams" view for supervisor accounts.
+   - Each topic displays real-time allotment status (`Picked` vs `Available`), PUGID code, course, complexity, and technology stack.
+   - For picked topics, displays full team details: project team ID, group name, completion progress bar, and member roster with enrollment numbers.
+   - Added live summary stat cards (Total Topics, Picked by Teams, Still Available) and topic proposal modal integration.
+   - Implemented backend endpoint `GET /api/projects/supervisor/my-topics` in `server/routes/projects.ts` and `getSupervisorTopicsWithTeams` in `server/db-storage.ts`.
+2. **Student Topic Confirmation Modal (`/student-topics`)** —
+   - Added an `AlertDialog` confirmation dialog before BCA students can finalize selecting a topic.
+   - Clearly alerts students to the selected project title, that the topic will be assigned to their entire project team, that the action is irreversible, and to contact their department coordinator for issues.
+3. **Manage Project Section Tabs for Admin & Coordinator (`/manage-project`)** —
+   - Added two dedicated tabs to categorize project teams:
+     - **Pending**: Teams that have not yet selected a project topic (`!group.project`), with live count badge and amber `Clock` icon. Set as default tab.
+     - **Assigned**: Teams that have selected and been allotted a project topic (`!!group.project`), with live count badge and green `CheckCircle2` icon.
+   - Comprehensive search filter covering team names, descriptions, project team IDs, topic titles, topic codes, supervisor names, and student names/enrollment numbers across both tabs.
+
+## Version 1.9.2
 ### Windows Server Batch Startup Script Fix
 1. **Resolved CMD Instant Close on Step 5** — Fixed a fatal syntax parsing error in `start_server.bat` caused by unescaped parentheses within nested batch `if` blocks during the Windows Firewall configuration check. Refactored Step 5 to use clean label-based jumps and safe rule naming (`APMS Server Port 3000`).
 
