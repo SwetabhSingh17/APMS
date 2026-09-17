@@ -4,7 +4,7 @@ setlocal
 
 echo ==========================================================
 echo    APMS - Academic Project Management System
-echo    One-Click Production Server
+echo    One-Click Production Server - By Swetabh Singh
 echo ==========================================================
 echo.
 
@@ -43,7 +43,7 @@ if not exist ".env" (
 REM ----------------------------------------------------------
 REM Step 2: Install / update dependencies
 REM ----------------------------------------------------------
-echo [1/4] Installing dependencies...
+echo [1/5] Installing dependencies...
 call npm install
 if errorlevel 1 goto :fail
 echo.
@@ -52,7 +52,7 @@ REM ----------------------------------------------------------
 REM Step 3: Prepare database (creates schema + admin on fresh installs,
 REM         safely syncs schema changes on updates - never wipes data)
 REM ----------------------------------------------------------
-echo [2/4] Preparing database...
+echo [2/5] Preparing database...
 call npm run db:ensure
 if errorlevel 1 goto :fail
 echo.
@@ -60,29 +60,33 @@ echo.
 REM ----------------------------------------------------------
 REM Step 4: Build production bundle
 REM ----------------------------------------------------------
-echo [3/4] Building production bundle...
+echo [3/5] Building production bundle...
 call npm run build
 if errorlevel 1 goto :fail
 echo.
 
 REM ----------------------------------------------------------
-REM Step 5: Check / Configure Windows Firewall for Port 3000 (LAN access)
+REM Step 5: Check / Configure Windows Firewall for Port 3000
 REM ----------------------------------------------------------
 echo [4/5] Checking Windows Firewall rule for Port 3000...
-netsh advfirewall firewall show rule name="APMS Server (Port 3000)" >nul 2>nul
-if errorlevel 1 (
-    netsh advfirewall firewall add rule name="APMS Server (Port 3000)" dir=in action=allow protocol=TCP localport=3000 >nul 2>nul
-    if errorlevel 1 (
-        echo [INFO] Could not automatically add firewall rule (requires Administrator privileges).
-        echo        If remote PCs cannot open http://[YOUR-IP]:3000, please run this once
-        echo        in an Administrator Command Prompt:
-        echo        netsh advfirewall firewall add rule name="APMS Server (Port 3000)" dir=in action=allow protocol=TCP localport=3000
-    ) else (
-        echo [INFO] Inbound firewall rule for Port 3000 configured successfully.
-    )
-) else (
+netsh advfirewall firewall show rule name="APMS Server Port 3000" >nul 2>nul
+if not errorlevel 1 (
     echo [INFO] Inbound firewall rule for Port 3000 is active.
+    goto :fw_done
 )
+
+netsh advfirewall firewall add rule name="APMS Server Port 3000" dir=in action=allow protocol=TCP localport=3000 >nul 2>nul
+if not errorlevel 1 (
+    echo [INFO] Inbound firewall rule for Port 3000 configured successfully.
+    goto :fw_done
+)
+
+echo [INFO] Could not automatically add firewall rule - requires Administrator privileges.
+echo        If remote PCs cannot open http://YOUR-IP:3000, please run this once
+echo        in an Administrator Command Prompt:
+echo        netsh advfirewall firewall add rule name="APMS Server Port 3000" dir=in action=allow protocol=TCP localport=3000
+
+:fw_done
 echo.
 
 REM ----------------------------------------------------------
@@ -91,9 +95,9 @@ REM ----------------------------------------------------------
 echo [5/5] Starting APMS server...
 echo.
 echo   Local access:   http://localhost:3000
-echo   Network access: Check console below for your IP (e.g. http://192.168.6.11:3000)
+echo   Network access: Check console below for your IP, e.g. http://192.168.6.11:3000
 echo.
-echo       (Press Ctrl+C to stop the server)
+echo       Press Ctrl+C to stop the server
 echo.
 call npm start
 

@@ -6,6 +6,19 @@ This document outlines suggested architectural, security, and maintenance improv
 
 ## 🚨 Priority Bugs to be Resolved
 
+### 🟢 ACTIVE ISSUES RESOLVED (v1.9.2 - Completed & Verified)
+
+- [x] **As soon as start_server.bat runs for step 5, cmd closes instantly.** — **FIXED**
+  - **Affected Files:** `start_server.bat`
+  - **Root Cause Analysis:**
+    - In Windows command prompt (`cmd.exe`), double quotes do not escape parentheses inside an `if (...)` compound block.
+    - Step 5 contained rule names and echo statements with parentheses such as `(Port 3000)` and `(requires Administrator privileges)`.
+    - `cmd.exe` parsed the first closing parenthesis `)` as terminating the `if errorlevel 1 (` block prematurely, causing a fatal syntax parsing error (`"" dir=in was unexpected at this time."`) that terminated the batch interpreter instantly before reaching `pause`.
+  - **Resolution Implemented:**
+    - Refactored Step 5 to use label-based control flow (`goto :fw_done`) instead of nested parenthesized `if/else` blocks.
+    - Renamed the firewall rule to `APMS Server Port 3000` (removing parentheses).
+    - Removed all unescaped parentheses from echo statements inside conditional blocks.
+
 ### 🟢 ACTIVE ISSUES RESOLVED (v1.9.1 - Completed & Verified)
 
 - [x] **On Windows Server, the page isn't loading, just circular animation.** — **FIXED**

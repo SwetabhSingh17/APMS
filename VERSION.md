@@ -1,6 +1,10 @@
 # Version History
 
-## Version 1.9.1 (Current)
+## Version 1.9.2 (Current)
+### Windows Server Batch Startup Script Fix
+1. **Resolved CMD Instant Close on Step 5** — Fixed a fatal syntax parsing error in `start_server.bat` caused by unescaped parentheses within nested batch `if` blocks during the Windows Firewall configuration check. Refactored Step 5 to use clean label-based jumps and safe rule naming (`APMS Server Port 3000`).
+
+## Version 1.9.1
 ### Windows Server Loading Loop & LAN Remote Access Fixes
 1. **Intranet/LAN HTTP Header Calibration (Helmet)** —
    - Disabled automatic HSTS (`Strict-Transport-Security`) and CSP `upgrade-insecure-requests` on HTTP deployments.
