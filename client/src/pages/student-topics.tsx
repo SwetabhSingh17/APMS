@@ -28,7 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Info, Lock, Plus, Search, ChevronDown, ChevronUp, CheckCircle2, ArrowRight } from "lucide-react";
+import { Info, Lock, Plus, Search, ChevronDown, ChevronUp, CheckCircle2, ArrowRight, AlertCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import Modal from "@/components/ui/modal";
 
@@ -53,6 +53,9 @@ function BcaStudentTopics() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [allottedAlertOpen, setAllottedAlertOpen] = useState(false);
+  // State for topic selection confirmation popup
+  const [selectedTopicForConfirm, setSelectedTopicForConfirm] = useState<ProjectTopic | null>(null);
+  const [confirmAlertOpen, setConfirmAlertOpen] = useState(false);
 
   // Fetch current user's team to check permission
   const { data: userGroup } = useQuery<StudentGroup & { myStatus: string }>({
@@ -142,7 +145,24 @@ function BcaStudentTopics() {
 
   const handleSelectTopic = (topicId: number) => {
     if (!canSelect) return;
-    selectTopicMutation.mutate(topicId);
+
+    // Find the topic to show its title in the confirmation dialog
+    const topic = availableTopics.find(t => t.id === topicId) ||
+                  (Array.isArray(topicsData) ? (topicsData as ProjectTopic[]) : (topicsData as IApprovedTopicsResponse)?.availableTopics ?? []).find(t => t.id === topicId);
+
+    if (topic) {
+      setSelectedTopicForConfirm(topic as ProjectTopic);
+      setConfirmAlertOpen(true);
+    }
+  };
+
+  /** Called when user confirms topic selection in the dialog */
+  const confirmTopicSelection = () => {
+    if (selectedTopicForConfirm) {
+      selectTopicMutation.mutate(selectedTopicForConfirm.id);
+      setConfirmAlertOpen(false);
+      setSelectedTopicForConfirm(null);
+    }
   };
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -391,6 +411,54 @@ function BcaStudentTopics() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setAllottedAlertOpen(false)}>Okay</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmation popup when a student selects a topic */}
+      <AlertDialog open={confirmAlertOpen} onOpenChange={(open) => {
+        setConfirmAlertOpen(open);
+        if (!open) setSelectedTopicForConfirm(null);
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Project Selection</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  You are about to select{" "}
+                  <strong className="text-foreground">"{selectedTopicForConfirm?.title}"</strong>{" "}
+                  as your project topic.
+                </p>
+                <p>
+                  This project will be allotted to your <strong className="text-foreground">entire project team</strong>.
+                </p>
+                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                  <p className="text-destructive font-semibold text-sm flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    This action cannot be changed or reversed.
+                  </p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  In case of any issue or query, kindly contact your Department's Project Coordinator.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setConfirmAlertOpen(false);
+              setSelectedTopicForConfirm(null);
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmTopicSelection}
+              disabled={selectTopicMutation.isPending}
+              className="bg-primary hover:bg-primary/90"
+            >
+              {selectTopicMutation.isPending ? "Selecting..." : "Confirm Selection"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

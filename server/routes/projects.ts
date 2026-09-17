@@ -136,6 +136,22 @@ export function registerProjectRoutes(router: Router, storage: DBStorage) {
         }
     });
 
+    // Get supervisor's own submitted topics with team details
+    // Returns each topic with allotment status and the team that picked it
+    router.get("/api/projects/supervisor/my-topics", requireRole([UserRole.SUPERVISOR]), async (req: Request, res: Response) => {
+        if (!isAuthenticatedRequest(req)) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        try {
+            const results = await storage.getSupervisorTopicsWithTeams(req.user.id);
+            res.json(results);
+        } catch (error) {
+            console.error('Error fetching supervisor topics with teams:', error);
+            res.status(500).json({ message: "Failed to fetch your topics" });
+        }
+    });
+
     // Get projects for supervisor
     router.get("/api/projects/supervisor", requireRole([UserRole.SUPERVISOR]), async (req: Request, res: Response) => {
         if (!isAuthenticatedRequest(req)) {
@@ -157,6 +173,7 @@ export function registerProjectRoutes(router: Router, storage: DBStorage) {
             res.status(500).json({ message: "Failed to fetch supervisor projects" });
         }
     });
+
 
     // Create or update assessment
     router.post("/api/projects/:id/assess", requireRole([UserRole.SUPERVISOR, UserRole.COORDINATOR]), async (req: Request, res: Response) => {

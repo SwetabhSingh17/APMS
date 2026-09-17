@@ -36,7 +36,9 @@ import {
   ShieldCheck, 
   Mail, 
   Building, 
-  ArrowRight 
+  ArrowRight,
+  FileText,
+  GraduationCap
 } from "lucide-react";
 import { useCourseFilter } from "@/hooks/course-filter-context";
 
@@ -45,6 +47,21 @@ export type IStudentProjectWithTopic = StudentProject & {
   student: User;
   supervisor?: User;
 };
+
+/** Response shape from GET /api/projects/supervisor/my-topics */
+interface ISupervisorTopicWithTeam {
+  id: number;
+  topic: ProjectTopic;
+  isPicked: boolean;
+  team?: {
+    groupId: number;
+    groupName: string;
+    projectTeamId: string | null;
+    course: string | null;
+    members: { id: number; firstName: string; lastName: string; enrollmentNumber: string | null; email: string }[];
+    progress: number;
+  };
+}
 
 export default function Projects() {
   const { user } = useAuth();
@@ -57,7 +74,7 @@ export default function Projects() {
   const [searchQuery, setSearchQuery] = useState("");
   const { courseFilter, getCourseQuery } = useCourseFilter();
 
-  // Topics catalog for coordinators/supervisors (students now view topics in /student-topics)
+  // Topics catalog for coordinators and admins
   const { data: approvedTopics = [], isLoading: isLoadingTopics } = useQuery<ProjectTopic[]>({
     queryKey: [`/api/projects/approved-topics${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
     queryFn: async () => {
@@ -65,11 +82,16 @@ export default function Projects() {
       const data = await response.json();
       return Array.isArray(data) ? data : (data.data || data.availableTopics || []);
     },
-    enabled: !!user && user.role !== UserRole.STUDENT
+    enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN)
   });
 
-  const { data: myTopics = [], isLoading: isLoadingMyTopics } = useQuery<ProjectTopic[]>({
-    queryKey: ["/api/topics/my"],
+  // Supervisor: fetch own submitted topics with team allotment details
+  const { data: supervisorTopicsWithTeams = [], isLoading: isLoadingSupervisorTopics } = useQuery<ISupervisorTopicWithTeam[]>({
+    queryKey: ["/api/projects/supervisor/my-topics"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/projects/supervisor/my-topics");
+      return await response.json();
+    },
     enabled: !!user && user.role === UserRole.SUPERVISOR
   });
 
@@ -105,7 +127,8 @@ export default function Projects() {
     enabled: !!user && user.role === UserRole.STUDENT
   });
  
-  // Add query for coordinator/admin/supervisor to fetch all student projects
+  // Add query for coordinator/admin to fetch all student projects
+  // Supervisors now use the dedicated /api/projects/supervisor/my-topics endpoint instead
   const { data: allProjects = [], isLoading: isLoadingAllProjects } = useQuery<IStudentProjectWithTopic[]>({
     queryKey: [`/api/projects/all${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
     queryFn: async () => {
@@ -113,7 +136,7 @@ export default function Projects() {
       const data = await response.json();
       return Array.isArray(data) ? data : (data.data || []);
     },
-    enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN || user.role === UserRole.SUPERVISOR)
+    enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN)
   });
 
   // Define form schema with additional validation
@@ -149,6 +172,7 @@ export default function Projects() {
       form.reset();
       setIsSubmitModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/topics/my"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects/supervisor/my-topics"] });
     },
     onError: (error: Error) => {
       toast({
@@ -255,59 +279,229 @@ export default function Projects() {
     );
   };
 
+  // Filter supervisor topics by search query
+  const filterSupervisorTopics = (topics: ISupervisorTopicWithTeam[]) => {
+    if (!searchQuery) return topics;
+    const query = searchQuery.toLowerCase();
+    return topics.filter(item =>
+      item.topic.title.toLowerCase().includes(query) ||
+      (item.topic.description?.toLowerCase().includes(query) || false) ||
+      (item.topic.technology?.toLowerCase().includes(query) || false) ||
+      (item.topic.topicCode?.toLowerCase().includes(query) || false) ||
+      (item.team?.groupName.toLowerCase().includes(query) || false) ||
+      (item.team?.projectTeamId?.toLowerCase().includes(query) || false) ||
+      (item.team?.members.some(m =>
+        m.firstName.toLowerCase().includes(query) ||
+        m.lastName.toLowerCase().includes(query) ||
+        (m.enrollmentNumber?.toLowerCase().includes(query) || false)
+      ) || false)
+    );
+  };
+
   const renderTeacherContent = () => {
-    console.log("All Projects:", allProjects);
-    console.log("Current User:", user);
-
-    const supervisorProjects = allProjects.filter(project => {
-      console.log("Checking project:", {
-        projectId: project.id,
-        topicId: project.topic?.id,
-        topicSubmittedById: project.topic?.submittedById,
-        currentUserId: user?.id,
-        hasMatch: project.topic?.submittedById === user?.id
-      });
-      return project.topic?.submittedById === user?.id;
-    });
-
-    console.log("Filtered Supervisor Projects:", supervisorProjects);
-
-    const filteredProjects = filterProjects(supervisorProjects);
+    const filteredItems = filterSupervisorTopics(supervisorTopicsWithTeams);
+    const pickedCount = supervisorTopicsWithTeams.filter(t => t.isPicked).length;
+    const availableCount = supervisorTopicsWithTeams.filter(t => !t.isPicked).length;
 
     return (
       <>
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-foreground mb-1">My Projects</h1>
-            <p className="text-muted-foreground">Projects selected by students from your topics</p>
+            <h1 className="text-3xl font-bold text-foreground">My Topics & Teams</h1>
+            <p className="text-muted-foreground mt-1">Track your submitted topics and see which teams have picked them</p>
           </div>
           <Button onClick={() => setIsSubmitModalOpen(true)}>Submit New Topic</Button>
         </div>
 
+        {/* Summary Stats */}
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="p-4 rounded-lg bg-background border shadow-xs">
+            <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
+              <FileText className="w-3.5 h-3.5 text-primary" />
+              Total Topics
+            </p>
+            <p className="text-2xl font-bold text-foreground">{supervisorTopicsWithTeams.length}</p>
+          </div>
+          <div className="p-4 rounded-lg bg-background border shadow-xs">
+            <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+              Picked by Teams
+            </p>
+            <p className="text-2xl font-bold text-green-600">{pickedCount}</p>
+          </div>
+          <div className="p-4 rounded-lg bg-background border shadow-xs">
+            <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-amber-600" />
+              Still Available
+            </p>
+            <p className="text-2xl font-bold text-amber-600">{availableCount}</p>
+          </div>
+        </div>
+
+        {/* Search Bar */}
         <div className="mb-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
-              placeholder="Search projects by title, student, technology..."
+              placeholder="Search by topic title, team name, student name, enrollment..."
               className="pl-10"
-              aria-label="Search projects"
+              aria-label="Search topics"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
         </div>
 
-        {isLoadingAllProjects ? (
+        {isLoadingSupervisorTopics ? (
           <div className="space-y-4">
-            <Skeleton className="h-20" />
-            <Skeleton className="h-20" />
-            <Skeleton className="h-20" />
+            <Skeleton className="h-40 rounded-xl" />
+            <Skeleton className="h-40 rounded-xl" />
+            <Skeleton className="h-40 rounded-xl" />
           </div>
+        ) : filteredItems.length === 0 ? (
+          <Card className="border-dashed border-2 text-center py-16 px-6 max-w-2xl mx-auto shadow-sm">
+            <CardContent className="space-y-4">
+              <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
+                <BookOpen className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-bold text-foreground">No Topics Submitted Yet</h2>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                {searchQuery
+                  ? `No topics match "${searchQuery}". Try refining your search.`
+                  : "You haven't submitted any project topics yet. Click 'Submit New Topic' to get started."
+                }
+              </p>
+            </CardContent>
+          </Card>
         ) : (
-          <ProjectTable
-            projects={filteredProjects}
-            onViewDetails={openDetailsModal}
-          />
+          <div className="space-y-4">
+            {filteredItems.map(item => (
+              <Card key={item.id} className={`shadow-sm transition-all ${
+                item.isPicked ? "border-green-500/30 bg-green-500/[0.02]" : "border-border"
+              }`}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {item.topic.topicCode && (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-mono font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                          {item.topic.topicCode}
+                        </span>
+                      )}
+                      {item.topic.course && (
+                        <Badge variant="outline" className="font-semibold border-primary/30 text-primary bg-primary/5">
+                          {item.topic.course}
+                        </Badge>
+                      )}
+                      {item.topic.projectType && (
+                        <Badge variant="secondary" className="text-xs">
+                          {item.topic.projectType}
+                        </Badge>
+                      )}
+                    </div>
+                    {item.isPicked ? (
+                      <Badge className="bg-green-600 text-white gap-1">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Picked
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="border-amber-500/30 text-amber-600 bg-amber-500/10">
+                        <Clock className="w-3 h-3 mr-1" />
+                        Available
+                      </Badge>
+                    )}
+                  </div>
+                  <CardTitle className="text-lg font-bold text-foreground mt-2">
+                    {item.topic.title}
+                  </CardTitle>
+                  {item.topic.description && (
+                    <CardDescription className="line-clamp-2 mt-1">
+                      {item.topic.description}
+                    </CardDescription>
+                  )}
+                </CardHeader>
+
+                <CardContent className="pt-0">
+                  {/* Topic metadata row */}
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
+                    <span className="flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" />
+                      {item.topic.technology || "General"}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Award className="w-3 h-3" />
+                      Complexity: {item.topic.estimatedComplexity || "Medium"}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      {new Date(item.topic.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+
+                  {/* Team details — only shown for picked topics */}
+                  {item.isPicked && item.team && (
+                    <div className="p-4 rounded-lg bg-muted/30 border border-border/50 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
+                          <Users className="w-4 h-4 text-primary" />
+                          Team Details
+                        </h4>
+                        <div className="flex items-center gap-2">
+                          {item.team.projectTeamId && (
+                            <span className="text-xs font-mono font-bold px-2 py-0.5 bg-primary/10 text-primary rounded">
+                              {item.team.projectTeamId}
+                            </span>
+                          )}
+                          <span className="text-xs text-muted-foreground">
+                            {item.team.groupName}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-muted-foreground w-16 shrink-0">Progress</span>
+                        <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
+                          <div
+                            className="bg-primary h-full rounded-full transition-all duration-500"
+                            style={{ width: `${item.team.progress}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-bold text-primary w-10 text-right">{item.team.progress}%</span>
+                      </div>
+
+                      {/* Members list */}
+                      {item.team.members.length > 0 ? (
+                        <div className="space-y-2">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Team Members</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {item.team.members.map(member => (
+                              <div key={member.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-background border border-border/50">
+                                <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
+                                  {member.firstName[0]}{member.lastName[0]}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-semibold text-foreground truncate">
+                                    {member.firstName} {member.lastName}
+                                  </p>
+                                  <p className="text-[11px] text-muted-foreground truncate">
+                                    {member.enrollmentNumber || member.email}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">
+                          Individual assignment — no team members
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         )}
       </>
     );
@@ -713,12 +907,130 @@ export default function Projects() {
 
   const filteredTopics = filterTopics(approvedTopics);
 
+  const renderSubmitTopicModal = () => (
+    <Modal
+      isOpen={isSubmitModalOpen}
+      onClose={() => setIsSubmitModalOpen(false)}
+      title="Submit New Project Topic"
+      description="Propose a new topic for students to work on"
+    >
+      <div className="bg-background/95 backdrop-blur-sm rounded-lg">
+        <Form {...form}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              console.log("Form submit event triggered");
+              const values = form.getValues();
+              console.log("Form values:", values);
+              submitTopicMutation.mutate(values);
+            }}
+            className="space-y-4"
+          >
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Topic Title</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter the project topic title" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Provide a detailed description of the project topic"
+                      rows={4}
+                      {...field}
+                      value={field.value || ""}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="technology"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Technology</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter technology" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="estimatedComplexity"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Estimated Complexity (1-5)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={5}
+                      placeholder="Enter complexity (1-5)"
+                      {...field}
+                      onChange={(e) => field.onChange(parseInt(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex justify-end space-x-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsSubmitModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={submitTopicMutation.isPending}
+              >
+                {submitTopicMutation.isPending ? "Submitting..." : "Submit Topic"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </div>
+    </Modal>
+  );
+
   // In Student accounts, the project section exclusively displays their selected project progress and detail.
   // Topic selection and catalog browsing is located in the dedicated Topics section (/student-topics).
   if (user?.role === UserRole.STUDENT) {
     return (
       <MainLayout>
         {renderStudentContent()}
+      </MainLayout>
+    );
+  }
+
+  // In Supervisor accounts, exclusively display "My Topics & Teams".
+  // The general project topics catalog is completely removed from the supervisor project page.
+  if (user?.role === UserRole.SUPERVISOR) {
+    return (
+      <MainLayout>
+        {renderTeacherContent()}
+        {renderSubmitTopicModal()}
       </MainLayout>
     );
   }
@@ -730,12 +1042,9 @@ export default function Projects() {
           <h1 className="text-3xl font-bold text-foreground">Project Hub</h1>
           <p className="text-muted-foreground mt-1">Explore approved project topics and monitor student project teams</p>
         </div>
-        {user?.role === UserRole.SUPERVISOR && (
-          <Button onClick={() => setIsSubmitModalOpen(true)}>Submit New Topic</Button>
-        )}
       </div>
 
-      <Tabs defaultValue={user?.role === UserRole.SUPERVISOR ? "topics" : "projects"} className="space-y-6">
+      <Tabs defaultValue="projects" className="space-y-6">
         <TabsList className="grid w-full max-w-md grid-cols-2">
           <TabsTrigger value="topics" className="flex items-center gap-2">
             <span>Project Topics</span>
@@ -744,12 +1053,10 @@ export default function Projects() {
             </span>
           </TabsTrigger>
           <TabsTrigger value="projects" className="flex items-center gap-2">
-            <span>{user?.role === UserRole.STUDENT ? "My Project" : "Student Projects"}</span>
-            {user?.role !== UserRole.STUDENT && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
-                {user?.role === UserRole.SUPERVISOR ? allProjects.filter(p => p.topic?.submittedById === user?.id).length : allProjects.length}
-              </span>
-            )}
+            <span>Student Projects</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
+              {allProjects.length}
+            </span>
           </TabsTrigger>
         </TabsList>
 
@@ -799,117 +1106,11 @@ export default function Projects() {
         </TabsContent>
 
         <TabsContent value="projects">
-          {user?.role === UserRole.SUPERVISOR && renderTeacherContent()}
-          {user?.role === UserRole.STUDENT && renderStudentContent()}
-          {(user?.role === UserRole.COORDINATOR || user?.role === UserRole.ADMIN) && renderCoordinatorContent()}
+          {renderCoordinatorContent()}
         </TabsContent>
       </Tabs>
 
-      {/* Submit Topic Modal */}
-      <Modal
-        isOpen={isSubmitModalOpen}
-        onClose={() => setIsSubmitModalOpen(false)}
-        title="Submit New Project Topic"
-        description="Propose a new topic for students to work on"
-      >
-        <div className="bg-background/95 backdrop-blur-sm rounded-lg">
-          <Form {...form}>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                console.log("Form submit event triggered");
-                const values = form.getValues();
-                console.log("Form values:", values);
-                submitTopicMutation.mutate(values);
-              }}
-              className="space-y-4"
-            >
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Topic Title</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter the project topic title" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Provide a detailed description of the project topic"
-                        rows={4}
-                        {...field}
-                        value={field.value || ""}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="technology"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Technology</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter technology" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="estimatedComplexity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Estimated Complexity (1-5)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={5}
-                        placeholder="Enter complexity (1-5)"
-                        {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="flex justify-end space-x-3 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsSubmitModalOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={submitTopicMutation.isPending}
-                >
-                  {submitTopicMutation.isPending ? "Submitting..." : "Submit Topic"}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </div>
-      </Modal>
+      {renderSubmitTopicModal()}
 
       {/* Confirm Topic Selection Modal */}
       <Modal

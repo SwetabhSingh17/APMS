@@ -369,6 +369,150 @@ export class DBStorage {
     return !!project;
   }
 
+  /**
+   * Fetches all topics submitted by a supervisor, enriched with team details
+   * for topics that have been picked by students.
+   * Returns each topic with its allotment status and the team that picked it.
+   */
+  async getSupervisorTopicsWithTeams(supervisorId: number): Promise<{
+    id: number;
+    topic: ProjectTopic;
+    isPicked: boolean;
+    team?: {
+      groupId: number;
+      groupName: string;
+      projectTeamId: string | null;
+      course: string | null;
+      members: { id: number; firstName: string; lastName: string; enrollmentNumber: string | null; email: string }[];
+      progress: number;
+    };
+  }[]> {
+    // Step 1: Fetch all topics submitted by this supervisor
+    const supervisorTopics = await db.select()
+      .from(projectTopics)
+      .where(and(
+        eq(projectTopics.submittedById, supervisorId),
+        eq(projectTopics.isDeleted, false)
+      ))
+      .orderBy(desc(projectTopics.createdAt));
+
+    if (supervisorTopics.length === 0) return [];
+
+    const topicIds = supervisorTopics.map(t => t.id);
+
+    // Step 2: Find all student_projects linked to these topics
+    const projectRows = await db.select({
+      project: studentProjects,
+      studentId: studentProjects.studentId,
+      topicId: studentProjects.topicId,
+    })
+    .from(studentProjects)
+    .where(inArray(studentProjects.topicId, topicIds));
+
+    // Step 3: Group projects by topicId and collect student IDs
+    const topicProjectMap = new Map<number, { studentIds: number[]; progress: number }>();
+    for (const row of projectRows) {
+      const existing = topicProjectMap.get(row.topicId);
+      if (existing) {
+        existing.studentIds.push(row.studentId);
+        // Average progress across team members
+        existing.progress = Math.round((existing.progress + row.project.progress) / 2);
+      } else {
+        topicProjectMap.set(row.topicId, {
+          studentIds: [row.studentId],
+          progress: row.project.progress,
+        });
+      }
+    }
+
+    // Step 4: For picked topics, resolve the team (group) via student_group_members
+    const allStudentIds = Array.from(new Set(projectRows.map(r => r.studentId)));
+
+    // Map each student to their group
+    let studentGroupMap = new Map<number, number>();
+    if (allStudentIds.length > 0) {
+      const memberships = await db.select({
+        studentId: studentGroupMembers.userId,
+        groupId: studentGroupMembers.groupId,
+      })
+      .from(studentGroupMembers)
+      .where(and(
+        inArray(studentGroupMembers.userId, allStudentIds),
+        eq(studentGroupMembers.status, "accepted")
+      ));
+      memberships.forEach(m => studentGroupMap.set(m.studentId, m.groupId));
+    }
+
+    // Step 5: Fetch all relevant groups
+    const groupIds = Array.from(new Set(Array.from(studentGroupMap.values())));
+    let groupMap = new Map<number, { group: StudentGroup; members: User[] }>();
+    if (groupIds.length > 0) {
+      const groups = await db.select().from(studentGroups).where(inArray(studentGroups.id, groupIds));
+
+      // Fetch all members for these groups
+      const allMembers = await db.select({
+        groupId: studentGroupMembers.groupId,
+        user: users,
+      })
+      .from(studentGroupMembers)
+      .innerJoin(users, eq(studentGroupMembers.userId, users.id))
+      .where(and(
+        inArray(studentGroupMembers.groupId, groupIds),
+        eq(studentGroupMembers.status, "accepted")
+      ));
+
+      for (const g of groups) {
+        const members = allMembers
+          .filter(m => m.groupId === g.id)
+          .map(m => m.user as User);
+        groupMap.set(g.id, { group: g as StudentGroup, members });
+      }
+    }
+
+    // Step 6: Assemble the result
+    return supervisorTopics.map(topic => {
+      const projectData = topicProjectMap.get(topic.id);
+      const isPicked = !!projectData;
+
+      if (!isPicked) {
+        return { id: topic.id, topic: topic as ProjectTopic, isPicked: false };
+      }
+
+      // Find the group for this topic's students
+      const firstStudentId = projectData.studentIds[0];
+      const groupId = studentGroupMap.get(firstStudentId);
+      const groupData = groupId ? groupMap.get(groupId) : undefined;
+
+      return {
+        id: topic.id,
+        topic: topic as ProjectTopic,
+        isPicked: true,
+        team: groupData ? {
+          groupId: groupData.group.id,
+          groupName: groupData.group.name,
+          projectTeamId: groupData.group.projectTeamId,
+          course: groupData.group.course,
+          members: groupData.members.map(m => ({
+            id: m.id,
+            firstName: m.firstName,
+            lastName: m.lastName,
+            enrollmentNumber: m.enrollmentNumber,
+            email: m.email,
+          })),
+          progress: projectData.progress,
+        } : {
+          // Fallback: individual student without a group
+          groupId: 0,
+          groupName: "Individual Assignment",
+          projectTeamId: null,
+          course: null,
+          members: [],
+          progress: projectData.progress,
+        },
+      };
+    });
+  }
+
 
   // Student Group operations
   async createStudentGroup(group: InsertStudentGroup, creatorId: number, invitedEnrollmentNumbers: string[], autoAccept: boolean = false): Promise<StudentGroup> {

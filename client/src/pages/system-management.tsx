@@ -19,7 +19,7 @@ import {
 import { useState, useRef } from "react";
 import { UserRole } from "@shared/schema";
 import { useLocation } from "wouter";
-import * as XLSX from 'xlsx';
+
 
 export default function SystemManagement() {
     const { user } = useAuth();
@@ -117,13 +117,12 @@ export default function SystemManagement() {
             if (!res.ok) throw new Error("Excel export failed");
             return res.json();
         },
-        onSuccess: (result) => {
-            // Create worksheet from data
+        onSuccess: async (result) => {
+            // Dynamically load xlsx only when needed to avoid 283KB in the page bundle
+            const XLSX = await import('xlsx');
             const ws = XLSX.utils.json_to_sheet(result.data);
-            // Create workbook
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Projects Report");
-            // Generate Excel file and download
             XLSX.writeFile(wb, `project-report-${new Date().toISOString().split('T')[0]}.xlsx`);
 
             toast({

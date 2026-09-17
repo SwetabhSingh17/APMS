@@ -1,12 +1,10 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
 export default defineConfig({
   plugins: [
     react(),
-    runtimeErrorOverlay(),
     ...(process.env.NODE_ENV !== "production" &&
       process.env.REPL_ID !== undefined
       ? [
@@ -32,8 +30,9 @@ export default defineConfig({
       output: {
         manualChunks: {
           'vendor-react': ['react', 'react-dom', 'wouter'],
-          'vendor-ui': ['lucide-react', 'framer-motion', 'recharts'],
-          'vendor-utils': ['date-fns', 'xlsx', 'mermaid']
+          'vendor-ui': ['lucide-react', 'framer-motion'],
+          'vendor-charts': ['recharts'],
+          'vendor-utils': ['date-fns'],
         }
       }
     }

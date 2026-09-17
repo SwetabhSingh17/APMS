@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { UserRole, ProjectMilestone, StudentProject, ProjectTopic, User } from "@shared/schema";
 import Modal from "@/components/ui/modal";
 import axios, { AxiosResponse } from "axios";
-import * as XLSX from 'xlsx';
+
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useCourseFilter } from "@/hooks/course-filter-context";
@@ -58,13 +58,12 @@ export default function TrackProgress() {
       if (!res.ok) throw new Error("Excel export failed");
       return res.json();
     },
-    onSuccess: (result) => {
-      // Create worksheet from data
+    onSuccess: async (result) => {
+      // Dynamically load xlsx only when needed to avoid 283KB in the page bundle
+      const XLSX = await import('xlsx');
       const ws = XLSX.utils.json_to_sheet(result.data);
-      // Create workbook
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Projects Report");
-      // Generate Excel file and download
       XLSX.writeFile(wb, `project-report-${new Date().toISOString().split('T')[0]}.xlsx`);
 
       toast({

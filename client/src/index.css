@@ -123,4 +123,18 @@
       background-position: 0% 50%;
     }
   }
+
+  /* SVG progress ring draw-in animation */
+  @keyframes ring-draw {
+    from {
+      stroke-dashoffset: var(--ring-circumference);
+    }
+    to {
+      stroke-dashoffset: var(--ring-offset);
+    }
+  }
+
+  .progress-ring-circle {
+    animation: ring-draw 1s ease-out forwards;
+  }
 }
