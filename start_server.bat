@@ -66,9 +66,33 @@ if errorlevel 1 goto :fail
 echo.
 
 REM ----------------------------------------------------------
-REM Step 5: Start the server
+REM Step 5: Check / Configure Windows Firewall for Port 3000 (LAN access)
 REM ----------------------------------------------------------
-echo [4/4] Starting APMS server...
+echo [4/5] Checking Windows Firewall rule for Port 3000...
+netsh advfirewall firewall show rule name="APMS Server (Port 3000)" >nul 2>nul
+if errorlevel 1 (
+    netsh advfirewall firewall add rule name="APMS Server (Port 3000)" dir=in action=allow protocol=TCP localport=3000 >nul 2>nul
+    if errorlevel 1 (
+        echo [INFO] Could not automatically add firewall rule (requires Administrator privileges).
+        echo        If remote PCs cannot open http://[YOUR-IP]:3000, please run this once
+        echo        in an Administrator Command Prompt:
+        echo        netsh advfirewall firewall add rule name="APMS Server (Port 3000)" dir=in action=allow protocol=TCP localport=3000
+    ) else (
+        echo [INFO] Inbound firewall rule for Port 3000 configured successfully.
+    )
+) else (
+    echo [INFO] Inbound firewall rule for Port 3000 is active.
+)
+echo.
+
+REM ----------------------------------------------------------
+REM Step 6: Start the server
+REM ----------------------------------------------------------
+echo [5/5] Starting APMS server...
+echo.
+echo   Local access:   http://localhost:3000
+echo   Network access: Check console below for your IP (e.g. http://192.168.6.11:3000)
+echo.
 echo       (Press Ctrl+C to stop the server)
 echo.
 call npm start

@@ -6,6 +6,31 @@ This document outlines suggested architectural, security, and maintenance improv
 
 ## 🚨 Priority Bugs to be Resolved
 
+### 🟢 ACTIVE ISSUES RESOLVED (v1.9.1 - Completed & Verified)
+
+- [x] **On Windows Server, the page isn't loading, just circular animation.** — **FIXED**
+  - **Affected Files:** `server/index.ts`, `server/db.ts`, `server/db-storage.ts`, `client/index.html`, `client/src/lib/queryClient.ts`
+  - **Root Cause Analysis:**
+    1. In production mode, Helmet default headers included HSTS (`Strict-Transport-Security`) and CSP `upgrade-insecure-requests`, which forced browsers to upgrade plain HTTP requests to HTTPS on port 3000. This caused `/api/user`, dynamic chunk imports, and WebSockets to fail or hang on plain HTTP, leaving React `<Suspense fallback={<PageLoader />}>` indefinitely showing the circular spinner.
+    2. `client/index.html` contained a synchronous `<script src="https://replit.com/public/js/replit-dev-banner.js">` that blocked HTML parsing or timed out on servers with restricted internet connectivity.
+    3. Connecting to `localhost` on Node.js 18+ on Windows attempted IPv6 `::1` DNS resolution, which could hang or delay when PostgreSQL only listened on IPv4 `127.0.0.1`.
+  - **Resolution Implemented:**
+    1. Configured Helmet for local/LAN HTTP deployments (`contentSecurityPolicy: false`, `hsts: false`, `crossOriginResourcePolicy: { policy: "cross-origin" }`).
+    2. Removed legacy third-party script from `client/index.html`.
+    3. Normalized `localhost` to `127.0.0.1` in `server/db.ts` and `winenv`, and added `connectionTimeoutMillis: 5000` to `pg.Pool`.
+    4. Added 15-second `AbortSignal` timeout handling to `apiRequest` and `getQueryFn` in `client/src/lib/queryClient.ts`.
+
+- [x] **Local remote network PC are unable to access the site: http://192.168.6.11:3000.** — **FIXED**
+  - **Affected Files:** `server/index.ts`, `start_server.bat`
+  - **Root Cause Analysis:**
+    1. `server.listen(Number(port))` omitted the host argument, causing Node on Windows to bind exclusively to `::` (IPv6), dropping inbound IPv4 connections from remote LAN devices.
+    2. Windows Defender Firewall blocks inbound connections on port 3000 by default unless an Inbound Rule is added.
+    3. Remote browsers receiving HSTS headers attempted to connect over HTTPS, causing `ERR_SSL_PROTOCOL_ERROR`.
+  - **Resolution Implemented:**
+    1. Updated `server.listen(Number(port), "0.0.0.0", ...)` in `server/index.ts` to bind to all IPv4 interfaces.
+    2. Updated `start_server.bat` to automatically check and configure the inbound Windows Defender Firewall rule for TCP Port 3000 (`netsh advfirewall firewall add rule name="APMS Server (Port 3000)" dir=in action=allow protocol=TCP localport=3000`).
+    3. Displayed local and LAN access URLs prominently in the startup batch console.
+
 ### 🟢 ACTIVE ISSUES RESOLVED (v1.9.0 - Completed & Verified)
 
 - [x] **In student Account, No project mentor name (rename it as Supervisor) in Project teams Section.** — **FIXED**

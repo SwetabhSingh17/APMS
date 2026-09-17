@@ -35,6 +35,9 @@ export class DBStorage {
       pool,
       createTableIfMissing: true,
     });
+    this.sessionStore.on('error', (err: any) => {
+      console.error('Session store error:', err?.message || err);
+    });
     // Removed synchronous initialization to prevent crashes if DB tables are missing.
     // It will be called explicitly during server startup.
   }

@@ -1,6 +1,24 @@
 # Version History
 
-## Version 1.9.0 (Current)
+## Version 1.9.1 (Current)
+### Windows Server Loading Loop & LAN Remote Access Fixes
+1. **Intranet/LAN HTTP Header Calibration (Helmet)** —
+   - Disabled automatic HSTS (`Strict-Transport-Security`) and CSP `upgrade-insecure-requests` on HTTP deployments.
+   - Resolved the infinite circular loading animation on Windows server caused by browsers upgrading subresources (`/api/user`, dynamic Vite chunks, WebSockets) to HTTPS on a plain HTTP port.
+   - Configured `crossOriginResourcePolicy: { policy: "cross-origin" }` to enable remote LAN PCs to load static assets without cross-origin blocking.
+2. **Explicit Network Interface Binding (`0.0.0.0`)** —
+   - Updated `server.listen(Number(port), "0.0.0.0")` in `server/index.ts` to ensure binding to all IPv4 network adapters on Windows, resolving inaccessible endpoints from remote LAN devices (`http://192.168.6.11:3000`).
+3. **Automated Windows Defender Firewall Configuration (`start_server.bat`)** —
+   - Added automated verification and Inbound Rule creation for TCP Port 3000 in `start_server.bat` (`netsh advfirewall firewall add rule name="APMS Server (Port 3000)" dir=in action=allow protocol=TCP localport=3000`).
+   - Added clear console access indicators displaying local (`http://localhost:3000`) and LAN IP (`http://192.168.6.11:3000`) access URLs.
+4. **Database & Session Store Connection Hardening** —
+   - Normalized database host to `127.0.0.1` across `server/db.ts` and `winenv`, preventing Node 18+ on Windows from stalling on IPv6 `::1` DNS resolution.
+   - Added `connectionTimeoutMillis: 5000` to `pg.Pool` and error handlers on `pool` and `sessionStore` to fail fast and prevent silent request hanging.
+5. **Client Request Timeouts & Cleanup** —
+   - Added 15-second `AbortSignal` timeouts to `apiRequest` and `getQueryFn` in `client/src/lib/queryClient.ts` to prevent UI hanging on dropped network packets.
+   - Removed obsolete third-party script `<script src="https://replit.com/public/js/replit-dev-banner.js"></script>` from `client/index.html`.
+
+## Version 1.9.0
 ### Student Experience Overhaul, Admin/Coordinator Progress Visibility & Supervisor Attribution
 1. **Student Account Project Isolation (`/projects`)** — Bypassed supervisor/admin `<Tabs>` and catalog exploration for student users. The page directly renders an isolated, focused dashboard for the team's selected project with academic milestone progress (5 phases), supervisor contact card, and team roster. When unassigned, displays an informative empty state pointing to topic discovery.
 2. **Dual Topic Catalog Visibility (`/student-topics`)** — Students can now view and search both available and unavailable (taken) topics with distinct colored status badges, live keyword search, and dedicated filter tabs (`All Topics`, `Available`, `Unavailable`).

@@ -31,8 +31,10 @@ function resolveDbConfig(): DbConfig {
       const url = new URL(DATABASE_URL);
       const database = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
       if (!database) throw new Error('no database name in path');
+      let host = url.hostname || '127.0.0.1';
+      if (host === 'localhost') host = '127.0.0.1';
       return {
-        host: url.hostname || 'localhost',
+        host,
         port: url.port ? parseInt(url.port) : 5432,
         database,
         user: url.username ? decodeURIComponent(url.username) : 'postgres',
@@ -43,9 +45,12 @@ function resolveDbConfig(): DbConfig {
     }
   }
 
+  let host = DB_HOST || '127.0.0.1';
+  if (host === 'localhost') host = '127.0.0.1';
+
   if (DB_HOST || DB_NAME || DB_USER) {
     return {
-      host: DB_HOST || 'localhost',
+      host,
       port: parseInt(DB_PORT || '5432'),
       database: DB_NAME || 'integral_project_hub',
       user: DB_USER || 'postgres',
@@ -54,7 +59,7 @@ function resolveDbConfig(): DbConfig {
   }
 
   return {
-    host: 'localhost',
+    host: '127.0.0.1',
     port: 5432,
     database: 'integral_project_hub',
     user: 'postgres',
@@ -77,8 +82,16 @@ const databaseUrl = usingDatabaseUrl
 const client = postgres(databaseUrl);
 export const db = drizzle(client, { schema });
 
-// Initialize pg Pool for session store
-export const pool = new Pool(dbConfig);
+// Initialize pg Pool for session store with 5s connection timeout
+export const pool = new Pool(
+  usingDatabaseUrl
+    ? { connectionString: databaseUrl, connectionTimeoutMillis: 5000 }
+    : { ...dbConfig, connectionTimeoutMillis: 5000 }
+);
+
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle PostgreSQL pool client:', err.message);
+});
 
 /**
  * The exact database URL the running server is using. ensure_db.ts injects

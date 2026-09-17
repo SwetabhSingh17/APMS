@@ -27,8 +27,12 @@ import { setupWebSocket } from "./websocket";
 const app = express();
 
 // Security: Set robust HTTP headers via helmet
+// In local/LAN deployments (HTTP), disable HSTS and CSP upgrade-insecure-requests
+// so remote LAN clients and local browsers are not forcibly upgraded to HTTPS.
 app.use(helmet({
-  contentSecurityPolicy: process.env.NODE_ENV === "production" ? undefined : false,
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  hsts: process.env.ENABLE_HSTS === "true",
 }));
 
 // Configure middleware for standard application/json and form-url parsing
@@ -105,8 +109,8 @@ async function startServer(): Promise<void> {
       serveStatic(app);
     }
 
-    // 4. Begin accepting incoming requests
-    server.listen(Number(port), async () => {
+    // 4. Begin accepting incoming requests explicitly on all IPv4 network interfaces
+    server.listen(Number(port), "0.0.0.0", async () => {
       log(`Server running on port ${port}`);
       log(`Local: http://localhost:${port}`);
 
