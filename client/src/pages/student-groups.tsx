@@ -201,18 +201,27 @@ export default function StudentGroups() {
             </CardHeader>
             <CardContent className="pt-6 space-y-6">
               <div className="flex items-center gap-4 p-4 border rounded-lg">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <span className="font-semibold text-lg text-primary">
-                    {userGroup.supervisor?.firstName[0]}{userGroup.supervisor?.lastName[0]}
-                  </span>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Proposed Project Mentor</p>
-                  <p className="font-semibold text-lg">
-                    {userGroup.supervisor?.firstName} {userGroup.supervisor?.lastName}
-                  </p>
-                  {/* <p className="text-sm text-muted-foreground">{userGroup.supervisor?.department}</p> */}
-                </div>
+                {userGroup.supervisor ? (
+                  <>
+                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <span className="font-semibold text-lg text-primary">
+                        {userGroup.supervisor?.firstName?.[0]}{userGroup.supervisor?.lastName?.[0]}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Supervisor</p>
+                      <p className="font-semibold text-lg">
+                        {userGroup.supervisor?.prefix ? `${userGroup.supervisor.prefix} ` : ""}
+                        {userGroup.supervisor?.firstName} {userGroup.supervisor?.lastName}
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Supervisor</p>
+                    <Badge variant="outline" className="border-amber-500/30 text-amber-600 bg-amber-500/10">Not Assigned</Badge>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -331,21 +340,32 @@ export default function StudentGroups() {
                           <Separator />
 
                           <div>
-                            <h3 className="font-semibold mb-4">Project Mentor</h3>
+                            <h3 className="font-semibold mb-4">Supervisor</h3>
                             <div className="flex items-center gap-4 p-4 border rounded-lg">
-                              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                <span className="font-semibold">
-                                  {group.supervisor?.firstName[0]}{group.supervisor?.lastName[0]}
-                                </span>
-                              </div>
-                              <div>
-                                <p className="font-medium">
-                                  {group.supervisor?.firstName} {group.supervisor?.lastName}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  {/* {group.supervisor?.department} */}
-                                </p>
-                              </div>
+                              {group.supervisor ? (
+                                <>
+                                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                    <span className="font-semibold">
+                                      {group.supervisor?.firstName?.[0]}{group.supervisor?.lastName?.[0]}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <p className="font-medium">
+                                      {group.supervisor?.prefix ? `${group.supervisor.prefix} ` : ""}
+                                      {group.supervisor?.firstName} {group.supervisor?.lastName}
+                                    </p>
+                                    {group.supervisor?.department && (
+                                      <p className="text-sm text-muted-foreground">
+                                        {group.supervisor.department}
+                                      </p>
+                                    )}
+                                  </div>
+                                </>
+                              ) : (
+                                <div>
+                                  <Badge variant="outline" className="border-amber-500/30 text-amber-600 bg-amber-500/10">Not Assigned</Badge>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -414,28 +434,52 @@ export default function StudentGroups() {
                   <div>
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                       <UserPlus className="h-5 w-5" />
-                      Project Mentor
+                      Supervisor
                     </h3>
-                    <div className="border rounded-lg p-4 bg-primary/5 border-primary/20">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                          <span className="font-semibold text-primary">
-                            {userGroup.supervisor?.firstName[0]}{userGroup.supervisor?.lastName[0]}
-                          </span>
-                        </div>
-                        <div>
-                          <p className="font-semibold text-lg">
-                            {userGroup.supervisor?.firstName} {userGroup.supervisor?.lastName}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {userGroup.supervisor?.department}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {userGroup.supervisor?.email}
-                          </p>
+                    {userGroup.supervisor ? (
+                      <div className="border rounded-lg p-4 bg-primary/5 border-primary/20">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="font-semibold text-primary">
+                              {userGroup.supervisor?.firstName?.[0]}{userGroup.supervisor?.lastName?.[0]}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-lg">
+                              {userGroup.supervisor?.prefix ? `${userGroup.supervisor.prefix} ` : ""}
+                              {userGroup.supervisor?.firstName} {userGroup.supervisor?.lastName}
+                            </p>
+                            {userGroup.supervisor?.department && (
+                              <p className="text-sm text-muted-foreground">
+                                {userGroup.supervisor?.department}
+                              </p>
+                            )}
+                            {userGroup.supervisor?.email && (
+                              <p className="text-sm text-muted-foreground">
+                                {userGroup.supervisor?.email}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="border border-dashed rounded-lg p-5 bg-muted/30">
+                        <div className="flex items-start gap-3">
+                          <Info className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">Supervisor</span>
+                              <Badge variant="outline" className="border-amber-500/30 text-amber-600 bg-amber-500/10 text-xs">
+                                Not Assigned
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              No supervisor has been assigned to your project team yet. Your coordinator will assign a supervisor shortly, or one will be assigned automatically upon project topic selection.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -463,7 +507,7 @@ export default function StudentGroups() {
                 <CardTitle>Create New Project Team</CardTitle>
                 <CardDescription>
                   Create a new project team with a minimum of 3 and maximum of 5 members.
-                  A supervisor member will be assigned as your project mentor.
+                  A supervisor will be assigned to guide your project.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -502,11 +546,11 @@ export default function StudentGroups() {
                       name="supervisorId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Project Mentor</FormLabel>
+                          <FormLabel>Supervisor</FormLabel>
                           <Select onValueChange={(value) => field.onChange(Number(value))}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select a supervisor member" />
+                                <SelectValue placeholder="Select a supervisor" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>

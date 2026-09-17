@@ -19,9 +19,11 @@ import { useTheme } from "@/components/theme-provider";
 import { Moon, Sun, Monitor } from "lucide-react";
 
 const profileFormSchema = z.object({
+  prefix: z.string().optional(),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email address"),
+  mobile: z.string().optional(),
 });
 
 const passwordFormSchema = z.object({
@@ -50,9 +52,11 @@ export default function Settings() {
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
+      prefix: (user as any)?.prefix || "",
       firstName: user?.firstName || "",
       lastName: user?.lastName || "",
       email: user?.email || "",
+      mobile: (user as any)?.mobile || "",
     },
   });
 
@@ -189,10 +193,61 @@ export default function Settings() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* User Identity & Designation Banner */}
+              <div className="flex items-center gap-4 p-4 mb-6 rounded-xl border bg-muted/30">
+                <div className="w-14 h-14 rounded-full bg-purple-500/10 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400 flex items-center justify-center font-bold text-xl border border-purple-200 dark:border-purple-800 shrink-0">
+                  {user.firstName ? user.firstName.charAt(0) : "U"}{user.lastName ? user.lastName.charAt(0) : ""}
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-foreground leading-none">
+                    {(user as any).prefix ? `${(user as any).prefix} ` : ""}{user.firstName} {user.lastName}
+                  </h3>
+                  {/* Visually displaying designation directly below user's name */}
+                  <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                    {(user as any).designation ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800/40">
+                        {(user as any).designation}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground capitalize">
+                        {user.role}
+                      </span>
+                    )}
+
+                    {(user as any).empId && (
+                      <span className="text-xs text-muted-foreground font-mono bg-background px-2 py-0.5 rounded border">
+                        Emp. ID: {(user as any).empId}
+                      </span>
+                    )}
+
+                    {(user as any).department && (
+                      <span className="text-xs text-muted-foreground">
+                        • {(user as any).department}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <Form {...profileForm}>
                 <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6">
-                  <div className="flex flex-col md:flex-row gap-6">
-                    <div className="w-full space-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="md:col-span-1 space-y-2">
+                      <FormField
+                        control={profileForm.control}
+                        name="prefix"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Prefix</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g. Dr. / Mr. / Ms." {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="md:col-span-1 space-y-2">
                       <FormField
                         control={profileForm.control}
                         name="firstName"
@@ -207,7 +262,7 @@ export default function Settings() {
                         )}
                       />
                     </div>
-                    <div className="w-full space-y-2">
+                    <div className="md:col-span-2 space-y-2">
                       <FormField
                         control={profileForm.control}
                         name="lastName"
@@ -224,44 +279,73 @@ export default function Settings() {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <FormField
-                      control={profileForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input type="email" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <FormField
+                        control={profileForm.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Official Email</FormLabel>
+                            <FormControl>
+                              <Input type="email" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <FormField
+                        control={profileForm.control}
+                        name="mobile"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Mobile Number</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g. 9984171083" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </div>
+
+                  {/* Designation field: Disabled for supervisors, managed by admins */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Academic Designation</Label>
+                      <span className="text-[11px] text-muted-foreground">Managed by Administrators</span>
+                    </div>
+                    <Input
+                      value={(user as any).designation || (user.role === "supervisor" ? "Supervisor" : user.role)}
+                      disabled
+                      className="bg-muted/50 cursor-not-allowed text-foreground"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Your designation is officially assigned by the department and can only be modified by administrators.
+                    </p>
+                  </div>
+
+                  {(user as any).department && (
+                    <div className="space-y-2">
+                      <Label>Department</Label>
+                      <Input value={(user as any).department} disabled className="bg-muted/50 cursor-not-allowed text-foreground" />
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label>Username</Label>
-                    <Input value={user.username} disabled />
-                    <p className="text-sm text-muted-foreground">
+                    <Input value={user.username} disabled className="bg-muted/50 cursor-not-allowed font-mono" />
+                    <p className="text-xs text-muted-foreground">
                       Your username cannot be changed.
                     </p>
                   </div>
 
-                  {/* <div className="space-y-2">
-                    <Label>Department</Label>
-                    <Input value={user.department} disabled />
-                    <p className="text-sm text-muted-foreground">
-                      Your department is managed by administrators.
-                    </p>
-                  </div> */}
-
                   <div className="space-y-2">
-                    <Label>Role</Label>
-                    <Input value={user.role} disabled />
-                    <p className="text-sm text-muted-foreground">
-                      Your role is assigned by administrators and cannot be changed.
-                    </p>
+                    <Label>System Role</Label>
+                    <Input value={user.role} disabled className="bg-muted/50 cursor-not-allowed capitalize" />
                   </div>
 
                   <div className="flex justify-end">

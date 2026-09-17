@@ -6,7 +6,110 @@ This document outlines suggested architectural, security, and maintenance improv
 
 ## 🚨 Priority Bugs to be Resolved
 
-All items below were verified directly against the current codebase. Fix in this order — the critical ones are actively exploitable on a LAN deployment.
+### 🟢 ACTIVE ISSUES RESOLVED (v1.9.0 - Completed & Verified)
+
+- [x] **In student Account, No project mentor name (rename it as Supervisor) in Project teams Section.** — **FIXED**
+  - **Affected Files:**
+    - `client/src/pages/student-groups.tsx` (lines 203–216, 334–350, 413–439, 466, 505)
+    - `client/src/pages/projects.tsx` (line 345)
+    - `server/routes/groups.ts` (lines 227–250)
+    - `server/db-storage.ts` (`getAllStudentGroups`, `getUserGroupMembership`)
+  - **Root Cause Analysis:**
+    1. **Outdated Terminology:** The student portal still used outdated terms: `"Project Mentor"` and `"Proposed Project Mentor"` instead of the system-standard term `"Supervisor"`.
+    2. **Missing Supervisor UI Fallback:** All 154 auto-provisioned student teams in the database had `studentGroups.supervisorId` initialized to `null`. When `userGroup.supervisor` was `null`, `student-groups.tsx` rendered `{userGroup.supervisor?.firstName}` and avatar initials `{userGroup.supervisor?.firstName[0]}`, which evaluated to empty blank whitespace without any fallback indicator.
+    3. **Missing Auto-Linkage on Topic Selection:** When a student team selected an approved project topic in `server/routes/projects.ts`, the server created records in `studentProjects`, but failed to set `studentGroups.supervisorId = topic.submittedById`.
+    4. **Storage Fallback Resolution Gap:** If `studentGroups.supervisorId` was `null`, neither `GET /api/student-groups/my-group` nor `storage.getAllStudentGroups()` inspected the group's members' assigned project topics in `studentProjects` to dynamically resolve the supervisor.
+  - **Resolution Implemented:**
+    1. Standardized all UI labels in `client/src/pages/student-groups.tsx` and `client/src/pages/projects.tsx` from `"Project Mentor"` / `"Proposed Project Mentor"` to `"Supervisor"`.
+    2. Implemented defensive conditional rendering in `client/src/pages/student-groups.tsx`:
+       - When `userGroup.supervisor` exists: renders supervisor initials avatar, full name, department/designation, and email.
+       - When `userGroup.supervisor` is `null`: renders an informative placeholder card with an amber/outline `<Badge>Not Assigned</Badge>` and explanatory guidance.
+    3. Updated `server/routes/projects.ts` to automatically synchronize `studentGroups.supervisorId = topic.submittedById` upon topic selection.
+    4. Added dynamic fallback resolution and database self-healing in both `server/routes/groups.ts` (`GET /api/student-groups/my-group`) and `server/db-storage.ts` (`getAllStudentGroups`).
+
+- [x] **the topic section is completely empty in student section.** — **FIXED**
+  - **Affected Files:**
+    - `client/src/pages/student-topics.tsx` (lines 61–66, 148–152, 215–236)
+    - `client/src/pages/projects.tsx` (lines 39–47)
+    - `client/src/pages/dashboard.tsx` (line 180)
+    - `server/routes/topics.ts` (lines 32–48)
+  - **Root Cause Analysis:**
+    1. **TanStack Query Key Collision & Cache Shape Corruption:**
+       - In `client/src/pages/projects.tsx`, `useQuery` used `queryKey: ["/api/topics/approved"]` (when course was default), returning a flat array `ProjectTopic[]`.
+       - In `client/src/pages/student-topics.tsx`, `useQuery` used the exact same key `["/api/topics/approved"]`, but expected an object `ApprovedTopicsResponse` (`{ hasSelectedTopic, myTopic, availableTopics, takenTopics }`).
+       - Cache sharing caused `student-topics.tsx` to read the cached flat array, where `topicsData.availableTopics` was `undefined`, defaulting to `[]` and rendering: *"No available topics at the moment. All topics have been taken."*
+    2. **Dashboard Navigation Mismatch:** On `client/src/pages/dashboard.tsx` line 180, "Browse Topics" linked to `<Link href="/topics">` (supervisor-only page where queries were disabled for students) instead of `<Link href="/student-topics">`.
+    3. **Course Isolation & Case Sensitivity:** In `server/routes/topics.ts`, unsanitized student course strings could result in empty array responses.
+  - **Resolution Implemented:**
+    1. Isolated query keys: `client/src/pages/projects.tsx` now uses `[`/api/projects/approved-topics${getCourseQuery() ? `?${getCourseQuery()}` : ''}`]`, and `client/src/pages/student-topics.tsx` uses dedicated key `["/api/topics/approved", "student"]` with an explicit `queryFn`.
+    2. Defensively normalized `topicsData` in `student-topics.tsx` to support both flat array and categorized object cache structures.
+    3. Corrected dashboard link to `<Link href="/student-topics">`.
+    4. Sanitized and normalized course filtering in `server/routes/topics.ts` (`studentCourse = ((req.user as any).course || '').trim().toUpperCase()`).
+
+- [x] **in admin and coordinator acc, even after selecting the project, under the manage project section the assigned supervisor is says not assigned even after assigning them.** — **FIXED**
+  - **Affected Files:**
+    - `server/routes/projects.ts` (lines 88–98)
+    - `server/db-storage.ts` (`getAllStudentGroups`, lines 528–554)
+    - `server/routes/groups.ts` (lines 292–340)
+    - `client/src/pages/manage-project.tsx` (lines 40–72, 149–163, 219–235)
+  - **Root Cause Analysis:**
+    1. **Missing Group Supervisor Sync on Topic Selection:**
+       - In `server/routes/projects.ts` (POST `/api/projects`), when students select a project topic, the server executes `storage.createStudentProject(...)` for all team members, but never updates `studentGroups.supervisorId`.
+       - Because `studentGroups.supervisorId` remains `NULL`, the Manage Project page (`/manage-project`) reads `group.supervisor === null`, displaying: `Current Supervisor: Not Assigned`.
+    2. **Storage Gap in `getAllStudentGroups()`:**
+       - In `server/db-storage.ts`, `getAllStudentGroups()` loads `group.supervisorId`. If it is `null`, it does not check if any member of the group has an active project in `studentProjects` with a supervisor who proposed the topic.
+    3. **Query Invalidation Key Mismatch on Supervisor Reassignment:**
+       - In `client/src/pages/manage-project.tsx`, the groups query key includes dynamic course query params: `[`/api/student-groups/all${getCourseQuery() ? `?${getCourseQuery()}` : ''}`]` (e.g., `["/api/student-groups/all?course=BCA"]`).
+       - In `changeSupervisorMutation.onSuccess` (line 61), it calls:
+         `queryClient.invalidateQueries({ queryKey: ["/api/student-groups/all"] });`
+       - TanStack Query exact prefix matching treats `"/api/student-groups/all?course=BCA"` as a distinct string. Exact array key matching fails, so the query is never invalidated or re-fetched.
+       - Consequently, even after an admin assigns a supervisor via the dialog and the backend updates successfully, the UI continues to display `Not Assigned` without updating.
+    4. **Historical Database Sync:**
+       - Existing groups that already selected a topic (e.g. Group 1 with Topic 2023, submitted by Supervisor 720 Ms. Fiza Afreen) currently have `supervisorId = null` in the `student_groups` table.
+  - **Resolution Implemented:**
+    1. In `server/routes/projects.ts`, automatically synchronized `studentGroups.supervisorId = topic.submittedById` whenever a topic is selected.
+    2. In `server/db-storage.ts` (`getAllStudentGroups()`) and `server/routes/groups.ts`, added fallback resolution: if `group.supervisorId` is `null`, it looks up whether group members have an active project in `studentProjects`, resolves the supervisor from `topic.submittedById`, and self-heals the group record in PostgreSQL.
+    3. In `client/src/pages/manage-project.tsx`, switched to predicate-based query invalidation (`key.startsWith('/api/student-groups')` and `key.startsWith('/api/projects')`), ensuring all parameterized queries instantly refresh when a supervisor is reassigned.
+    4. Added automated end-to-end regression test suite (`scripts/verify_priority_bug_fixes.ts`) to `npm test`.
+
+- [x] **In Student account, Project section must show only their selected project progress and detail** — **FIXED**
+  - **Affected Files:** `client/src/pages/projects.tsx`
+  - **Resolution:** For student users (`user.role === UserRole.STUDENT`), bypassed supervisor/admin `<Tabs>` and topic catalog exploration. Isolated view directly renders the student's selected project details, milestone timeline (5 phases), supervisor contact card, and team roster. When no project is selected, presents an informative empty state guiding the student to `/student-topics`. Query for approved topics is disabled for students on this page, saving bandwidth.
+
+- [x] **In Student account, Topic section must see both available and unavailable topics** — **FIXED**
+  - **Affected Files:** `client/src/pages/student-topics.tsx`
+  - **Resolution:** Added live search filtering (title, PUGID, tech stack, description) and filter tabs (`All Topics`, `Available`, `Unavailable`). In both scenarios (whether the student already selected a topic or hasn't yet), both available and taken topics are listed with distinct colored status badges (`Available` in emerald, `Unavailable / Taken` in red/amber).
+
+- [x] **Topic Card Expandability (descriptions cropped with line-clamp-3)** — **FIXED**
+  - **Affected Files:** `client/src/components/projects/topic-card.tsx`, `client/src/pages/student-topics.tsx`
+  - **Resolution:** Made topic cards interactive and clickable. Clicking anywhere on the card or the "Read full description" toggle smoothly expands the card to show unabridged text with `whitespace-pre-line text-foreground/90 leading-relaxed`. Added `e.stopPropagation()` on action buttons to prevent accidental card toggles.
+
+- [x] **Admin account and Coordinator account doesn’t show anything about selected project. The Track progress section is empty and projects section doesn’t show student project.** — **FIXED**
+  - **Affected Files:**
+    - `server/db-storage.ts` (`getAllProjects`, `getPaginatedProjects`, `getAllStudentGroups`)
+    - `server/routes/projects.ts` (GET `/api/projects`)
+    - `server/routes/users.ts` (GET `/api/supervisors`)
+    - `client/src/pages/projects.tsx` (default active tab & data fetching)
+    - `client/src/pages/track-progress.tsx` (queryFn with `apiRequest`, 8-column table with supervisor details, multi-tab support)
+    - `client/src/pages/manage-project.tsx` (team selected project card, supervisor prefix)
+    - `client/src/components/projects/project-table.tsx` (supervisor prefix & department display)
+    - `client/src/hooks/use-auth.tsx` (query cache purge on login)
+    - `client/src/lib/queryClient.ts` (default staleTime 5s)
+    - `scripts/verify_priority_bug_fixes.ts` & `scripts/verify_bulk_topic_onboarding.ts` (scoped cleanup to prevent wiping DB student projects)
+  - **Root Cause Analysis:**
+    1. **Unscoped Test Script Deletions:** `scripts/verify_priority_bug_fixes.ts` and `scripts/verify_bulk_topic_onboarding.ts` unconditionally ran `await db.delete(studentProjects);` whenever `npm test` was executed. This wiped all active student projects across the entire system behind the scenes.
+    2. **Default Tab Mismatch on Projects Page:** `/projects` defaulted to `<Tabs defaultValue="topics">` for all non-students, showing Topic Proposals instead of student projects by default.
+    3. **Uncredentialed / Misconfigured Axios Fetching:** In `client/src/pages/track-progress.tsx`, raw `axios.get` was used instead of `apiRequest`, risking missing session cookies and returning truncated paginated shapes without parsing.
+    4. **Unsynchronized Supervisor Allotment in Projects Query:** `getPaginatedProjects` previously only checked `topic.submittedById`. If a team was reassigned to a new supervisor by the Coordinator, `getPaginatedProjects` did not resolve the group's allotted supervisor.
+    5. **Stale Query Cache Across Sessions:** `staleTime` was set to `Infinity` and `queryClient.clear()` was only called on logout, allowing stale query responses from prior logins to persist across accounts.
+  - **Resolution Implemented:**
+    1. Scoped test cleanups: Replaced wholesale `await db.delete(studentProjects);` with isolated, test-member-only deletes (`inArray(...)`), guaranteeing real student projects are never deleted by test suites.
+    2. Changed default tab in `client/src/pages/projects.tsx` so Admin and Coordinator immediately land on the "Student Projects" table (`defaultValue={user?.role === UserRole.SUPERVISOR ? "topics" : "projects"}`).
+    3. Refactored `client/src/pages/track-progress.tsx` to use authenticated `apiRequest`, fetch `limit=all`, and render a rich 8-column table with student name, enrollment number, PUGID code, topic title, assigned supervisor (with prefix and department), progress bar, and working details modal.
+    4. Enhanced `getAllProjects()` and `getPaginatedProjects()` in `server/db-storage.ts` to resolve group supervisor from `studentGroupMembers` + `studentGroups.supervisorId` with fallback to `projectTopics.submittedById`, populating full supervisor contact details (prefix, name, department, designation).
+    5. Upgraded `client/src/pages/manage-project.tsx` to display each team's selected project badge (e.g. `PUGID26001`), topic title, status, and formatted supervisor name with honorific prefix.
+    6. Added `queryClient.clear()` on login and set `staleTime: 5000` to guarantee fresh data synchronization across page navigations and account switches.
+    7. Verified with comprehensive test script (`scripts/verify_admin_coordinator_projects.ts`) and full test suite (`npm test`).
 
 ### 🔴 CRITICAL
 

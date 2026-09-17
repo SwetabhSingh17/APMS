@@ -22,6 +22,7 @@ import { useCourseFilter } from "@/hooks/course-filter-context";
 interface ProjectWithMilestones extends StudentProject {
   topic: ProjectTopic;
   student: User;
+  supervisor?: User;
   milestones: ProjectMilestone[];
 }
 
@@ -35,12 +36,13 @@ export default function TrackProgress() {
 
   const { courseFilter, getCourseQuery } = useCourseFilter();
 
-  const { data: projects, isLoading } = useQuery<ProjectWithMilestones[]>({
+  const { data: projects = [], isLoading } = useQuery<ProjectWithMilestones[]>({
     queryKey: [`/api/projects${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
     enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN),
     queryFn: async () => {
-      const res: AxiosResponse<any> = await axios.get(`/api/projects${getCourseQuery() ? `?${getCourseQuery()}` : ''}`);
-      return res.data?.data || res.data;
+      const res = await apiRequest("GET", `/api/projects?${getCourseQuery() ? `${getCourseQuery()}&` : ''}limit=all`);
+      const data = await res.json();
+      return Array.isArray(data) ? data : (data.data || []);
     }
   });
 
@@ -96,18 +98,24 @@ export default function TrackProgress() {
     return map[phase] || 0;
   };
 
-  const filterProjects = (projects: ProjectWithMilestones[] | undefined) => {
-    if (!projects) return [];
-    let filtered = [...projects];
-
-
+  const filterProjects = (projectsList: ProjectWithMilestones[] | undefined) => {
+    if (!projectsList) return [];
+    let filtered = [...projectsList];
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(project =>
-        project.topic.title.toLowerCase().includes(query) ||
-        `${project.student.firstName} ${project.student.lastName}`.toLowerCase().includes(query)
-      );
+      filtered = filtered.filter(project => {
+        const sup = project.supervisor || (project.topic as any)?.submittedBy;
+        const supName = sup ? `${sup.firstName} ${sup.lastName}`.toLowerCase() : "";
+        return (
+          project.topic?.title?.toLowerCase().includes(query) ||
+          project.topic?.topicCode?.toLowerCase().includes(query) ||
+          `${project.student?.firstName} ${project.student?.lastName}`.toLowerCase().includes(query) ||
+          project.student?.enrollmentNumber?.toLowerCase().includes(query) ||
+          project.topic?.technology?.toLowerCase().includes(query) ||
+          supName.includes(query)
+        );
+      });
     }
 
     return filtered;
@@ -159,6 +167,119 @@ export default function TrackProgress() {
       );
     }
   }
+
+  const renderProjectTable = (list: ProjectWithMilestones[], emptyMessage: string) => {
+    return (
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Project Topic</TableHead>
+              <TableHead>Course</TableHead>
+              <TableHead>Student</TableHead>
+              <TableHead>Enrollment #</TableHead>
+              <TableHead>Supervisor</TableHead>
+              <TableHead>Progress</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Action</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {list && list.length > 0 ? (
+              list.map((project) => {
+                const supervisor = project.supervisor || (project.topic as any)?.submittedBy;
+                const supervisorName = supervisor 
+                  ? `${supervisor.prefix ? `${supervisor.prefix} ` : ""}${supervisor.firstName} ${supervisor.lastName}`.trim()
+                  : null;
+
+                return (
+                  <TableRow key={project.id} className="hover:bg-muted/50">
+                    <TableCell className="font-medium">
+                      <div className="space-y-1 max-w-xs">
+                        {project.topic?.topicCode && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                            {project.topic.topicCode}
+                          </span>
+                        )}
+                        <p className="line-clamp-2 text-sm">{project.topic?.title || "Unknown Topic"}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="px-2 py-1 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">
+                        {project.student?.course || project.topic?.course || "N/A"}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
+                          {project.student?.firstName?.charAt(0) || ""}
+                          {project.student?.lastName?.charAt(0) || ""}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm text-foreground truncate">
+                            {project.student ? `${project.student.firstName} ${project.student.lastName}` : "Unknown Student"}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground truncate">{project.student?.email || ""}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{project.student?.enrollmentNumber || "N/A"}</TableCell>
+                    <TableCell>
+                      {supervisorName ? (
+                        <div className="flex items-center space-x-2">
+                          <div className="w-7 h-7 rounded-full bg-secondary/10 text-secondary border border-secondary/20 flex items-center justify-center text-xs font-bold shrink-0">
+                            {supervisor.firstName?.charAt(0) || ""}{supervisor.lastName?.charAt(0) || ""}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-medium text-xs text-foreground truncate">{supervisorName}</p>
+                            {supervisor.department && (
+                              <p className="text-[10px] text-muted-foreground truncate">{supervisor.department}</p>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Not Assigned</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
+                          <div
+                            className={`rounded-full h-2 ${getProgressColorClass(project.progress)}`}
+                            style={{ width: `${project.progress}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm font-semibold">{project.progress}%</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {getStatusBadge(project.progress)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openDetailsModal(project)}
+                      >
+                        View Details
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            ) : (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                  <FileText className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                  <p>{searchQuery ? "No projects match your search query." : emptyMessage}</p>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    );
+  };
 
   if (!user || (user.role !== UserRole.COORDINATOR && user.role !== UserRole.ADMIN)) {
     return (
@@ -272,307 +393,19 @@ export default function TrackProgress() {
 
           <CardContent>
             <TabsContent value="all" className="mt-0">
-              {isLoading ? (
-                <Skeleton className="h-64 w-full" />
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Project Topic</TableHead>
-                        <TableHead>Course</TableHead>
-                        <TableHead>Student</TableHead>
-                        <TableHead>Enrollment #</TableHead>
-                        <TableHead>Progress</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredProjects && filteredProjects.length > 0 ? (
-                        filteredProjects.map((project) => (
-                          <TableRow key={project.id} className="hover:bg-muted/50">
-                            <TableCell className="font-medium">{project.topic.title}</TableCell>
-                            <TableCell>
-                              <span className="px-2 py-1 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">
-                                {project.student.course}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-2">
-                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                  <span className="text-primary font-medium text-sm">
-                                    {project.student.firstName.charAt(0)}
-                                    {project.student.lastName.charAt(0)}
-                                  </span>
-                                </div>
-                                <span>{`${project.student.firstName} ${project.student.lastName}`}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>{project.student.enrollmentNumber || 'N/A'}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-2">
-                                <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
-                                  <div
-                                    className={`rounded-full h-2 ${getProgressColorClass(project.progress)}`}
-                                    style={{ width: `${project.progress}%` }}
-                                  ></div>
-                                </div>
-                                <span className="text-sm">{project.progress}%</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {getStatusBadge(project.progress)}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openDetailsModal(project)}
-                              >
-                                View Details
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                            {searchQuery
-                              ? "No projects match your filters"
-                              : "No projects found"}
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
+              {isLoading ? <Skeleton className="h-64 w-full" /> : renderProjectTable(filteredProjects, "No student projects found.")}
             </TabsContent>
 
             <TabsContent value="atRisk" className="mt-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Project Topic</TableHead>
-                      <TableHead>Course</TableHead>
-                      <TableHead>Student</TableHead>
-                      <TableHead>Enrollment #</TableHead>
-                      <TableHead>Progress</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredProjects && filteredProjects.length > 0 ? (
-                      filteredProjects
-                        .filter(project => project.progress < 30)
-                        .map((project) => (
-                          <TableRow key={project.id} className="hover:bg-muted/50">
-                            <TableCell className="font-medium">{project.topic.title}</TableCell>
-                            <TableCell>
-                              <span className="px-2 py-1 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">
-                                {project.student.course}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-2">
-                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                  <span className="text-primary font-medium text-sm">
-                                    {project.student.firstName.charAt(0)}
-                                    {project.student.lastName.charAt(0)}
-                                  </span>
-                                </div>
-                                <span>{`${project.student.firstName} ${project.student.lastName}`}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>{project.student.enrollmentNumber || 'N/A'}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-2">
-                                <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
-                                  <div
-                                    className={`rounded-full h-2 ${getProgressColorClass(project.progress)}`}
-                                    style={{ width: `${project.progress}%` }}
-                                  ></div>
-                                </div>
-                                <span className="text-sm">{project.progress}%</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {getStatusBadge(project.progress)}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openDetailsModal(project)}
-                              >
-                                View Details
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                          No projects at risk
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+              {isLoading ? <Skeleton className="h-64 w-full" /> : renderProjectTable(filteredProjects.filter(p => p.progress < 30), "No projects currently at risk.")}
             </TabsContent>
 
             <TabsContent value="onTrack" className="mt-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Project Topic</TableHead>
-                      <TableHead>Course</TableHead>
-                      <TableHead>Student</TableHead>
-                      <TableHead>Enrollment #</TableHead>
-                      <TableHead>Progress</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredProjects && filteredProjects.length > 0 ? (
-                      filteredProjects
-                        .filter(project => project.progress >= 30 && project.progress < 100)
-                        .map((project) => (
-                          <TableRow key={project.id} className="hover:bg-muted/50">
-                            <TableCell className="font-medium">{project.topic.title}</TableCell>
-                            <TableCell>
-                              <span className="px-2 py-1 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">
-                                {project.student.course}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-2">
-                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                  <span className="text-primary font-medium text-sm">
-                                    {project.student.firstName.charAt(0)}
-                                    {project.student.lastName.charAt(0)}
-                                  </span>
-                                </div>
-                                <span>{`${project.student.firstName} ${project.student.lastName}`}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>{project.student.enrollmentNumber || 'N/A'}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-2">
-                                <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
-                                  <div
-                                    className={`rounded-full h-2 ${getProgressColorClass(project.progress)}`}
-                                    style={{ width: `${project.progress}%` }}
-                                  ></div>
-                                </div>
-                                <span className="text-sm">{project.progress}%</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {getStatusBadge(project.progress)}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openDetailsModal(project)}
-                              >
-                                View Details
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                          No projects on track
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+              {isLoading ? <Skeleton className="h-64 w-full" /> : renderProjectTable(filteredProjects.filter(p => p.progress >= 30 && p.progress < 100), "No projects currently in progress.")}
             </TabsContent>
 
             <TabsContent value="completed" className="mt-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Project Topic</TableHead>
-                      <TableHead>Course</TableHead>
-                      <TableHead>Student</TableHead>
-                      <TableHead>Enrollment #</TableHead>
-                      <TableHead>Progress</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredProjects && filteredProjects.length > 0 ? (
-                      filteredProjects
-                        .filter(project => project.progress === 100)
-                        .map((project) => (
-                          <TableRow key={project.id} className="hover:bg-muted/50">
-                            <TableCell className="font-medium">{project.topic.title}</TableCell>
-                            <TableCell>
-                              <span className="px-2 py-1 bg-accent/10 text-accent text-xs rounded-full border border-accent/20">
-                                {project.student.course}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-2">
-                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                  <span className="text-primary font-medium text-sm">
-                                    {project.student.firstName.charAt(0)}
-                                    {project.student.lastName.charAt(0)}
-                                  </span>
-                                </div>
-                                <span>{`${project.student.firstName} ${project.student.lastName}`}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>{project.student.enrollmentNumber || 'N/A'}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-2">
-                                <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
-                                  <div
-                                    className={`rounded-full h-2 ${getProgressColorClass(project.progress)}`}
-                                    style={{ width: `${project.progress}%` }}
-                                  ></div>
-                                </div>
-                                <span className="text-sm">{project.progress}%</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {getStatusBadge(project.progress)}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openDetailsModal(project)}
-                              >
-                                View Details
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                          No completed projects
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+              {isLoading ? <Skeleton className="h-64 w-full" /> : renderProjectTable(filteredProjects.filter(p => p.progress === 100), "No completed projects yet.")}
             </TabsContent>
           </CardContent>
         </Tabs>
@@ -587,69 +420,98 @@ export default function TrackProgress() {
           description="Detailed information about the selected project"
         >
           <div className="space-y-6">
-            <div className="space-y-2">
-              <h3 className="text-lg font-semibold">{selectedProject.topic.title}</h3>
-              <p className="text-sm text-muted-foreground">{selectedProject.topic.description}</p>
+            <div className="space-y-2 bg-card/50 p-4 rounded-lg border">
+              {selectedProject.topic?.topicCode && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                  {selectedProject.topic.topicCode}
+                </span>
+              )}
+              <h3 className="text-lg font-semibold text-foreground">{selectedProject.topic.title}</h3>
+              <p className="text-sm text-muted-foreground whitespace-pre-line">{selectedProject.topic.description}</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-medium">Student</p>
-                <p className="text-sm text-muted-foreground">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-3 rounded-lg border bg-muted/20 space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase">Student</p>
+                <p className="text-sm font-bold text-foreground">
                   {selectedProject.student.firstName} {selectedProject.student.lastName}
+                </p>
+                <p className="text-xs text-muted-foreground">{selectedProject.student.enrollmentNumber || selectedProject.student.email}</p>
+              </div>
+
+              <div className="p-3 rounded-lg border bg-muted/20 space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase">Assigned Supervisor</p>
+                {(() => {
+                  const supervisor = selectedProject.supervisor || (selectedProject.topic as any)?.submittedBy;
+                  if (!supervisor) return <p className="text-sm text-muted-foreground">Not Assigned</p>;
+                  const name = `${supervisor.prefix ? `${supervisor.prefix} ` : ""}${supervisor.firstName} ${supervisor.lastName}`.trim();
+                  return (
+                    <div>
+                      <p className="text-sm font-bold text-foreground">{name}</p>
+                      {supervisor.department && <p className="text-xs text-muted-foreground">{supervisor.department}</p>}
+                      {supervisor.email && <p className="text-xs text-muted-foreground">{supervisor.email}</p>}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="p-3 rounded-lg border bg-muted/20 space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase">Course & Complexity</p>
+                <p className="text-sm font-medium text-foreground">
+                  {selectedProject.student.course || selectedProject.topic.course || "BCA"} • {selectedProject.topic.estimatedComplexity} Complexity
                 </p>
               </div>
 
-              <div>
-                <p className="text-sm font-medium">Start Date</p>
-                <p className="text-sm text-muted-foreground">
+              <div className="p-3 rounded-lg border bg-muted/20 space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase">Start Date</p>
+                <p className="text-sm font-medium text-foreground">
                   {new Date(selectedProject.createdAt).toLocaleDateString()}
                 </p>
               </div>
-              <div>
-                <p className="text-sm font-medium">Complexity</p>
-                <p className="text-sm text-muted-foreground">{selectedProject.topic.estimatedComplexity}</p>
-              </div>
             </div>
 
-            <div>
-              <p className="text-sm font-medium mb-2">Overall Progress</p>
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <ProgressBar
-                    label=""
-                    percentage={selectedProject.progress}
-                    color={getProgressColorClass(selectedProject.progress)}
-                  />
-                </div>
-                <span className="text-sm font-medium">{selectedProject.progress}%</span>
+            <div className="p-4 rounded-lg border bg-muted/10 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-foreground">Project Milestone Progress</p>
+                <span className="text-sm font-bold text-primary">{selectedProject.progress}%</span>
               </div>
-              <div className="mt-2">
+              <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${getProgressColorClass(selectedProject.progress)}`}
+                  style={{ width: `${selectedProject.progress}%` }}
+                />
+              </div>
+              <div className="pt-1">
                 {getStatusBadge(selectedProject.progress)}
               </div>
             </div>
 
             <div>
-              <p className="text-sm font-medium mb-2">Technology Stack</p>
-              <p className="text-sm text-muted-foreground">{selectedProject.topic.technology}</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Technology Stack</p>
+              <p className="text-sm text-foreground bg-muted/30 p-2.5 rounded-md border font-mono text-xs">{selectedProject.topic.technology}</p>
             </div>
 
-            {selectedProject?.milestones?.map((milestone: ProjectMilestone) => (
-              <div key={milestone.id} className="flex items-center gap-4 mb-4">
-                <div>
-                  <p className="text-sm font-medium">{milestone.title}</p>
-                  <p className="text-xs text-muted-foreground">{milestone.description}</p>
-                </div>
-                <span className={`text-xs px-2 py-1 rounded-full ${milestone.status === "completed"
-                  ? "bg-blue-500/10 text-blue-500"
-                  : "bg-amber-500/10 text-amber-500"
-                  }`}>
-                  {milestone.status === "completed" ? "Completed" : "Pending"}
-                </span>
+            {selectedProject?.milestones && selectedProject.milestones.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase">Milestone Breakdown</p>
+                {selectedProject.milestones.map((milestone: ProjectMilestone) => (
+                  <div key={milestone.id} className="flex items-center justify-between p-2.5 rounded-lg border bg-muted/20 text-sm">
+                    <div>
+                      <p className="font-medium text-xs text-foreground">{milestone.title}</p>
+                      <p className="text-[11px] text-muted-foreground">{milestone.description}</p>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${milestone.status === "completed"
+                      ? "bg-blue-500/10 text-blue-500 font-medium"
+                      : "bg-amber-500/10 text-amber-500 font-medium"
+                      }`}>
+                      {milestone.status === "completed" ? "Completed" : "Pending"}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
 
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={closeDetailsModal}>Close</Button>
             </div>
           </div>

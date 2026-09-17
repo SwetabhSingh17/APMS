@@ -36,11 +36,12 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
 
                 let topics = await storage.getApprovedTopics();
                 const studentId = req.user.id;
-                const studentCourse = (req.user as any).course;
+                const rawCourse = (req.user as any).course;
+                const studentCourse = typeof rawCourse === 'string' ? rawCourse.trim().toUpperCase() : null;
 
                 // Strict course visibility rule: BCA students see only BCA; MCA students see only MCA
                 if (studentCourse && (studentCourse === "BCA" || studentCourse === "MCA")) {
-                    topics = topics.filter(t => (t as any).course === studentCourse);
+                    topics = topics.filter(t => ((t as any).course || '').trim().toUpperCase() === studentCourse);
                 } else {
                     // If no course is assigned, expose no topics to prevent accidental information leak
                     topics = [];
@@ -74,9 +75,10 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
                 });
             } else {
                 // Admins, coordinators, or supervisors: paginated response with optional course filter
-                res.setHeader('Cache-Control', 'public, max-age=60');
+                res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
                 const page = parseInt(req.query.page as string) || 1;
-                const limit = parseInt(req.query.limit as string) || 50;
+                const isAll = req.query.limit === 'all' || req.query.limit === 'none';
+                const limit = isAll ? 10000 : (parseInt(req.query.limit as string) || 500);
                 const paginatedTopics = await storage.getPaginatedApprovedTopics(page, limit, courseFilter);
                 res.json(paginatedTopics);
             }
@@ -85,30 +87,6 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
         }
     });
 
-    // Get specific topic details with course isolation validation for students
-    router.get("/api/topics/:id", async (req: Request, res: Response) => {
-        try {
-            const topicId = parseInt(req.params.id);
-            const topic = await storage.getProjectTopic(topicId);
-            if (!topic) {
-                return res.status(404).json({ message: "Project topic not found" });
-            }
-
-            // If requester is a student, verify topic belongs to their academic program
-            if (isAuthenticatedRequest(req) && req.user?.role === UserRole.STUDENT) {
-                const studentCourse = (req.user as any).course;
-                if (topic.course !== studentCourse) {
-                    return res.status(403).json({
-                        message: "Access denied: Topic belongs to a different academic program",
-                    });
-                }
-            }
-
-            res.json(topic);
-        } catch (error) {
-            res.status(500).json({ message: "Failed to fetch topic" });
-        }
-    });
 
     // Get all rejected topics
     router.get("/api/topics/rejected", requireRole([UserRole.COORDINATOR, UserRole.ADMIN]), async (req: Request, res: Response) => {
@@ -230,6 +208,35 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
         } catch (error) {
             console.error("Error fetching my suggestions:", error);
             res.status(500).json({ message: "Failed to fetch your suggestions" });
+        }
+    });
+
+    // Get specific topic details with course isolation validation for students
+    router.get("/api/topics/:id", async (req: Request, res: Response, next) => {
+        const topicId = parseInt(req.params.id);
+        if (isNaN(topicId)) {
+            return next();
+        }
+
+        try {
+            const topic = await storage.getProjectTopic(topicId);
+            if (!topic) {
+                return res.status(404).json({ message: "Project topic not found" });
+            }
+
+            // If requester is a student, verify topic belongs to their academic program
+            if (isAuthenticatedRequest(req) && req.user?.role === UserRole.STUDENT) {
+                const studentCourse = (req.user as any).course;
+                if (topic.course !== studentCourse) {
+                    return res.status(403).json({
+                        message: "Access denied: Topic belongs to a different academic program",
+                    });
+                }
+            }
+
+            res.json(topic);
+        } catch (error) {
+            res.status(500).json({ message: "Failed to fetch topic" });
         }
     });
 
@@ -455,6 +462,52 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
             res.json(topic);
         } catch (error) {
             res.status(500).json({ message: "Failed to reject topic" });
+        }
+    });
+
+    // Mark topic as pending (revert approval)
+    router.post("/api/topics/:id/mark-pending", requireRole([UserRole.COORDINATOR, UserRole.ADMIN]), async (req: Request, res: Response) => {
+        try {
+            const topicId = parseInt(req.params.id);
+            const topic = await storage.updateProjectTopicStatus(topicId, "pending");
+            if (!topic) {
+                return res.status(404).json({ message: "Topic not found" });
+            }
+            res.json(topic);
+        } catch (error) {
+            res.status(500).json({ message: "Failed to mark topic as pending" });
+        }
+    });
+
+    // Delete topic (soft-delete)
+    router.delete("/api/topics/:id", requireRole([UserRole.COORDINATOR, UserRole.ADMIN, UserRole.SUPERVISOR]), async (req: Request, res: Response) => {
+        if (!isAuthenticatedRequest(req)) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        try {
+            const topicId = parseInt(req.params.id);
+            const topic = await storage.getProjectTopic(topicId);
+            if (!topic) {
+                return res.status(404).json({ message: "Topic not found" });
+            }
+
+            // Supervisors can only delete their own pending topics
+            if (req.user.role === UserRole.SUPERVISOR) {
+                if (topic.submittedById !== req.user.id) {
+                    return res.status(403).json({ message: "You can only delete your own topics" });
+                }
+            }
+
+            const success = await storage.deleteProjectTopic(topicId);
+            if (!success) {
+                return res.status(500).json({ message: "Failed to delete topic" });
+            }
+
+            res.json({ success: true, message: "Topic deleted successfully" });
+        } catch (error) {
+            console.error("Error deleting topic:", error);
+            res.status(500).json({ message: "Failed to delete topic" });
         }
     });
 }

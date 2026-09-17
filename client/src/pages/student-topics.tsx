@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import MainLayout from "@/components/layout/main-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -8,9 +9,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ProjectTopic, StudentGroup } from "@shared/schema";
+import { ProjectTopic, StudentGroup, User } from "@shared/schema";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -25,16 +28,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Info, Lock, Plus } from "lucide-react";
+import { Info, Lock, Plus, Search, ChevronDown, ChevronUp, CheckCircle2, ArrowRight } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import Modal from "@/components/ui/modal";
 
-type ApprovedTopicsResponse = {
+export interface IApprovedTopicsResponse {
   hasSelectedTopic: boolean;
   myTopic?: ProjectTopic;
   availableTopics: ProjectTopic[];
   takenTopics: ProjectTopic[];
-};
+}
 
 export default function StudentTopics() {
   const { user } = useAuth();
@@ -59,15 +62,21 @@ function BcaStudentTopics() {
   });
 
   // Fetch approved topics with categorization
-  const { data: topicsData, isLoading: isLoadingTopics } = useQuery<ApprovedTopicsResponse>({
-    queryKey: ["/api/topics/approved"],
+  const { data: topicsData, isLoading: isLoadingTopics } = useQuery<IApprovedTopicsResponse | ProjectTopic[]>({
+    queryKey: ["/api/topics/approved", "student"],
+    queryFn: async () => {
+      const res = await fetch("/api/topics/approved", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch topics");
+      return res.json();
+    },
     enabled: !!user
   });
 
   // Determine if user can select topic
   const isGroupMember = !!userGroup;
-  const isCreator = userGroup?.createdById === user?.id;
   const isAcceptedMember = userGroup?.myStatus === 'accepted';
+  const creatorIsStudentMember = (userGroup as any)?.members?.some((m: any) => m.id === userGroup?.createdById);
+  const isCreator = userGroup?.createdById === user?.id;
 
   let canSelect = true;
   let reason = "";
@@ -76,20 +85,28 @@ function BcaStudentTopics() {
     if (!isAcceptedMember) {
       canSelect = false;
       reason = "You must accept the project team invite to select a topic.";
-    } else if (!isCreator) {
+    } else if (creatorIsStudentMember && !isCreator) {
       canSelect = false;
       reason = "Only the project team creator can select a project topic.";
     }
   }
 
   // If student has already selected a topic, they cannot select another
-  if (topicsData?.hasSelectedTopic) {
+  const isArray = Array.isArray(topicsData);
+  const hasSelectedTopicCheck = !isArray && Boolean((topicsData as IApprovedTopicsResponse)?.hasSelectedTopic);
+  if (hasSelectedTopicCheck) {
     canSelect = false;
   }
 
   const selectTopicMutation = useMutation({
     mutationFn: async (topicId: number) => {
-      const res = await apiRequest("POST", "/api/projects", { topicId });
+      // Use raw fetch instead of apiRequest to handle error body parsing ourselves
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topicId }),
+        credentials: "include",
+      });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.message || "Failed to select topic");
@@ -101,8 +118,17 @@ function BcaStudentTopics() {
         title: "Topic selected successfully",
         description: "You have successfully selected this project topic.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/topics/approved"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/projects/my"] });
+      // Invalidate queries across topics, projects, and student groups so all views update
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === 'string' && (
+            key.startsWith('/api/topics') ||
+            key.startsWith('/api/projects') ||
+            key.startsWith('/api/student-groups')
+          );
+        },
+      });
     },
     onError: (error: Error) => {
       console.error("Error selecting topic:", error);
@@ -119,6 +145,9 @@ function BcaStudentTopics() {
     selectTopicMutation.mutate(topicId);
   };
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<"all" | "available" | "unavailable">("all");
+
   if (isLoadingTopics) {
     return (
       <MainLayout>
@@ -131,119 +160,225 @@ function BcaStudentTopics() {
     );
   }
 
-  const hasSelected = topicsData?.hasSelectedTopic ?? false;
-  const myTopic = topicsData?.myTopic;
-  const availableTopics = topicsData?.availableTopics ?? [];
-  const takenTopics = topicsData?.takenTopics ?? [];
+  const availableTopics = isArray ? (topicsData as ProjectTopic[]) : ((topicsData as IApprovedTopicsResponse)?.availableTopics ?? []);
+  const takenTopics = isArray ? [] : ((topicsData as IApprovedTopicsResponse)?.takenTopics ?? []);
+  const myTopic = isArray ? undefined : (topicsData as IApprovedTopicsResponse)?.myTopic;
+  const hasSelected = isArray ? false : ((topicsData as IApprovedTopicsResponse)?.hasSelectedTopic ?? false);
+
+  // Apply search query filtering across topic attributes
+  const filterBySearch = (list: ProjectTopic[]) => {
+    if (!searchQuery.trim()) return list;
+    const q = searchQuery.toLowerCase().trim();
+    return list.filter(t =>
+      t.title.toLowerCase().includes(q) ||
+      (t.description?.toLowerCase().includes(q) || false) ||
+      (t.technology?.toLowerCase().includes(q) || false) ||
+      (t.topicCode?.toLowerCase().includes(q) || false)
+    );
+  };
+
+  const filteredAvailable = filterBySearch(availableTopics);
+  const filteredTaken = filterBySearch(takenTopics);
 
   return (
     <MainLayout>
-      {/* Scenario B: Student HAS selected a topic */}
-      {hasSelected && myTopic ? (
-        <>
-          {/* Top Section: My Selected Topic */}
-          <div className="mb-8">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h1 className="text-2xl font-bold text-foreground mb-1">My Selected Topic</h1>
-                <p className="text-muted-foreground">Your current project assignment</p>
-              </div>
-            </div>
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground tracking-tight">Project Topics</h1>
+          <p className="text-muted-foreground mt-1">
+            Browse available and allocated project topics for your course
+          </p>
+        </div>
+        {!canSelect && isGroupMember && (
+          <div className="bg-yellow-500/10 text-yellow-600 px-4 py-2 rounded-md border border-yellow-500/20 text-sm font-medium flex items-center gap-2">
+            <Lock className="h-4 w-4 shrink-0" />
+            <span>{reason}</span>
+          </div>
+        )}
+      </div>
 
-            <TopicCard
-              topic={myTopic}
-              onSelect={() => { }}
-              disabled={true}
-              disabledReason="You have already selected this topic"
-              isSelected={true}
+      {/* Featured Banner: My Selected Topic (if selected) */}
+      {hasSelected && myTopic && (
+        <div className="mb-8 p-6 rounded-xl bg-primary/5 border-2 border-primary/30 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-bold text-foreground">Your Selected Project Topic</h2>
+            </div>
+            <Link href="/projects">
+              <Button size="sm" className="gap-2 shadow-xs">
+                View Project Progress & Details
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+          <TopicCard
+            topic={myTopic}
+            onSelect={() => {}}
+            disabled={true}
+            disabledReason="You have already selected this topic"
+            isSelected={true}
+          />
+        </div>
+      )}
+
+      {/* Search and Filter Controls */}
+      <div className="space-y-4 mb-6">
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder="Search topics by title, PUGID code (e.g. PUGID26001), technology..."
+              className="pl-10 w-full"
+              aria-label="Search topics"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+        </div>
 
-          {/* Bottom Section: Other Topics (All greyed out) */}
-          <div>
-            <div className="mb-6">
-              <h2 className="text-xl font-bold text-foreground mb-1">Other Topics</h2>
-              <p className="text-muted-foreground">You cannot select another topic</p>
-            </div>
+        {/* Tab Filters */}
+        <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full">
+          <TabsList className="grid grid-cols-3 max-w-md w-full">
+            <TabsTrigger value="all" className="flex items-center gap-1.5 text-xs sm:text-sm">
+              <span>All Topics</span>
+              <Badge variant="secondary" className="px-1.5 py-0 text-[11px]">
+                {filteredAvailable.length + filteredTaken.length}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="available" className="flex items-center gap-1.5 text-xs sm:text-sm">
+              <span>Available</span>
+              <Badge variant="outline" className="px-1.5 py-0 text-[11px] border-green-500/30 text-green-700 dark:text-green-400 bg-green-500/10">
+                {filteredAvailable.length}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="unavailable" className="flex items-center gap-1.5 text-xs sm:text-sm">
+              <span>Unavailable</span>
+              <Badge variant="outline" className="px-1.5 py-0 text-[11px] border-destructive/30 text-destructive bg-destructive/10">
+                {filteredTaken.length}
+              </Badge>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[...availableTopics, ...takenTopics].map(topic => (
-                <TopicCard
-                  key={topic.id}
-                  topic={topic}
-                  onSelect={() => { }}
-                  disabled={true}
-                  disabledReason="You have already selected a topic"
-                  isGreyedOut={true}
-                />
-              ))}
-            </div>
-          </div>
-        </>
-      ) : (
-        /* Scenario A: Student has NOT selected a topic */
-        <>
-          {/* Top Section: Available Topics */}
-          <div className="mb-8">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h1 className="text-2xl font-bold text-foreground mb-1">Available Topics</h1>
-                <p className="text-muted-foreground">Select a project topic from the list below</p>
+      {/* Topics Display based on activeTab */}
+      {activeTab === "all" && (
+        <div className="space-y-8">
+          {/* Available Section */}
+          {filteredAvailable.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+                  Available Topics ({filteredAvailable.length})
+                </h2>
               </div>
-              {!canSelect && isGroupMember && (
-                <div className="bg-yellow-500/10 text-yellow-600 px-4 py-2 rounded-md border border-yellow-500/20 text-sm font-medium flex items-center gap-2">
-                  <Lock className="h-4 w-4" />
-                  {reason}
-                </div>
-              )}
-            </div>
-
-            {availableTopics.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {availableTopics.map(topic => (
+                {filteredAvailable.map(topic => (
                   <TopicCard
                     key={topic.id}
                     topic={topic}
                     onSelect={() => handleSelectTopic(topic.id)}
                     disabled={!canSelect}
-                    disabledReason={reason}
-                  />
-                ))}
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="pt-6">
-                  <p className="text-center text-muted-foreground">
-                    No available topics at the moment. All topics have been taken.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Bottom Section: Taken Topics (Greyed out) */}
-          {takenTopics.length > 0 && (
-            <div>
-              <div className="mb-6">
-                <h2 className="text-xl font-bold text-foreground mb-1">Taken Topics</h2>
-                <p className="text-muted-foreground">These topics are already assigned to other students</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {takenTopics.map(topic => (
-                  <TopicCard
-                    key={topic.id}
-                    topic={topic}
-                    onSelect={() => setAllottedAlertOpen(true)}
-                    disabled={true}
-                    disabledReason="This topic is already taken"
-                    isGreyedOut={true}
+                    disabledReason={reason || (hasSelected ? "You have already selected a project topic" : "")}
                   />
                 ))}
               </div>
             </div>
           )}
-        </>
+
+          {/* Unavailable / Taken Section */}
+          {filteredTaken.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-destructive"></span>
+                  Unavailable / Taken Topics ({filteredTaken.length})
+                </h2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredTaken.map(topic => (
+                  <TopicCard
+                    key={topic.id}
+                    topic={topic}
+                    onSelect={() => setAllottedAlertOpen(true)}
+                    disabled={true}
+                    disabledReason="This topic is already allotted to another team"
+                    isUnavailable={true}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {filteredAvailable.length === 0 && filteredTaken.length === 0 && (
+            <Card className="text-center py-12">
+              <CardContent>
+                <p className="text-lg font-medium text-foreground mb-1">No topics found</p>
+                <p className="text-sm text-muted-foreground">
+                  {searchQuery ? `No topics match "${searchQuery}". Try refining your search.` : "No project topics available."}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {activeTab === "available" && (
+        <div>
+          {filteredAvailable.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredAvailable.map(topic => (
+                <TopicCard
+                  key={topic.id}
+                  topic={topic}
+                  onSelect={() => handleSelectTopic(topic.id)}
+                  disabled={!canSelect}
+                  disabledReason={reason || (hasSelected ? "You have already selected a project topic" : "")}
+                />
+              ))}
+            </div>
+          ) : (
+            <Card className="text-center py-12">
+              <CardContent>
+                <p className="text-lg font-medium text-foreground mb-1">No available topics found</p>
+                <p className="text-sm text-muted-foreground">
+                  {searchQuery ? `No available topics match "${searchQuery}".` : "All project topics have been allotted."}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {activeTab === "unavailable" && (
+        <div>
+          {filteredTaken.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredTaken.map(topic => (
+                <TopicCard
+                  key={topic.id}
+                  topic={topic}
+                  onSelect={() => setAllottedAlertOpen(true)}
+                  disabled={true}
+                  disabledReason="This topic is already allotted to another team"
+                  isUnavailable={true}
+                />
+              ))}
+            </div>
+          ) : (
+            <Card className="text-center py-12">
+              <CardContent>
+                <p className="text-lg font-medium text-foreground mb-1">No unavailable topics found</p>
+                <p className="text-sm text-muted-foreground">
+                  {searchQuery ? `No taken topics match "${searchQuery}".` : "No topics are currently marked as taken."}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
 
       <AlertDialog open={allottedAlertOpen} onOpenChange={setAllottedAlertOpen}>
@@ -251,7 +386,7 @@ function BcaStudentTopics() {
           <AlertDialogHeader>
             <AlertDialogTitle>Topic Unavailable</AlertDialogTitle>
             <AlertDialogDescription>
-              This topic is already allotted. To change your selection, please contact your coordinator.
+              This topic has already been selected by another student or team. To change your selection, please contact your coordinator.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -409,26 +544,7 @@ function McaStudentTopics() {
              </Card>
           ) : (
             mySuggestions.map(topic => (
-              <Card key={topic.id}>
-                <CardHeader>
-                  <CardTitle className="flex justify-between items-start gap-2">
-                    <span>{topic.title}</span>
-                    <BadgeForStatus status={topic.status} />
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-2">Description:</p>
-                      <p className="text-sm line-clamp-3">{topic.description}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-2">Technology:</p>
-                      <p className="text-sm">{topic.technology}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <McaSuggestionCard key={topic.id} topic={topic} />
             ))
           )}
         </div>
@@ -521,6 +637,73 @@ function McaStudentTopics() {
   );
 }
 
+function McaSuggestionCard({ topic }: { topic: ProjectTopic }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <Card 
+      onClick={() => setIsExpanded(!isExpanded)}
+      className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
+        isExpanded ? "ring-2 ring-primary/30 shadow-md" : ""
+      }`}
+      role="button"
+      tabIndex={0}
+      aria-expanded={isExpanded}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          setIsExpanded(!isExpanded);
+        }
+      }}
+    >
+      <CardHeader>
+        <CardTitle className="flex justify-between items-start gap-2">
+          <span>{topic.title}</span>
+          <BadgeForStatus status={topic.status} />
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm text-muted-foreground mb-1">Description:</p>
+            <p className={`text-sm transition-all duration-200 ${
+              isExpanded ? "whitespace-pre-line text-foreground/90 leading-relaxed" : "line-clamp-3 text-muted-foreground"
+            }`}>
+              {topic.description || "No description provided."}
+            </p>
+            {topic.description && topic.description.length > 100 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsExpanded(!isExpanded);
+                }}
+                className="text-xs text-primary font-medium hover:underline flex items-center gap-1 mt-1.5 focus:outline-none"
+              >
+                {isExpanded ? (
+                  <>
+                    <span>Show less</span>
+                    <ChevronUp className="h-3 w-3" />
+                  </>
+                ) : (
+                  <>
+                    <span>Read full description</span>
+                    <ChevronDown className="h-3 w-3" />
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground mb-1">Technology:</p>
+            <p className="text-sm font-medium">{topic.technology}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function BadgeForStatus({ status }: { status: string }) {
   if (status === 'pending_supervisor') {
     return <span className="text-xs font-normal px-2 py-1 bg-blue-500/10 text-blue-600 rounded-full whitespace-nowrap">Pending Supervisor</span>
@@ -537,70 +720,161 @@ function BadgeForStatus({ status }: { status: string }) {
   return <span className="text-xs font-normal px-2 py-1 bg-gray-500/10 text-gray-600 rounded-full whitespace-nowrap">{status}</span>
 }
 
-interface TopicCardProps {
+interface ITopicCardProps {
   topic: ProjectTopic;
   onSelect: () => void;
   disabled: boolean;
   disabledReason: string;
   isSelected?: boolean;
+  isUnavailable?: boolean;
   isGreyedOut?: boolean;
 }
 
-function TopicCard({ topic, onSelect, disabled, disabledReason, isSelected = false, isGreyedOut = false }: TopicCardProps) {
+function TopicCard({
+  topic,
+  onSelect,
+  disabled,
+  disabledReason,
+  isSelected = false,
+  isUnavailable = false,
+  isGreyedOut = false,
+}: ITopicCardProps) {
+  // State for toggling between clamped summary view and full unabridged description
+  const [isExpanded, setIsExpanded] = useState(false);
+  const unavailable = isUnavailable || isGreyedOut;
+
   const cardClassName = isSelected
-    ? "border-primary bg-primary/5"
-    : isGreyedOut
-      ? "opacity-50 cursor-not-allowed"
-      : "";
+    ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+    : unavailable
+      ? "border-border/60 bg-muted/20 opacity-80"
+      : "hover:border-primary/40 hover:shadow-sm";
 
   return (
-    <Card className={cardClassName}>
-      <CardHeader>
-        <CardTitle className="flex justify-between items-start gap-2">
+    <Card 
+      onClick={() => setIsExpanded(!isExpanded)}
+      className={`h-full flex flex-col cursor-pointer transition-all duration-200 ${cardClassName} ${
+        isExpanded ? "ring-2 ring-primary/30 shadow-md" : ""
+      }`}
+      role="button"
+      tabIndex={0}
+      aria-expanded={isExpanded}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          setIsExpanded(!isExpanded);
+        }
+      }}
+    >
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-2 flex-wrap mb-1">
+          {topic.topicCode && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+              {topic.topicCode}
+            </span>
+          )}
+          {topic.course && (
+            <span className="px-2 py-0.5 bg-accent/10 text-accent text-[11px] rounded-full border border-accent/20 font-medium">
+              {topic.course}
+            </span>
+          )}
+          {topic.projectType && (
+            <span className="px-2 py-0.5 bg-muted text-muted-foreground text-[11px] rounded-full font-medium">
+              {topic.projectType}
+            </span>
+          )}
+        </div>
+        <CardTitle className="flex justify-between items-start gap-2 text-base md:text-lg leading-tight">
           <span>{topic.title}</span>
           {isSelected ? (
-            <span className="text-xs font-normal px-2 py-1 bg-primary text-primary-foreground rounded-full whitespace-nowrap">
+            <span className="text-xs font-semibold px-2.5 py-0.5 bg-primary text-primary-foreground rounded-full whitespace-nowrap shadow-2xs">
               Selected
             </span>
-          ) : isGreyedOut ? (
-            <span className="text-xs font-normal px-2 py-1 bg-destructive/10 text-destructive rounded-full whitespace-nowrap">
-              Taken
+          ) : unavailable ? (
+            <span className="text-xs font-semibold px-2.5 py-0.5 bg-destructive/10 text-destructive border border-destructive/20 rounded-full whitespace-nowrap">
+              Unavailable / Taken
             </span>
           ) : (
-            <span className="text-xs font-normal px-2 py-1 bg-green-500/10 text-green-600 rounded-full whitespace-nowrap">
+            <span className="text-xs font-semibold px-2.5 py-0.5 bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/20 rounded-full whitespace-nowrap">
               Available
             </span>
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
+
+      <CardContent className="flex-grow flex flex-col justify-between pt-0">
+        <div className="space-y-3">
+          {/* Description Section with Click to Expand */}
           <div>
-            <p className="text-sm text-muted-foreground mb-2">Description:</p>
-            <p className="text-sm line-clamp-3">{topic.description}</p>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground mb-2">Technology:</p>
-            <p className="text-sm">{topic.technology}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Description</p>
+            <p className={`text-sm text-foreground/90 transition-all duration-200 ${
+              isExpanded ? "whitespace-pre-line leading-relaxed" : "line-clamp-3 text-muted-foreground"
+            }`}>
+              {topic.description || "No description provided."}
+            </p>
+            {topic.description && topic.description.length > 100 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsExpanded(!isExpanded);
+                }}
+                className="text-xs text-primary font-medium hover:underline flex items-center gap-1 mt-1.5 focus:outline-none"
+              >
+                {isExpanded ? (
+                  <>
+                    <span>Show less</span>
+                    <ChevronUp className="h-3 w-3" />
+                  </>
+                ) : (
+                  <>
+                    <span>Read full description</span>
+                    <ChevronDown className="h-3 w-3" />
+                  </>
+                )}
+              </button>
+            )}
           </div>
 
+          {/* Technology & Metadata */}
+          <div className="grid grid-cols-2 gap-2 pt-2 border-t text-xs">
+            <div>
+              <p className="text-muted-foreground">Technology</p>
+              <p className="font-medium line-clamp-1">{topic.technology || "General"}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Complexity</p>
+              <p className="font-medium">{topic.estimatedComplexity || "Medium"}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Button */}
+        <div className="pt-4 mt-auto">
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <span tabIndex={0} className="w-full block">
                   <Button
-                    onClick={onSelect}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelect();
+                    }}
                     className="w-full"
-                    variant={isSelected || isGreyedOut ? "secondary" : "default"}
-                    disabled={disabled || isGreyedOut}
+                    variant={isSelected ? "secondary" : unavailable ? "outline" : "default"}
+                    disabled={disabled || unavailable || isSelected}
                   >
-                    {isSelected ? "Selected Topic" : isGreyedOut ? "Already Taken" : "Select Topic"}
+                    {isSelected ? "Your Selected Topic" : unavailable ? "Already Taken" : "Select Topic"}
                   </Button>
                 </span>
               </TooltipTrigger>
-              {disabled && !isGreyedOut && !isSelected && (
+              {disabled && !unavailable && !isSelected && (
                 <TooltipContent>
                   <p>{disabledReason}</p>
+                </TooltipContent>
+              )}
+              {unavailable && (
+                <TooltipContent>
+                  <p>This project topic has already been allotted to another student or team.</p>
                 </TooltipContent>
               )}
             </Tooltip>

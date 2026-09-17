@@ -1,6 +1,82 @@
 # Version History
 
-## Version 1.7.2 (Current)
+## Version 1.9.0 (Current)
+### Student Experience Overhaul, Admin/Coordinator Progress Visibility & Supervisor Attribution
+1. **Student Account Project Isolation (`/projects`)** — Bypassed supervisor/admin `<Tabs>` and catalog exploration for student users. The page directly renders an isolated, focused dashboard for the team's selected project with academic milestone progress (5 phases), supervisor contact card, and team roster. When unassigned, displays an informative empty state pointing to topic discovery.
+2. **Dual Topic Catalog Visibility (`/student-topics`)** — Students can now view and search both available and unavailable (taken) topics with distinct colored status badges, live keyword search, and dedicated filter tabs (`All Topics`, `Available`, `Unavailable`).
+3. **Expandable Topic Cards** — Topic cards now feature smooth interactive expansion on click and a dedicated "Read full description" / "Show less" toggle, eliminating description truncation and preserving line breaks.
+4. **Supervisor Honorific / Prefix Display** — Added `prefix` (Dr., Mr., Mrs., Ms., Prof.) to supervisor projections across all student team views, project dashboards, and user management.
+5. **Admin & Coordinator Selected Project & Progress Tracking Overhaul** —
+   - Changed default landing tab on `/projects` to `Student Projects` table for Admin and Coordinator accounts.
+   - Refactored `/track-progress` with authenticated `apiRequest` and `limit=all` to render an 8-column table with student names, enrollment numbers, PUGID codes, topic titles, and supervisors with prefix and academic department.
+   - Enhanced `Manage Projects` (`/manage-project`) so each team card displays their selected project badge, topic title, status, and supervisor honorific prefix.
+   - Unified supervisor resolution in `server/db-storage.ts` (`getAllProjects`, `getPaginatedProjects`, `getAllStudentGroups`) across both assigned group supervisors and topic submitters.
+6. **Query Cache Optimization & Test Sandbox Isolation** —
+   - Added `queryClient.clear()` on login and set `staleTime: 5000ms` in `queryClient.ts` to prevent stale caches across user sessions and tab transitions.
+   - Scoped test cleanups in `scripts/verify_priority_bug_fixes.ts` and `scripts/verify_bulk_topic_onboarding.ts` to prevent indiscriminate deletion of student projects in the database.
+
+## Version 1.8.1
+### Excel-Based Bulk Project Topic Upload, Supervisor Cross-Checking & Sequential PUGID Generation
+1. **Verbatim File Parsing & Multi-Topic Extraction** — Implemented `server/services/topic-onboarding-parser.ts` configured specifically to parse `"BCA Final Project Suggestions 2026-27 (Responses).xlsx"`:
+   - Accurately parses timestamp, faculty Name, and faculty Email from columns 0-2.
+   - Extracts up to 5 submitted project topics per row across 20 topic columns (Title, Project Type, Technology, Description).
+   - Intelligently trims inputs and applies safe fallbacks for optional fields (e.g. Technology defaulting to "General / Web Development") to comply with PostgreSQL schema constraints.
+2. **Database Cross-Checking & Supervisor Account Validation** —
+   - Implemented in `server/db-storage.ts` (`bulkUploadProjectTopics`): queries the PostgreSQL `users` table to verify that the extracted faculty Name and Email match an existing supervisor account.
+   - Utilizes token-based name normalization and synonym mapping (handling honorifics like Dr., Prof., and variations such as "Mohammad" vs "Mohd." / "Nafees Akhter" vs "Nafees Akhtar") while strictly detecting true name mismatches (e.g., "John Doe").
+   - If a faculty Name or Email fails validation, topics for that row are strictly skipped and not written to PostgreSQL.
+3. **Auto-Incrementing Sequential Unique IDs (`PUGID26xxx`)** —
+   - Added `topicCode: text("topic_code")` to `projectTopics` table in `shared/schema.ts` with `topic_code_idx` index.
+   - Sequential topic ID generator dynamically queries current max sequence for `PUGID26%` in PostgreSQL and generates sequential IDs: `PUGID26001`, `PUGID26002`, `PUGID26003`, up to `PUGID26305`.
+   - Topics inserted via bulk onboarding are immediately set to `status = 'approved'` and attributed to the verified supervisor's account ID.
+4. **Post-Upload Failure & Success Reporting Modal** —
+   - Built `client/src/components/admin/topic-bulk-onboarding-modal.tsx` with drag-and-drop file upload, course selector (BCA/MCA), and "Download Demo Format" button.
+   - Post-upload report dynamically renders:
+     - Metric cards: Verified Supervisors, Topics Provisioned, Unmatched Records, and Generated PUGID Range.
+     - Dedicated Failure Report table displaying Row Number, Faculty Name, Faculty Email, and exact failure reason badge (e.g., `"Upload Failed: Supervisor email not found in database"` or `"Upload Failed: Supervisor name does not match record for this email"`).
+     - Success Report table listing each verified faculty member and their assigned sequential PUGID topic codes.
+5. **UI Badging & Topic Code Visibility** —
+   - Added `topic.topicCode` badge (`PUGID26xxx`) to `client/src/pages/approve-topics.tsx` in Pending, Approved, and Rejected tabs.
+   - Added `topic.topicCode` badge to `TopicCard` in `client/src/pages/topics.tsx` and `client/src/pages/student-topics.tsx`.
+   - Added "Bulk Upload Topics" button to the Topic Approval toolbar.
+6. **Demo Format Excel Generator** —
+   - Implemented `GET /api/admin/onboarding/topics/demo-template` generating a downloadable Excel template matching the exact 23-column layout of the Google Forms responses spreadsheet.
+7. **Comprehensive Automated Verification Suite** —
+   - Created `scripts/verify_bulk_topic_onboarding.ts` with 57 automated test assertions verifying: verbatim parsing of 61 rows / 305 topics, demo template generation, supervisor cross-checking, error simulation with unmatched email and name, sequential `PUGID26xxx` code generation, and complete ingestion.
+   - Full test suite (`npm test`) now validates 120 total test assertions across all modules with 100% success rate.
+
+## Version 1.8.0
+### Supervisor Bulk Onboarding, Faculty Directory & Multi-Course Access Control
+1. **Dedicated Supervisor Bulk Onboarding Workflow** — Created a completely isolated onboarding module specifically for faculty supervisors:
+   - Dedicated backend parser (`server/services/supervisor-onboarding-parser.ts`) supporting both legacy BIFF8 binary `.xls` (e.g. `Updated Staff List with all details.xls`) and modern `.xlsx`.
+   - Automatically extracts `Emp. ID.`, `Employee Name` (with prefix separation: Dr., Mr., Mrs., Ms., Prof.), `Designation`, `Mobile`, `Official Email`, and Department title banner.
+   - Separate API route `POST /api/admin/onboarding/supervisor/upload` with optional SSE real-time streaming telemetry.
+   - In-memory optimized batch upsert in `server/db-storage.ts` (`bulkOnboardSupervisors`), auto-provisioning supervisor accounts with `username = empId`, initial temporary password = `empId` (scrypt hashed), `role = supervisor`, and `forcePasswordReset = true`.
+2. **Multi-Course Supervisor Availability (BCA & MCA)** —
+   - Updated `getAllUsers` and `getPaginatedUsers` in `server/db-storage.ts` so that supervisors, coordinators, and administrators remain visible and accessible when filtering by `BCA` or `MCA`, recognizing that faculty supervisors advise both BCA and MCA students.
+   - Strict student cohort isolation is simultaneously preserved (BCA student queries never leak MCA students, and vice versa).
+3. **User Management Interface Streamlining** —
+   - Removed the redundant roles dropdown next to the search bar in `client/src/pages/user-management.tsx`.
+   - Role filtering is now cleanly handled exclusively by the interactive visual tabs: `All Users`, `Admins`, `Supervisors`, `Coordinators`, and `Students`.
+   - Expanded search input across the full card width for an uncluttered, modern layout.
+4. **Strict UI Separation for Student & Supervisor Workflows** —
+   - Rendered two distinct, prominent buttons in User Management: "Bulk Upload Student" and "Bulk Upload Supervisor".
+   - Created `SupervisorBulkOnboardingModal` with custom progress bar, file drag-and-drop, live terminal logs, and onboarding summary metrics (Processed, Created, Updated).
+5. **Supervisor Demo Template Generator** —
+   - Implemented `GET /api/admin/onboarding/supervisor/demo-template` generating a downloadable Excel template matching the exact layout, header banner ("Department of Computer Application"), column styling, and Integral University sample faculty data as the official staff list.
+6. **Database Schema & Migration** —
+   - Added `emp_id`, `prefix`, `designation`, `mobile`, `department` columns and `emp_id_idx` index to the `users` table in PostgreSQL.
+   - Verified non-destructive automatic schema verification in `server/db.ts`.
+7. **Universal First-Login Security Enforcement** —
+   - Extended the Express security interceptor in `server/auth.ts` to enforce `forcePasswordReset` for all users, requiring newly provisioned supervisors to update their initial password before accessing operational APIs.
+   - Updated `ForcePasswordResetModal` to adaptively display "Employee ID" for faculty supervisors and "Enrollment Number" for students.
+8. **Profile Settings Interface & RBAC on Designation** —
+   - Updated Settings Profile view to visually display academic designation directly below the user's name in a styled badge alongside Employee ID and department.
+   - Allowed faculty to mutate their own Name, Prefix, Email, and Mobile.
+   - Strictly enforced RBAC: Designation input is disabled for supervisors; attempts to modify designation via `PATCH /api/user/profile` by non-administrators are rejected with HTTP 403 Forbidden.
+9. **Automated Verification Suite** — Added `scripts/verify_supervisor_onboarding_and_rbac.ts` covering 44 comprehensive automated test assertions across parsing, template generation, provisioning, security interception, RBAC enforcement, and multi-course supervisor visibility with 100% pass rate (63 total test assertions across the project).
+
+## Version 1.7.2
 ### Team Access Control & Permission Hardening
 1. **Removed "Leave Project Team" Entirely** — Removed the "Leave Project Team" button and confirmation dialog from the student portal (`client/src/pages/student-groups.tsx`). Students in a team can now only view their assigned team, members, and project mentor without any option to leave.
 2. **Restricted Team Modifications to Admins & Coordinators** —

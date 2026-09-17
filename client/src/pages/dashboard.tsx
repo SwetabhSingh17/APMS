@@ -177,7 +177,7 @@ export default function Dashboard() {
                   <AlertTriangle className="w-10 h-10 text-yellow-500" />
                   <h3 className="text-lg font-semibold">No Project Selected</h3>
                   <p className="text-muted-foreground">You haven't selected a project topic yet.</p>
-                  <Link href="/topics">
+                  <Link href="/student-topics">
                     <Button>Browse Topics</Button>
                   </Link>
                 </div>

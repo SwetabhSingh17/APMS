@@ -60,17 +60,22 @@ export function registerProjectRoutes(router: Router, storage: DBStorage) {
             }
 
             if (userGroup) {
-                // Enforce Group Creator Authority
-                // Note: Check schema if createdById is available
-                if ('createdById' in userGroup && userGroup.createdById !== user.id) {
-                    return res.status(403).json({ message: "Only the group creator can select a project topic." });
-                } else if (!('createdById' in userGroup)) {
-                    // Fallback if not present in type
-                    console.warn("Group createdById missing in type definition");
-                }
-
                 // Get all ACCEPTED members
                 const groupMembers = await storage.getAcceptedGroupMembers(userGroup.id);
+
+                // Verify the requesting user is an accepted member of the group
+                const isAccepted = groupMembers.some(member => member.id === user.id);
+                if (!isAccepted) {
+                    return res.status(403).json({ message: "You must be an accepted member of the project team to select a project topic." });
+                }
+
+                // If the group was created by a student who is a member of this team, only that creator can select.
+                // If the group was auto-provisioned or created by an administrator/coordinator (createdById not in the student group),
+                // any accepted member of the team is authorized to select the topic for the team.
+                const creatorIsStudentMember = groupMembers.some(member => member.id === (userGroup as any).createdById);
+                if (creatorIsStudentMember && (userGroup as any).createdById !== user.id) {
+                    return res.status(403).json({ message: "Only the group creator can select a project topic." });
+                }
 
                 // Check if ANY member already has a project
                 for (const member of groupMembers) {
@@ -87,6 +92,11 @@ export function registerProjectRoutes(router: Router, storage: DBStorage) {
                         topicId
                     })
                 ));
+
+                // Automatically update the group's supervisor to the topic's proposer
+                if (topic && topic.submittedById) {
+                    await storage.updateStudentGroupSupervisor(userGroup.id, topic.submittedById);
+                }
 
                 // Return the first project (as they are all the same topic)
                 return res.status(201).json(projects[0]);
@@ -117,7 +127,7 @@ export function registerProjectRoutes(router: Router, storage: DBStorage) {
         try {
             const courseFilter = req.query.course as string | undefined;
             const page = parseInt(req.query.page as string) || 1;
-            const limit = parseInt(req.query.limit as string) || 50;
+            const limit = req.query.limit === "all" ? 10000 : (parseInt(req.query.limit as string) || 50);
 
             const paginatedProjects = await storage.getPaginatedProjects(page, limit, courseFilter);
             res.json(paginatedProjects);

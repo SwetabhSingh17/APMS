@@ -226,11 +226,28 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
 
             // Get group members and supervisor details
             const members = await storage.getStudentGroupMembers(group.id);
-            const supervisor = group.supervisorId ? await storage.getUser(group.supervisorId) : null;
+            let supervisor = group.supervisorId ? await storage.getUser(group.supervisorId) : null;
+
+            // Fallback resolution: If group.supervisorId is null, check if any member has an assigned project
+            if (!supervisor) {
+                for (const member of members) {
+                    const memberProjects = await storage.getStudentProjects(member.id);
+                    if (memberProjects.length > 0 && memberProjects[0].topicId) {
+                        const topic = await storage.getProjectTopic(memberProjects[0].topicId);
+                        if (topic && topic.submittedById) {
+                            supervisor = await storage.getUser(topic.submittedById);
+                            // Self-heal the database record
+                            await storage.updateStudentGroupSupervisor(group.id, topic.submittedById);
+                            break;
+                        }
+                    }
+                }
+            }
 
             // Return the complete group data with members and supervisor
             res.json({
                 ...group,
+                supervisorId: supervisor ? supervisor.id : group.supervisorId,
                 myStatus: status,
                 members: members.map(member => ({
                     id: member.id,
@@ -242,9 +259,12 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
                 })),
                 supervisor: supervisor ? {
                     id: supervisor.id,
+                    prefix: supervisor.prefix || "",
                     firstName: supervisor.firstName,
                     lastName: supervisor.lastName,
                     email: supervisor.email,
+                    department: supervisor.department,
+                    designation: (supervisor as any).designation,
                     role: supervisor.role
                 } : null
             });

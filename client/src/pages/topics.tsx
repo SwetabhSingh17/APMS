@@ -669,6 +669,13 @@ function TopicCard({ topic, onEdit, onDelete, onEndorse, onReject, isSuggestion 
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="pb-3">
+        {topic.topicCode && (
+          <div className="mb-1">
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+              {topic.topicCode}
+            </span>
+          </div>
+        )}
         <CardTitle className="text-lg">{topic.title}</CardTitle>
       </CardHeader>
       <CardContent className="flex-grow">

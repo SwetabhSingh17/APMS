@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { User, UserRole } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Users, Search, ArrowRightLeft, UserPlus } from "lucide-react";
+import { Loader2, Users, Search, ArrowRightLeft, UserPlus, FolderGit2 } from "lucide-react";
 import { useCourseFilter } from "@/hooks/course-filter-context";
 import { CreateTeamDialog } from "@/components/create-team-dialog";
 import { ManageMembersDialog } from "@/components/manage-members-dialog";
@@ -58,7 +58,15 @@ export default function ManageProject() {
         title: "Supervisor Updated",
         description: "The supervisor allotment has been changed successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/student-groups/all"] });
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === "string" && (
+            key.startsWith("/api/student-groups") ||
+            key.startsWith("/api/projects")
+          );
+        },
+      });
       setChangeSupervisorGroupId(null);
       setSelectedSupervisorId("");
     },
@@ -157,7 +165,7 @@ export default function ManageProject() {
                       <div>
                         <p className="text-xs text-muted-foreground">Current Supervisor</p>
                         <p className="font-medium">
-                          {group.supervisor ? `${group.supervisor.firstName} ${group.supervisor.lastName}` : "Not Assigned"}
+                          {group.supervisor ? `${group.supervisor.prefix ? `${group.supervisor.prefix} ` : ""}${group.supervisor.firstName} ${group.supervisor.lastName}` : "Not Assigned"}
                         </p>
                       </div>
                     </div>
@@ -199,7 +207,7 @@ export default function ManageProject() {
                               <SelectContent>
                                 {supervisors?.map((s: User) => (
                                   <SelectItem key={s.id} value={s.id.toString()}>
-                                    {s.firstName} {s.lastName} — {s.email}
+                                    {s.prefix ? `${s.prefix} ` : ""}{s.firstName} {s.lastName} — {s.department || s.email}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -236,6 +244,35 @@ export default function ManageProject() {
                         </div>
                       </DialogContent>
                     </Dialog>
+                  </div>
+
+                  {/* Selected Project Info */}
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1.5">Selected Project</p>
+                    {group.project ? (
+                      <div className="flex items-center gap-2.5 p-2.5 rounded-lg border bg-blue-50/50 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-900/40">
+                        <div className="w-8 h-8 rounded-md bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center shrink-0">
+                          <FolderGit2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/80 text-blue-700 dark:text-blue-300">
+                              {group.project.topicCode || `PRJ-${group.project.id}`}
+                            </span>
+                            <Badge variant="outline" className="capitalize text-[10px] py-0 h-4">
+                              {group.project.status || "in_progress"}
+                            </Badge>
+                          </div>
+                          <p className="text-xs font-medium text-foreground truncate mt-0.5" title={group.project.topicTitle}>
+                            {group.project.topicTitle || "Project Assigned"}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 p-2 rounded-lg border border-dashed text-xs text-muted-foreground bg-muted/20">
+                        <span className="italic">No topic selected by this team yet</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Members List */}

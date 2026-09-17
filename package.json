@@ -1,6 +1,6 @@
 {
   "name": "rest-express",
-  "version": "1.7.2",
+  "version": "1.9.0",
   "type": "module",
   "license": "MIT",
   "scripts": {
@@ -8,8 +8,12 @@
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "check": "tsc",
-    "test": "npm run check && tsx scripts/verify_onboarding_and_access_control.ts",
+    "test": "npm run check && tsx scripts/verify_onboarding_and_access_control.ts && tsx scripts/verify_supervisor_onboarding_and_rbac.ts && tsx scripts/verify_bulk_topic_onboarding.ts && tsx scripts/verify_topic_selection_and_routing.ts && tsx scripts/verify_priority_bug_fixes.ts",
+    "test:fixes": "tsx scripts/verify_priority_bug_fixes.ts",
     "test:onboarding": "tsx scripts/verify_onboarding_and_access_control.ts",
+    "test:supervisor": "tsx scripts/verify_supervisor_onboarding_and_rbac.ts",
+    "test:topics": "tsx scripts/verify_bulk_topic_onboarding.ts",
+    "test:selection": "tsx scripts/verify_topic_selection_and_routing.ts",
     "test:e2e": "tsx scripts/e2e_verify.ts",
     "db:push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",

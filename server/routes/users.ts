@@ -62,8 +62,8 @@ export function registerUserRoutes(router: Router, storage: DBStorage) {
 
         try {
             const supervisors = await storage.getUsersByRole(UserRole.SUPERVISOR);
-            const safeSupervisors = supervisors.map(({ id, firstName, lastName, email }) => ({
-                id, firstName, lastName, email
+            const safeSupervisors = supervisors.map(({ id, firstName, lastName, email, prefix, department, designation }) => ({
+                id, firstName, lastName, email, prefix, department, designation
             }));
             res.json(safeSupervisors);
         } catch (error) {

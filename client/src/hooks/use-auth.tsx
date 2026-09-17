@@ -44,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: (user: SelectUser) => {
       setSplashUser(user.username);
       setSplashState("login");
+      queryClient.clear();
       queryClient.setQueryData(["/api/user"], user);
       toast({
         title: "Login successful",

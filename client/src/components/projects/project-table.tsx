@@ -56,21 +56,26 @@ export default function ProjectTable({ projects, onViewDetails }: ProjectTablePr
               </TableCell>
               <TableCell>{project.student?.enrollmentNumber || 'N/A'}</TableCell>
               <TableCell>
-                {project.topic?.submittedBy ? (
-                  <div className="flex items-center space-x-2">
-                    <div className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center">
-                      <span className="text-secondary font-medium text-sm">
-                        {project.topic.submittedBy.firstName.charAt(0)}
-                        {project.topic.submittedBy.lastName.charAt(0)}
-                      </span>
+                {(() => {
+                  const supervisor = project.supervisor || project.topic?.submittedBy;
+                  if (!supervisor) {
+                    return <span className="text-muted-foreground text-xs">Not Assigned</span>;
+                  }
+                  const name = `${supervisor.prefix ? `${supervisor.prefix} ` : ""}${supervisor.firstName} ${supervisor.lastName}`.trim();
+                  return (
+                    <div className="flex items-center space-x-2">
+                      <div className="w-8 h-8 rounded-full bg-secondary/10 text-secondary border border-secondary/20 flex items-center justify-center text-xs font-bold shrink-0">
+                        {supervisor.firstName?.charAt(0) || ""}{supervisor.lastName?.charAt(0) || ""}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm text-foreground truncate">{name}</p>
+                        {supervisor.department && (
+                          <p className="text-[11px] text-muted-foreground truncate">{supervisor.department}</p>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <p>{`${project.topic.submittedBy.firstName} ${project.topic.submittedBy.lastName}`}</p>
-                    </div>
-                  </div>
-                ) : (
-                  <span className="text-muted-foreground">Unknown Supervisor</span>
-                )}
+                  );
+                })()}
               </TableCell>
               <TableCell>{project.topic?.technology || 'Unknown'}</TableCell>
               <TableCell>

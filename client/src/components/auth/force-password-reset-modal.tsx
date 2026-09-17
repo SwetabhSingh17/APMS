@@ -37,8 +37,11 @@ export function ForcePasswordResetModal() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  // Only display to authenticated students who have the forced password reset flag active
-  const shouldOpen = Boolean(user && user.role === "student" && user.forcePasswordReset);
+  // Display to any authenticated user who has the forced password reset flag active (students, supervisors)
+  const shouldOpen = Boolean(user && user.forcePasswordReset);
+  const isSupervisor = user?.role === "supervisor";
+  const idLabel = isSupervisor ? "Employee ID" : "Enrollment Number";
+  const userIdentifier = isSupervisor ? ((user as any)?.empId || user?.username) : (user as any)?.enrollmentNumber;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +49,7 @@ export function ForcePasswordResetModal() {
 
     // Validate current password presence
     if (!formData.currentPassword) {
-      setErrorMessage("Please enter your current password (your enrollment number).");
+      setErrorMessage(`Please enter your current password (your ${idLabel.toLowerCase()}).`);
       return;
     }
 
@@ -58,7 +61,7 @@ export function ForcePasswordResetModal() {
 
     // Ensure new password differs from initial password
     if (formData.currentPassword === formData.newPassword) {
-      setErrorMessage("New password cannot be the same as your initial enrollment number password.");
+      setErrorMessage(`New password cannot be the same as your initial ${idLabel.toLowerCase()} password.`);
       return;
     }
 
@@ -138,7 +141,7 @@ export function ForcePasswordResetModal() {
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-xs text-amber-600 dark:text-amber-400 flex items-start space-x-2">
           <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <div>
-            <span className="font-semibold">Initial Login Credential:</span> Your default current password is your <strong>enrollment number ({user?.enrollmentNumber})</strong>.
+            <span className="font-semibold">Initial Login Credential:</span> Your default current password is your <strong>{idLabel} ({userIdentifier})</strong>.
           </div>
         </div>
 
@@ -153,13 +156,13 @@ export function ForcePasswordResetModal() {
           {/* Current password */}
           <div className="space-y-1.5">
             <Label htmlFor="current-pwd" className="text-xs font-semibold text-foreground">
-              Current Password (Enrollment Number)
+              Current Password ({idLabel})
             </Label>
             <div className="relative">
               <Input
                 id="current-pwd"
                 type={showCurrent ? "text" : "password"}
-                placeholder="Enter your enrollment number"
+                placeholder={`Enter your current ${idLabel.toLowerCase()}`}
                 value={formData.currentPassword}
                 onChange={(e) => setFormData((prev) => ({ ...prev, currentPassword: e.target.value }))}
                 className="pr-10 bg-background/50 border-input"

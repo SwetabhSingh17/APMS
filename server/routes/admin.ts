@@ -5,6 +5,8 @@ import { requireRole, comparePasswords, hashPassword } from "../auth";
 import { isAuthenticatedRequest } from "./utils";
 import multer from "multer";
 import { generateDemoFormatExcel, parseStudentOnboardingExcel } from "../services/onboarding-parser";
+import { generateSupervisorDemoFormatExcel, parseSupervisorOnboardingFile } from "../services/supervisor-onboarding-parser";
+import { generateTopicDemoFormatExcel, parseTopicOnboardingFile } from "../services/topic-onboarding-parser";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -320,4 +322,174 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
             }
         }
     );
+
+    // Download demo Excel format for supervisors matching "Updated Staff List with all details.xls"
+    router.get(
+        "/api/admin/onboarding/supervisor/demo-template",
+        requireRole([UserRole.ADMIN, UserRole.COORDINATOR]),
+        async (req: Request, res: Response) => {
+            try {
+                const buffer = await generateSupervisorDemoFormatExcel();
+                res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                res.setHeader("Content-Disposition", "attachment; filename=APMS_Supervisor_Staff_List_Demo_Format.xlsx");
+                res.send(buffer);
+            } catch (error: any) {
+                console.error("Error generating supervisor demo template:", error);
+                res.status(500).json({ message: "Failed to generate supervisor Excel demo template" });
+            }
+        }
+    );
+
+    // Bulk onboarding of supervisors exclusively
+    // Parses .xls or .xlsx, provisions supervisor accounts with empId as username/initial password
+    // Enforces forcePasswordReset: true and extracts designation, prefix, mobile, department
+    router.post(
+        "/api/admin/onboarding/supervisor/upload",
+        requireRole([UserRole.ADMIN, UserRole.COORDINATOR]),
+        upload.single("file"),
+        async (req: Request, res: Response) => {
+            if (!isAuthenticatedRequest(req)) {
+                return res.status(401).json({ message: "Unauthorized" });
+            }
+
+            const isStreaming = req.query.stream === "true" || req.headers.accept === "text/event-stream";
+
+            if (isStreaming) {
+                res.setHeader("Content-Type", "text/event-stream");
+                res.setHeader("Cache-Control", "no-cache, no-transform");
+                res.setHeader("Connection", "keep-alive");
+                res.setHeader("X-Accel-Buffering", "no");
+                res.flushHeaders?.();
+            }
+
+            const sendProgress = (p: any) => {
+                if (isStreaming) {
+                    res.write(`data: ${JSON.stringify(p)}\n\n`);
+                }
+            };
+
+            try {
+                if (!req.file) {
+                    const errMsg = "Please select a supervisor Excel file (.xls or .xlsx) to continue";
+                    if (isStreaming) {
+                        sendProgress({ stage: "error", percent: 100, message: errMsg });
+                        return res.end();
+                    }
+                    return res.status(400).json({ message: errMsg });
+                }
+
+                sendProgress({
+                    stage: "parsing",
+                    percent: 25,
+                    message: "Parsing supervisor directory sheet...",
+                });
+
+                const parsed = await parseSupervisorOnboardingFile(req.file.buffer);
+
+                sendProgress({
+                    stage: "provisioning",
+                    percent: 50,
+                    message: `Extracted ${parsed.supervisors.length} supervisor records from ${parsed.department}. Provisioning accounts...`,
+                    current: 0,
+                    total: parsed.supervisors.length,
+                });
+
+                const result = await storage.bulkOnboardSupervisors(parsed.supervisors);
+
+                if (isStreaming) {
+                    sendProgress({
+                        stage: "completed",
+                        percent: 100,
+                        message: result.message,
+                        result,
+                    });
+                    return res.end();
+                } else {
+                    return res.status(200).json(result);
+                }
+            } catch (error: any) {
+                console.error("Error during supervisor bulk onboarding:", error);
+                const errMsg = `Failed to process supervisor file: ${error.message || "Internal server error"}`;
+                if (isStreaming) {
+                    sendProgress({ stage: "error", percent: 100, message: errMsg });
+                    return res.end();
+                } else {
+                    res.status(500).json({ message: errMsg });
+                }
+            }
+        }
+    );
+
+    // =========================================================================
+    // BULK PROJECT TOPIC ONBOARDING & VALIDATION
+    // =========================================================================
+
+    // Generate downloadable topic suggestions demo Excel template
+    router.get(
+        "/api/admin/onboarding/topics/demo-template",
+        requireRole([UserRole.ADMIN, UserRole.COORDINATOR]),
+        async (req: Request, res: Response) => {
+            try {
+                const buffer = await generateTopicDemoFormatExcel();
+                res.setHeader(
+                    "Content-Type",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                );
+                res.setHeader(
+                    "Content-Disposition",
+                    "attachment; filename=APMS_Project_Topics_Suggestions_Demo_Format.xlsx"
+                );
+                return res.send(buffer);
+            } catch (error: any) {
+                console.error("Error generating topic demo template:", error);
+                res.status(500).json({ message: "Failed to generate topic demo template" });
+            }
+        }
+    );
+
+    // Upload, parse, cross-check and assign sequential PUGID26xxx IDs to project topics
+    router.post(
+        "/api/admin/onboarding/topics/upload",
+        requireRole([UserRole.ADMIN, UserRole.COORDINATOR]),
+        upload.single("file"),
+        async (req: Request, res: Response) => {
+            try {
+                if (!req.file) {
+                    return res.status(400).json({ message: "No Excel file was uploaded." });
+                }
+
+                const course = (req.body.course as string || "BCA").trim().toUpperCase();
+                const autoApprove = req.body.autoApprove !== "false";
+
+                // 1. Parse Excel file containing faculty submissions
+                const parsed = parseTopicOnboardingFile(req.file.buffer);
+                if (!parsed.success || parsed.rows.length === 0) {
+                    return res.status(400).json({
+                        success: false,
+                        message: parsed.message || "Failed to extract valid topic rows from uploaded workbook.",
+                        totalRows: 0,
+                        matchedSupervisors: 0,
+                        unmatchedSupervisors: 0,
+                        totalTopicsCreated: 0,
+                        successRecords: [],
+                        failureRecords: [],
+                    });
+                }
+
+                // 2. Cross-check supervisors and insert with sequential PUGID26xxx IDs
+                const result = await storage.bulkUploadProjectTopics(course, parsed.rows, {
+                    autoApprove,
+                });
+
+                return res.status(200).json(result);
+            } catch (error: any) {
+                console.error("Error during project topic bulk upload:", error);
+                return res.status(500).json({
+                    success: false,
+                    message: `Internal server error during topic bulk upload: ${error.message || error}`,
+                });
+            }
+        }
+    );
 }
+

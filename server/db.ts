@@ -145,4 +145,22 @@ export async function runMigrations() {
       `(full reset) and restart the server.`
     );
   }
+
+  // Ensure supervisor-specific columns and indexes exist in users table
+  try {
+    await db.execute(sql`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS emp_id TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS prefix TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS designation TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS department TEXT;
+      CREATE INDEX IF NOT EXISTS emp_id_idx ON users (emp_id);
+
+      ALTER TABLE project_topics ADD COLUMN IF NOT EXISTS topic_code TEXT;
+      CREATE INDEX IF NOT EXISTS topic_code_idx ON project_topics (topic_code);
+    `);
+  } catch (colErr) {
+    console.warn('Notice: Custom columns check/migration:', colErr);
+  }
 }
+

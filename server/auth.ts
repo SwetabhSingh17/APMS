@@ -73,12 +73,13 @@ export function setupAuth(app: Express, storage: DBStorage) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Security interceptor: students with forced password reset can only access profile or change password
+  // Security interceptor: users with forced password reset can only access profile or change password
   // Blocks access to all other operational APIs until mandatory password reset is completed
   app.use((req: Request, res: Response, next: NextFunction) => {
-    if (req.isAuthenticated() && req.user?.role === UserRole.STUDENT && req.user?.forcePasswordReset) {
+    if (req.isAuthenticated() && req.user?.forcePasswordReset) {
       const allowedPaths = [
         "/api/user",
+        "/api/user/profile",
         "/api/user/change-password",
         "/api/logout",
       ];
@@ -92,6 +93,7 @@ export function setupAuth(app: Express, storage: DBStorage) {
     }
     next();
   });
+
 
   passport.use(
     new LocalStrategy(async (username, password, done) => {
@@ -291,7 +293,24 @@ export function setupAuth(app: Express, storage: DBStorage) {
     }
 
     try {
-      const allowedFields = ['firstName', 'lastName', 'email'];
+      const userRole = (req.user as any)?.role;
+      const isAdminOrCoordinator = userRole === UserRole.ADMIN || userRole === UserRole.COORDINATOR;
+
+      // RBAC check: Only ADMIN and COORDINATOR can modify designation
+      if (req.body.designation !== undefined && req.body.designation !== (req.user as any)?.designation) {
+        if (!isAdminOrCoordinator) {
+          return res.status(403).json({
+            message: "Access denied. Only administrators and coordinators can update designation.",
+            field: "designation",
+          });
+        }
+      }
+
+      const allowedFields = ['firstName', 'lastName', 'email', 'prefix', 'mobile'];
+      if (isAdminOrCoordinator) {
+        allowedFields.push('designation');
+      }
+
       const updateData = Object.entries(req.body).reduce((acc, [key, value]) => {
         if (allowedFields.includes(key)) {
           acc[key] = value;

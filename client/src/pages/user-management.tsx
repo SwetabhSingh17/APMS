@@ -8,12 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, UserPlus, UserCog, Edit, Trash2, Eye, EyeOff, Download, FileSpreadsheet } from "lucide-react";
+import { Search, UserPlus, UserCog, Edit, Trash2, Eye, EyeOff, FileSpreadsheet, UserCheck } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { InsertUser, UserRole } from "@shared/schema";
 import { BulkOnboardingModal } from "@/components/admin/bulk-onboarding-modal";
+import { SupervisorBulkOnboardingModal } from "@/components/admin/supervisor-bulk-onboarding-modal";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertUserSchema } from "@shared/schema";
@@ -61,6 +62,11 @@ interface UserData {
   email: string;
   role: UserRole;
   enrollmentNumber: string | null;
+  empId?: string | null;
+  prefix?: string | null;
+  designation?: string | null;
+  mobile?: string | null;
+  department?: string | null;
   topicsCount?: number;
   projectStatus?: string;
 }
@@ -70,48 +76,14 @@ export default function UserManagement() {
   const { toast } = useToast();
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [isBulkOnboardOpen, setIsBulkOnboardOpen] = useState(false);
+  const [isSupervisorBulkOnboardOpen, setIsSupervisorBulkOnboardOpen] = useState(false);
+
   const [isEditUserOpen, setIsEditUserOpen] = useState(false);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterRole, setFilterRole] = useState("all");
 
   const { courseFilter, getCourseQuery } = useCourseFilter();
-
-  // Safely download demo Excel template using authenticated credentials
-  const handleDownloadDemoTemplate = async () => {
-    try {
-      toast({
-        title: "Downloading Demo Template",
-        description: "Generating official APMS_Student_Onboarding_Demo_Format.xlsx...",
-      });
-      const res = await fetch("/api/admin/onboarding/demo-template", {
-        credentials: "include",
-      });
-      if (!res.ok) {
-        throw new Error(res.status === 401 ? "Unauthorized. Please log in as Admin or Coordinator." : "Failed to download demo template");
-      }
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "APMS_Student_Onboarding_Demo_Format.xlsx";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      toast({
-        title: "Download Started",
-        description: "Official demo template downloaded successfully.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Download Failed",
-        description: error.message || "Failed to download demo format.",
-        variant: "destructive",
-      });
-    }
-  };
 
   const userQueryParam = getCourseQuery() ? `?${getCourseQuery()}&limit=all` : '?limit=all';
   const { data: users, isLoading } = useQuery<UserData[]>({
@@ -324,11 +296,7 @@ export default function UserManagement() {
   const filterUsers = (items: UserData[] | undefined): UserData[] => {
     if (!items) return [];
 
-    // Filter by role
     let filtered = items;
-    if (filterRole !== "all") {
-      filtered = filtered.filter(item => item.role === filterRole);
-    }
 
     // Filter by search query
     if (searchQuery) {
@@ -384,18 +352,8 @@ export default function UserManagement() {
               Manage user accounts and permissions
             </CardDescription>
           </div>
-          {/* Action buttons: Download demo template, bulk onboarding, and single user creation */}
+          {/* Action buttons: separate bulk onboarding for Students and Supervisors, and single user creation */}
           <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              variant="outline"
-              size="default"
-              type="button"
-              onClick={handleDownloadDemoTemplate}
-              className="gap-1.5 border-border hover:bg-muted font-medium text-xs sm:text-sm"
-            >
-              <Download className="h-4 w-4 text-primary" />
-              <span>Download Demo Format</span>
-            </Button>
 
             <Button
               variant="secondary"
@@ -404,7 +362,17 @@ export default function UserManagement() {
               className="gap-1.5 border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary font-semibold text-xs sm:text-sm"
             >
               <FileSpreadsheet className="h-4 w-4" />
-              <span>Bulk Onboarding</span>
+              <span>Bulk Upload Student</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => setIsSupervisorBulkOnboardOpen(true)}
+              className="gap-1.5 border border-purple-300 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/30 hover:bg-purple-100 text-purple-700 dark:text-purple-300 font-semibold text-xs sm:text-sm shadow-sm"
+            >
+              <UserCheck className="h-4 w-4" />
+              <span>Bulk Upload Supervisor</span>
             </Button>
 
             <Button
@@ -420,8 +388,8 @@ export default function UserManagement() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="mb-6 flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
+          <div className="mb-6">
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 placeholder="Search users by name, email, or username..."
@@ -430,39 +398,23 @@ export default function UserManagement() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-
-            <div className="w-full md:w-56">
-              <Select
-                value={filterRole}
-                onValueChange={setFilterRole}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value={UserRole.ADMIN}>Admin</SelectItem>
-                  <SelectItem value={UserRole.COORDINATOR}>Coordinator</SelectItem>
-                  <SelectItem value={UserRole.SUPERVISOR}>Supervisor</SelectItem>
-                  <SelectItem value={UserRole.STUDENT}>Student</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           {(() => {
+            const adminsList = filteredUsers ? filteredUsers.filter(u => u.role === UserRole.ADMIN) : [];
             const supervisorsList = filteredUsers ? filteredUsers.filter(u => u.role === UserRole.SUPERVISOR) : [];
-            const studentsList = filteredUsers ? filteredUsers.filter(u => u.role === UserRole.STUDENT) : [];
             const coordinatorsList = filteredUsers ? filteredUsers.filter(u => u.role === UserRole.COORDINATOR) : [];
+            const studentsList = filteredUsers ? filteredUsers.filter(u => u.role === UserRole.STUDENT) : [];
             const allUsersCount = filteredUsers ? filteredUsers.length : 0;
 
             return (
               <Tabs defaultValue="all-users">
                 <TabsList className="mb-4">
                   <TabsTrigger value="all-users">All Users ({allUsersCount})</TabsTrigger>
+                  <TabsTrigger value="admins">Admins ({adminsList.length})</TabsTrigger>
                   <TabsTrigger value="supervisors">Supervisors ({supervisorsList.length})</TabsTrigger>
-                  <TabsTrigger value="students">Students ({studentsList.length})</TabsTrigger>
                   <TabsTrigger value="coordinators">Coordinators ({coordinatorsList.length})</TabsTrigger>
+                  <TabsTrigger value="students">Students ({studentsList.length})</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="all-users">
@@ -526,8 +478,8 @@ export default function UserManagement() {
                           ) : (
                             <TableRow>
                               <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                                {searchQuery || filterRole !== "all"
-                                  ? "No users match your filters"
+                                {searchQuery
+                                  ? "No users match your search"
                                   : "No users found"}
                               </TableCell>
                             </TableRow>
@@ -538,13 +490,83 @@ export default function UserManagement() {
                   )}
                 </TabsContent>
 
-                <TabsContent value="supervisors">
+                <TabsContent value="admins">
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Name</TableHead>
+                          <TableHead>Username</TableHead>
                           <TableHead>Email</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {adminsList.length > 0 ? (
+                          adminsList.map((user) => (
+                            <TableRow key={user.id} className="hover:bg-muted/50">
+                              <TableCell>
+                                <div className="flex items-center space-x-2">
+                                  <div className="w-8 h-8 rounded-full bg-red-500/10 text-red-600 dark:bg-red-500/20 dark:text-red-400 flex items-center justify-center font-semibold text-xs">
+                                    {user.firstName ? user.firstName.charAt(0) : "A"}
+                                    {user.lastName ? user.lastName.charAt(0) : ""}
+                                  </div>
+                                  <span className="font-medium text-foreground">
+                                    {user.firstName} {user.lastName}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="font-mono text-xs">{user.username}</TableCell>
+                              <TableCell className="text-sm">{user.email}</TableCell>
+                              <TableCell>
+                                <span className={`px-2 py-1 text-xs rounded-full ${getRoleBadgeClasses(user.role)}`}>
+                                  {getRoleDisplay(user.role)}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex space-x-2 justify-end">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleEditUser(user)}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={() => handleDeleteUser(user)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                              No administrators found
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="supervisors">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Emp. ID</TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Designation</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Mobile</TableHead>
                           <TableHead>Topics Submitted</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -553,18 +575,29 @@ export default function UserManagement() {
                         {supervisorsList.length > 0 ? (
                           supervisorsList.map((user) => (
                             <TableRow key={user.id} className="hover:bg-muted/50">
+                              <TableCell className="font-mono text-xs font-semibold text-foreground">
+                                {user.empId || user.username}
+                              </TableCell>
                               <TableCell>
                                 <div className="flex items-center space-x-2">
-                                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                    <span className="text-primary font-medium text-sm">
-                                      {user.firstName.charAt(0)}
-                                      {user.lastName.charAt(0)}
-                                    </span>
+                                  <div className="w-8 h-8 rounded-full bg-purple-500/10 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400 flex items-center justify-center font-semibold text-xs">
+                                    {user.firstName ? user.firstName.charAt(0) : "S"}
+                                    {user.lastName ? user.lastName.charAt(0) : ""}
                                   </div>
-                                  <span>{user.firstName} {user.lastName}</span>
+                                  <span className="font-medium text-foreground">
+                                    {user.prefix ? `${user.prefix} ` : ""}{user.firstName} {user.lastName}
+                                  </span>
                                 </div>
                               </TableCell>
-                              <TableCell>{user.email}</TableCell>
+                              <TableCell>
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800/40">
+                                  {user.designation || "Supervisor"}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-sm">{user.email}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground font-mono">
+                                {user.mobile || "—"}
+                              </TableCell>
                               <TableCell>
                                 {user.topicsCount || 0} topics
                               </TableCell>
@@ -591,7 +624,7 @@ export default function UserManagement() {
                           ))
                         ) : (
                           <TableRow>
-                            <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                               No supervisors found
                             </TableCell>
                           </TableRow>
@@ -1152,6 +1185,12 @@ export default function UserManagement() {
       <BulkOnboardingModal
         isOpen={isBulkOnboardOpen}
         onClose={() => setIsBulkOnboardOpen(false)}
+      />
+
+      {/* Bulk supervisor and faculty directory onboarding modal */}
+      <SupervisorBulkOnboardingModal
+        isOpen={isSupervisorBulkOnboardOpen}
+        onClose={() => setIsSupervisorBulkOnboardOpen(false)}
       />
     </MainLayout>
   );

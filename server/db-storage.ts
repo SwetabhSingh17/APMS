@@ -3,11 +3,13 @@ import {
   User, ProjectTopic, StudentProject, StudentGroup, ProjectMilestone, ProjectAssessment, Notification, UserRole,
   InsertUser, InsertProjectTopic, InsertStudentProject, InsertStudentGroup, InsertProjectAssessment, InsertNotification,
   users, projectTopics, studentProjects, studentGroups, projectAssessments, notifications, projectMilestones, studentGroupMembers,
-  IStudentOnboardingRow, IOnboardingResult, IOnboardingProgress
+  IStudentOnboardingRow, IOnboardingResult, IOnboardingProgress,
+  ISupervisorOnboardingRow, ISupervisorOnboardingResult,
+  ITopicOnboardingRow, ITopicOnboardingResult, ITopicOnboardingSuccessRecord, ITopicOnboardingFailureRecord
 } from "@shared/schema";
 import { db } from "./db";
 import { notifyUser, disconnectAllClients } from "./websocket";
-import { eq, and, or, asc, desc, sql, inArray, not, ne, aliasedTable, SQL } from "drizzle-orm";
+import { eq, and, or, asc, desc, sql, inArray, not, ne, aliasedTable, SQL, like, isNotNull } from "drizzle-orm";
 import connectPg from "connect-pg-simple";
 import session from "express-session";
 import { pool } from "./db";
@@ -106,7 +108,9 @@ export class DBStorage {
           eq(users.isDeleted, false),
           or(
             eq(sql`UPPER(${users.course})`, normalizedCourse),
-            eq(users.role, UserRole.ADMIN)
+            eq(users.role, UserRole.ADMIN),
+            eq(users.role, UserRole.SUPERVISOR),
+            eq(users.role, UserRole.COORDINATOR)
           )
         )
       ).orderBy(asc(users.id))) as User[];
@@ -303,7 +307,7 @@ export class DBStorage {
     return project as StudentProject | undefined;
   }
 
-  async getAllProjects(course?: string): Promise<(StudentProject & { topic: ProjectTopic; student: User })[]> {
+  async getAllProjects(course?: string): Promise<(StudentProject & { topic: ProjectTopic; student: User; supervisor?: User })[]> {
     const rows = await db.select({
       project: studentProjects,
       topic: projectTopics,
@@ -315,21 +319,46 @@ export class DBStorage {
     .where(course ? eq(projectTopics.course, course) : undefined);
 
     const submitterIds = Array.from(new Set(rows.map(r => r.topic.submittedById).filter(id => id != null) as number[]));
-    let submitters: User[] = [];
-    if (submitterIds.length > 0) {
-      submitters = await db.select().from(users).where(inArray(users.id, submitterIds));
+
+    const studentUserIds = rows.map(r => r.student.id);
+    let groupSupervisorMap = new Map<number, number | null>();
+    if (studentUserIds.length > 0) {
+      const memberships = await db.select({
+        studentId: studentGroupMembers.userId,
+        supervisorId: studentGroups.supervisorId
+      })
+      .from(studentGroupMembers)
+      .innerJoin(studentGroups, eq(studentGroupMembers.groupId, studentGroups.id))
+      .where(and(
+        inArray(studentGroupMembers.userId, studentUserIds),
+        eq(studentGroupMembers.status, "accepted")
+      ));
+      memberships.forEach(m => groupSupervisorMap.set(m.studentId, m.supervisorId));
     }
 
-    const submitterMap = new Map(submitters.map(s => [s.id, s]));
+    const groupSupervisorIds = Array.from(new Set(Array.from(groupSupervisorMap.values()).filter(id => id != null) as number[]));
+    const allFacultyIds = Array.from(new Set([...submitterIds, ...groupSupervisorIds]));
 
-    return rows.map(r => ({
-      ...(r.project as StudentProject),
-      student: r.student as User,
-      topic: {
-        ...(r.topic as ProjectTopic),
-        submittedBy: r.topic.submittedById ? submitterMap.get(r.topic.submittedById) : undefined
-      }
-    }));
+    let allFaculty: User[] = [];
+    if (allFacultyIds.length > 0) {
+      allFaculty = await db.select().from(users).where(inArray(users.id, allFacultyIds));
+    }
+    const facultyMap = new Map(allFaculty.map(s => [s.id, s]));
+
+    return rows.map(r => {
+      const groupSupId = groupSupervisorMap.get(r.student.id);
+      const supervisor = (groupSupId ? facultyMap.get(groupSupId) : undefined) ||
+                         (r.topic.submittedById ? facultyMap.get(r.topic.submittedById) : undefined);
+      return {
+        ...(r.project as StudentProject),
+        student: r.student as User,
+        supervisor,
+        topic: {
+          ...(r.topic as ProjectTopic),
+          submittedBy: r.topic.submittedById ? facultyMap.get(r.topic.submittedById) : undefined
+        }
+      };
+    });
   }
 
   async isTopicAllotted(topicId: number): Promise<boolean> {
@@ -525,9 +554,37 @@ export class DBStorage {
     const groups = await db.select().from(studentGroups);
     const result = await Promise.all(groups.map(async (group) => {
       const members = await this.getStudentGroupMembers(group.id);
-      const supervisor = group.supervisorId ? await this.getUser(group.supervisorId) : null;
+      let supervisor = group.supervisorId ? await this.getUser(group.supervisorId) : null;
+      let project: { id: number; topicId: number; status: string; topicCode?: string | null; topicTitle?: string } | null = null;
+
+      // Check if group members have an assigned project
+      if (members.length > 0) {
+        for (const m of members) {
+          const mProjects = await this.getStudentProjects(m.id);
+          if (mProjects.length > 0 && mProjects[0].topicId) {
+            const topic = await this.getProjectTopic(mProjects[0].topicId);
+            project = {
+              id: mProjects[0].id,
+              topicId: mProjects[0].topicId,
+              status: mProjects[0].status,
+              topicCode: topic?.topicCode,
+              topicTitle: topic?.title,
+            };
+
+            // Fallback resolution: If group.supervisorId is null, resolve supervisor from topic
+            if (!supervisor && topic && topic.submittedById) {
+              supervisor = await this.getUser(topic.submittedById);
+              // Self-heal the database record
+              await this.updateStudentGroupSupervisor(group.id, topic.submittedById);
+            }
+            break;
+          }
+        }
+      }
+
       return {
         ...group,
+        project,
         members: members.map(m => ({
           id: m.id,
           firstName: m.firstName,
@@ -539,10 +596,13 @@ export class DBStorage {
         })),
         supervisor: supervisor ? {
           id: supervisor.id,
+          prefix: supervisor.prefix,
           firstName: supervisor.firstName,
           lastName: supervisor.lastName,
           email: supervisor.email,
           role: supervisor.role,
+          department: supervisor.department,
+          designation: supervisor.designation,
         } : null,
       };
     }));
@@ -879,7 +939,9 @@ export class DBStorage {
       const normalizedCourse = course.trim().toUpperCase();
       conditions.push(or(
         eq(sql`UPPER(${users.course})`, normalizedCourse),
-        eq(users.role, UserRole.ADMIN)
+        eq(users.role, UserRole.ADMIN),
+        eq(users.role, UserRole.SUPERVISOR),
+        eq(users.role, UserRole.COORDINATOR)
       )!);
     }
     
@@ -930,7 +992,7 @@ export class DBStorage {
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  async getPaginatedProjects(page: number, limit: number, course?: string): Promise<import('@shared/schema').PaginatedResponse<StudentProject & { topic: ProjectTopic; student: User }>> {
+  async getPaginatedProjects(page: number, limit: number, course?: string): Promise<import('@shared/schema').PaginatedResponse<StudentProject & { topic: ProjectTopic; student: User; supervisor?: User }>> {
     const countQuery = await db.select({ count: sql<number>`count(*)` })
       .from(studentProjects)
       .innerJoin(projectTopics, eq(studentProjects.topicId, projectTopics.id))
@@ -950,20 +1012,46 @@ export class DBStorage {
     .limit(limit).offset((page - 1) * limit);
 
     const submitterIds = Array.from(new Set(rows.map(r => r.topic.submittedById).filter(id => id != null) as number[]));
-    let submitters: User[] = [];
-    if (submitterIds.length > 0) {
-      submitters = await db.select().from(users).where(inArray(users.id, submitterIds));
-    }
-    const submitterMap = new Map(submitters.map(s => [s.id, s]));
 
-    const data = rows.map(r => ({
-      ...(r.project as StudentProject),
-      student: r.student as User,
-      topic: {
-        ...(r.topic as ProjectTopic),
-        submittedBy: r.topic.submittedById ? submitterMap.get(r.topic.submittedById) : undefined
-      }
-    }));
+    const studentUserIds = rows.map(r => r.student.id);
+    let groupSupervisorMap = new Map<number, number | null>();
+    if (studentUserIds.length > 0) {
+      const memberships = await db.select({
+        studentId: studentGroupMembers.userId,
+        supervisorId: studentGroups.supervisorId
+      })
+      .from(studentGroupMembers)
+      .innerJoin(studentGroups, eq(studentGroupMembers.groupId, studentGroups.id))
+      .where(and(
+        inArray(studentGroupMembers.userId, studentUserIds),
+        eq(studentGroupMembers.status, "accepted")
+      ));
+      memberships.forEach(m => groupSupervisorMap.set(m.studentId, m.supervisorId));
+    }
+
+    const groupSupervisorIds = Array.from(new Set(Array.from(groupSupervisorMap.values()).filter(id => id != null) as number[]));
+    const allFacultyIds = Array.from(new Set([...submitterIds, ...groupSupervisorIds]));
+
+    let allFaculty: User[] = [];
+    if (allFacultyIds.length > 0) {
+      allFaculty = await db.select().from(users).where(inArray(users.id, allFacultyIds));
+    }
+    const facultyMap = new Map(allFaculty.map(s => [s.id, s]));
+
+    const data = rows.map(r => {
+      const groupSupId = groupSupervisorMap.get(r.student.id);
+      const supervisor = (groupSupId ? facultyMap.get(groupSupId) : undefined) ||
+                         (r.topic.submittedById ? facultyMap.get(r.topic.submittedById) : undefined);
+      return {
+        ...(r.project as StudentProject),
+        student: r.student as User,
+        supervisor,
+        topic: {
+          ...(r.topic as ProjectTopic),
+          submittedBy: r.topic.submittedById ? facultyMap.get(r.topic.submittedById) : undefined
+        }
+      };
+    });
 
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
@@ -1247,6 +1335,325 @@ export class DBStorage {
       result
     });
 
+    return result;
+  }
+
+  // Bulk provisioning and updating of supervisor faculty accounts
+  // Username: EmpID (e.g. F00157)
+  // Initial Password: EmpID (e.g. F00157), hashed with scrypt
+  // Role: UserRole.SUPERVISOR
+  // forcePasswordReset: true
+  // Preserves designation, prefix, mobile, department, email
+  async bulkOnboardSupervisors(
+    supervisorRows: ISupervisorOnboardingRow[]
+  ): Promise<ISupervisorOnboardingResult> {
+    const result: ISupervisorOnboardingResult = {
+      success: true,
+      message: "",
+      totalSupervisorsProcessed: 0,
+      totalSupervisorsCreated: 0,
+      totalSupervisorsUpdated: 0,
+      supervisors: [],
+      errors: [],
+    };
+
+    if (supervisorRows.length === 0) {
+      result.message = "No valid supervisor records were found in the uploaded file.";
+      return result;
+    }
+
+    // Preload existing users to perform fast O(1) in-memory lookups
+    const existingUsersList = await db.select().from(users);
+    const existingByEmpId = new Map<string, User>();
+    const existingByUsername = new Map<string, User>();
+    const existingByEmail = new Map<string, User>();
+
+    for (const u of existingUsersList) {
+      if (u.empId) existingByEmpId.set(u.empId.trim().toUpperCase(), u as User);
+      if (u.username) existingByUsername.set(u.username.trim().toUpperCase(), u as User);
+      if (u.email) existingByEmail.set(u.email.trim().toLowerCase(), u as User);
+    }
+
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < supervisorRows.length; i += BATCH_SIZE) {
+      const batch = supervisorRows.slice(i, i + BATCH_SIZE);
+
+      await Promise.all(
+        batch.map(async (row) => {
+          const cleanEmpId = String(row.empId).trim();
+          const cleanEmpIdUpper = cleanEmpId.toUpperCase();
+          const rawName = (row.name || "").trim();
+          const prefix = row.prefix || undefined;
+          const firstName = row.firstName || rawName || "Supervisor";
+          const lastName = row.lastName || "";
+          const designation = (row.designation || "Supervisor").trim();
+          const mobile = row.mobile ? String(row.mobile).trim() : undefined;
+          const department = (row.department || "Department of Computer Application").trim();
+          let email = (row.email || `${cleanEmpId.toLowerCase()}@iul.ac.in`).trim().toLowerCase();
+
+          try {
+            // Check if supervisor already exists by empId or username
+            const existingSupervisor = existingByEmpId.get(cleanEmpIdUpper) || existingByUsername.get(cleanEmpIdUpper);
+
+            if (existingSupervisor) {
+              // Ensure email does not collide with another user
+              const emailOwner = existingByEmail.get(email);
+              if (emailOwner && emailOwner.id !== existingSupervisor.id) {
+                email = `${cleanEmpId.toLowerCase()}@iul.ac.in`;
+              }
+
+              const [updated] = await db.update(users)
+                .set({
+                  empId: cleanEmpId,
+                  prefix: prefix !== undefined ? prefix : existingSupervisor.prefix,
+                  firstName: firstName || existingSupervisor.firstName,
+                  lastName: lastName !== undefined ? lastName : existingSupervisor.lastName,
+                  designation,
+                  mobile: mobile !== undefined ? mobile : existingSupervisor.mobile,
+                  department,
+                  email,
+                  role: UserRole.SUPERVISOR,
+                  updatedAt: new Date(),
+                })
+                .where(eq(users.id, existingSupervisor.id))
+                .returning();
+
+              result.totalSupervisorsUpdated++;
+              result.totalSupervisorsProcessed++;
+              result.supervisors.push({
+                empId: cleanEmpId,
+                name: `${prefix ? prefix + " " : ""}${firstName} ${lastName}`.trim(),
+                designation,
+                email,
+                username: updated.username,
+                isNew: false,
+              });
+            } else {
+              // Check if email collides with another user
+              if (existingByEmail.has(email)) {
+                email = `${cleanEmpId.toLowerCase()}@iul.ac.in`;
+              }
+
+              const initialPasswordHash = await hashPassword(cleanEmpId);
+
+              const [created] = await db.insert(users).values({
+                username: cleanEmpId,
+                password: initialPasswordHash,
+                empId: cleanEmpId,
+                prefix,
+                firstName,
+                lastName,
+                designation,
+                mobile,
+                department,
+                email,
+                role: UserRole.SUPERVISOR,
+                forcePasswordReset: true, // Mandatory first login password change
+              }).returning();
+
+              existingByEmpId.set(cleanEmpIdUpper, created as User);
+              existingByUsername.set(cleanEmpIdUpper, created as User);
+              existingByEmail.set(email, created as User);
+
+              result.totalSupervisorsCreated++;
+              result.totalSupervisorsProcessed++;
+              result.supervisors.push({
+                empId: cleanEmpId,
+                name: `${prefix ? prefix + " " : ""}${firstName} ${lastName}`.trim(),
+                designation,
+                email,
+                username: created.username,
+                isNew: true,
+              });
+            }
+          } catch (err: any) {
+            result.errors?.push(`Failed to onboard supervisor ${cleanEmpId} (${rawName}): ${err.message}`);
+          }
+        })
+      );
+    }
+
+    result.message = `Bulk supervisor onboarding completed. ${result.totalSupervisorsCreated} created, ${result.totalSupervisorsUpdated} updated out of ${result.totalSupervisorsProcessed} processed.`;
+    return result;
+  }
+
+  // Bulk upload, cross-check, and assign sequential PUGID26xxx IDs to project topics
+  async bulkUploadProjectTopics(
+    course: string,
+    rows: ITopicOnboardingRow[],
+    options?: { autoApprove?: boolean }
+  ): Promise<ITopicOnboardingResult> {
+    const result: ITopicOnboardingResult = {
+      success: true,
+      message: "",
+      totalRows: rows.length,
+      matchedSupervisors: 0,
+      unmatchedSupervisors: 0,
+      totalTopicsCreated: 0,
+      successRecords: [],
+      failureRecords: [],
+    };
+
+    if (rows.length === 0) {
+      result.message = "No topic rows to process.";
+      return result;
+    }
+
+    // Preload all supervisors
+    const supervisorsList = (await db
+      .select()
+      .from(users)
+      .where(and(eq(users.role, UserRole.SUPERVISOR), eq(users.isDeleted, false)))) as User[];
+
+    const supervisorsByEmail = new Map<string, User>();
+    for (const s of supervisorsList) {
+      if (s.email) {
+        supervisorsByEmail.set(s.email.trim().toLowerCase(), s);
+      }
+    }
+
+    // Helper to tokenize name for cross-checking
+    const normalizeTokens = (name: string): string[] => {
+      const variants: Record<string, string> = {
+        mohd: "mohammad",
+        "mohd.": "mohammad",
+        mohammad: "mohammad",
+        mohammed: "mohammad",
+        muhammad: "mohammad",
+        md: "mohammad",
+        "md.": "mohammad",
+        akhter: "akhtar",
+        akhtar: "akhtar",
+      };
+
+      return name
+        .toLowerCase()
+        .replace(/^(dr\.?|mr\.?|mrs\.?|ms\.?|prof\.?)\s+/i, "")
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((t) => t.length > 1 && !["dr", "mr", "mrs", "ms", "prof"].includes(t))
+        .map((t) => variants[t] || t);
+    };
+
+    // Calculate current maximum sequence for PUGID26xxx
+    const existingTopicsWithCodes = await db
+      .select({ topicCode: projectTopics.topicCode })
+      .from(projectTopics)
+      .where(and(isNotNull(projectTopics.topicCode), like(projectTopics.topicCode, "PUGID26%")));
+
+    let maxSequence = 0;
+    for (const t of existingTopicsWithCodes) {
+      if (t.topicCode) {
+        const match = t.topicCode.match(/^PUGID26(\d+)$/i);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxSequence) {
+            maxSequence = num;
+          }
+        }
+      }
+    }
+
+    let nextSequence = maxSequence + 1;
+    let firstGeneratedCode: string | undefined;
+    let lastGeneratedCode: string | undefined;
+
+    // Process rows sequentially to guarantee deterministic, ordered PUGID assignment
+    for (const row of rows) {
+      const cleanEmail = String(row.facultyEmail || "").trim().toLowerCase();
+      const rawName = String(row.facultyName || "").trim();
+
+      // 1. Cross-check email against supervisors in database
+      const supervisor = supervisorsByEmail.get(cleanEmail);
+      if (!supervisor) {
+        result.unmatchedSupervisors++;
+        result.failureRecords.push({
+          rowNumber: row.rowNumber,
+          facultyName: rawName,
+          facultyEmail: cleanEmail,
+          reason: "Upload Failed: Supervisor email not found in database",
+        });
+        continue;
+      }
+
+      // 2. Cross-check faculty name compatibility
+      const dbFullName = `${supervisor.prefix ? supervisor.prefix + " " : ""}${supervisor.firstName} ${supervisor.lastName || ""}`.trim();
+      const excelTokens = normalizeTokens(rawName);
+      const dbTokens = normalizeTokens(dbFullName);
+
+      // Verify token overlap (at least one substantial token matches)
+      const hasTokenMatch = excelTokens.some((token) => dbTokens.includes(token));
+      if (excelTokens.length > 0 && dbTokens.length > 0 && !hasTokenMatch) {
+        result.unmatchedSupervisors++;
+        result.failureRecords.push({
+          rowNumber: row.rowNumber,
+          facultyName: rawName,
+          facultyEmail: cleanEmail,
+          reason: `Upload Failed: Supervisor name '${rawName}' does not match database record '${dbFullName}' for email '${cleanEmail}'`,
+        });
+        continue;
+      }
+
+      // 3. Supervisor verified! Proceed to insert topics with sequential PUGID26xxx
+      const rowTopicCodes: string[] = [];
+      const rowTopicTitles: string[] = [];
+
+      for (const t of row.topics) {
+        const seqStr = String(nextSequence++).padStart(3, "0");
+        const topicCode = `PUGID26${seqStr}`;
+
+        if (!firstGeneratedCode) firstGeneratedCode = topicCode;
+        lastGeneratedCode = topicCode;
+
+        try {
+          const [inserted] = await db
+            .insert(projectTopics)
+            .values({
+              topicCode,
+              title: t.title,
+              description: t.description,
+              technology: t.technology || "General / Web Development",
+              projectType: t.projectType || "Web Application",
+              course: course.toUpperCase(),
+              submittedById: supervisor.id,
+              status: options?.autoApprove !== false ? "approved" : "pending",
+              estimatedComplexity: "Medium",
+            })
+            .returning();
+
+          rowTopicCodes.push(topicCode);
+          rowTopicTitles.push(inserted.title);
+          result.totalTopicsCreated++;
+        } catch (err: any) {
+          result.failureRecords.push({
+            rowNumber: row.rowNumber,
+            facultyName: rawName,
+            facultyEmail: cleanEmail,
+            reason: `Database error inserting topic '${t.title}': ${err.message}`,
+          });
+        }
+      }
+
+      result.matchedSupervisors++;
+      result.successRecords.push({
+        rowNumber: row.rowNumber,
+        facultyName: rawName,
+        facultyEmail: cleanEmail,
+        supervisorId: supervisor.id,
+        empId: supervisor.empId || null,
+        topicCodes: rowTopicCodes,
+        topicTitles: rowTopicTitles,
+      });
+    }
+
+    if (firstGeneratedCode && lastGeneratedCode) {
+      result.generatedIdRange = {
+        start: firstGeneratedCode,
+        end: lastGeneratedCode,
+      };
+    }
+
+    result.message = `Bulk topic onboarding completed. ${result.totalTopicsCreated} topics provisioned across ${result.matchedSupervisors} verified supervisors. ${result.unmatchedSupervisors} faculty records skipped.`;
     return result;
   }
 }

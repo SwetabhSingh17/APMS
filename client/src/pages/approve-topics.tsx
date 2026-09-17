@@ -13,12 +13,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import Modal from "@/components/ui/modal";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle, XCircle, Search, Trash2 } from "lucide-react";
+import { CheckCircle, XCircle, Search, Trash2, FileSpreadsheet } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ProjectTopic, UserRole } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { useCourseFilter } from "@/hooks/course-filter-context";
+import { TopicBulkOnboardingModal } from "@/components/admin/topic-bulk-onboarding-modal";
 
 export default function ApproveTopics() {
   const { user } = useAuth();
@@ -28,6 +29,7 @@ export default function ApproveTopics() {
   const [isTopicModalOpen, setIsTopicModalOpen] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [isBulkTopicModalOpen, setIsBulkTopicModalOpen] = useState(false);
 
   const { courseFilter, getCourseQuery } = useCourseFilter();
 
@@ -40,10 +42,10 @@ export default function ApproveTopics() {
   } as UseQueryOptions<ProjectTopic[]>);
 
   const { data: approvedTopics = [], isLoading: isLoadingApproved } = useQuery<ProjectTopic[]>({
-    queryKey: [`/api/topics/approved${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
+    queryKey: [`/api/topics/approved${getCourseQuery() ? `?${getCourseQuery()}&` : '?'}limit=all`],
     enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN),
     queryFn: async () => {
-      const response = await apiRequest("GET", `/api/topics/approved${getCourseQuery() ? `?${getCourseQuery()}` : ''}`);
+      const response = await apiRequest("GET", `/api/topics/approved${getCourseQuery() ? `?${getCourseQuery()}&` : '?'}limit=all`);
       const data = await response.json();
       return data.data || data;
     },
@@ -96,8 +98,12 @@ export default function ApproveTopics() {
         description: "The topic has been approved and is now available for students to select.",
       });
       closeTopicModal();
-      queryClient.invalidateQueries({ queryKey: ["/api/topics/pending"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/topics/approved"] });
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === 'string' && key.startsWith('/api/topics');
+        },
+      });
     },
     onError: (error: Error, _topicId, context) => {
       // Rollback to snapshots on failure
@@ -149,8 +155,12 @@ export default function ApproveTopics() {
         description: "The topic has been rejected.",
       });
       closeTopicModal();
-      queryClient.invalidateQueries({ queryKey: ["/api/topics/pending"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/topics/rejected"] });
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === 'string' && key.startsWith('/api/topics');
+        },
+      });
     },
     onError: (error: Error, _topicId, context) => {
       if (context?.previousPending) {
@@ -179,9 +189,12 @@ export default function ApproveTopics() {
         description: "The selected topics have been deleted.",
       });
       setSelectedTopics(new Set());
-      queryClient.invalidateQueries({ queryKey: ["/api/topics/pending"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/topics/approved"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/topics/rejected"] });
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === 'string' && key.startsWith('/api/topics');
+        },
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -234,13 +247,16 @@ export default function ApproveTopics() {
   };
 
   const filterTopics = (topics: ProjectTopic[]) => {
-    // Filter by search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return topics.filter(
         topic =>
           topic.title.toLowerCase().includes(query) ||
-          topic.description?.toLowerCase().includes(query)
+          topic.description?.toLowerCase().includes(query) ||
+          (topic.topicCode?.toLowerCase().includes(query) || false) ||
+          (topic.technology?.toLowerCase().includes(query) || false) ||
+          ((topic.submittedBy as any)?.firstName?.toLowerCase().includes(query) || false) ||
+          ((topic.submittedBy as any)?.lastName?.toLowerCase().includes(query) || false)
       );
     }
     return topics;
@@ -274,9 +290,20 @@ export default function ApproveTopics() {
 
   return (
     <MainLayout>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground mb-1">Topic Approval</h1>
-        <p className="text-muted-foreground">Review and manage project topics submitted by faculty members</p>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground mb-1">Topic Approval</h1>
+          <p className="text-muted-foreground">Review and manage project topics submitted by faculty members</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setIsBulkTopicModalOpen(true)}
+            className="gap-1.5 bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            <span>Bulk Upload Topics</span>
+          </Button>
+        </div>
       </div>
 
       <div className="mb-6 flex flex-col md:flex-row gap-4">
@@ -371,7 +398,14 @@ export default function ApproveTopics() {
                             </TableCell>
                             <TableCell>
                               <div>
-                                <p className="font-medium text-foreground">{topic.title}</p>
+                                <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                  {topic.topicCode && (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                                      {topic.topicCode}
+                                    </span>
+                                  )}
+                                  <p className="font-medium text-foreground">{topic.title}</p>
+                                </div>
                                 <p className="text-sm text-muted-foreground">{(topic.description || "").substring(0, 60)}...</p>
                               </div>
                             </TableCell>
@@ -466,7 +500,14 @@ export default function ApproveTopics() {
                             </TableCell>
                             <TableCell>
                               <div>
-                                <p className="font-medium text-foreground">{topic.title}</p>
+                                <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                  {topic.topicCode && (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                                      {topic.topicCode}
+                                    </span>
+                                  )}
+                                  <p className="font-medium text-foreground">{topic.title}</p>
+                                </div>
                                 <p className="text-sm text-muted-foreground">{(topic.description || "").substring(0, 60)}...</p>
                               </div>
                             </TableCell>
@@ -568,7 +609,14 @@ export default function ApproveTopics() {
                             </TableCell>
                             <TableCell>
                               <div>
-                                <p className="font-medium text-foreground">{topic.title}</p>
+                                <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                  {topic.topicCode && (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                                      {topic.topicCode}
+                                    </span>
+                                  )}
+                                  <p className="font-medium text-foreground">{topic.title}</p>
+                                </div>
                                 <p className="text-sm text-muted-foreground">{(topic.description || "").substring(0, 60)}...</p>
                               </div>
                             </TableCell>
@@ -703,6 +751,11 @@ export default function ApproveTopics() {
           </>
         )}
       </Modal>
+
+      <TopicBulkOnboardingModal
+        isOpen={isBulkTopicModalOpen}
+        onClose={() => setIsBulkTopicModalOpen(false)}
+      />
     </MainLayout>
   );
 }

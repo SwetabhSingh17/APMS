@@ -51,6 +51,11 @@ export const users = pgTable("users", {
   role: text("role").notNull(),
   enrollmentNumber: text("enrollment_number"),
   course: text("course"),
+  empId: text("emp_id"),
+  prefix: text("prefix"),
+  designation: text("designation"),
+  mobile: text("mobile"),
+  department: text("department"),
   groupId: integer("group_id").references(() => studentGroups.id),
   forcePasswordReset: boolean("force_password_reset").notNull().default(false),
   isDeleted: boolean("is_deleted").notNull().default(false),
@@ -61,6 +66,7 @@ export const users = pgTable("users", {
     usernameIdx: index("username_idx").on(table.username),
     emailIdx: index("email_idx").on(table.email),
     enrollmentIdx: index("enrollment_idx").on(table.enrollmentNumber),
+    empIdIdx: index("emp_id_idx").on(table.empId),
   };
 });
 
@@ -74,6 +80,7 @@ export const insertUserSchema = createInsertSchema(users).omit({
 // Project topics table
 export const projectTopics = pgTable("project_topics", {
   id: serial("id").primaryKey(),
+  topicCode: text("topic_code"), // Auto-incrementing unique sequential ID: PUGID26001, PUGID26002, etc.
   title: text("title").notNull(),
   description: text("description"),
   submittedById: integer("submitted_by_id").references(() => users.id).notNull(),
@@ -89,6 +96,7 @@ export const projectTopics = pgTable("project_topics", {
 }, (table) => {
   return {
     statusIsDeletedIdx: index("status_is_deleted_idx").on(table.status, table.isDeleted),
+    topicCodeIdx: index("topic_code_idx").on(table.topicCode),
   };
 });
 
@@ -226,6 +234,11 @@ export type ProjectTopic = typeof projectTopics.$inferSelect & {
     id: number;
     firstName: string;
     lastName: string;
+    prefix?: string | null;
+    designation?: string | null;
+    empId?: string | null;
+    department?: string | null;
+    email?: string | null;
   };
 };
 export type InsertProjectTopic = z.infer<typeof insertProjectTopicSchema>;
@@ -323,4 +336,91 @@ export interface PaginatedResponse<T> {
   limit: number;
   totalPages: number;
 }
+
+// Row extracted from supervisor onboarding Excel file
+export interface ISupervisorOnboardingRow {
+  sNo?: number | string;
+  empId: string;
+  name: string;
+  prefix?: string;
+  firstName?: string;
+  lastName?: string;
+  designation: string;
+  mobile?: string;
+  email?: string;
+  department?: string;
+}
+
+// Summary result returned after processing bulk supervisor onboarding
+export interface ISupervisorOnboardingResult {
+  success: boolean;
+  message: string;
+  totalSupervisorsProcessed: number;
+  totalSupervisorsCreated: number;
+  totalSupervisorsUpdated: number;
+  supervisors: Array<{
+    empId: string;
+    name: string;
+    designation: string;
+    email: string;
+    username: string;
+    isNew: boolean;
+  }>;
+  errors?: string[];
+}
+
+// Individual project topic item extracted from a faculty suggestion row
+export interface ITopicOnboardingItem {
+  slot: number; // 1 to 5
+  title: string;
+  projectType: string;
+  technology: string;
+  description: string;
+}
+
+// Single faculty row extracted from topic suggestions Excel file
+export interface ITopicOnboardingRow {
+  rowNumber: number;
+  facultyName: string;
+  facultyEmail: string;
+  timestamp?: string;
+  topics: ITopicOnboardingItem[];
+}
+
+// Success record for an onboarded supervisor and their topics
+export interface ITopicOnboardingSuccessRecord {
+  rowNumber: number;
+  facultyName: string;
+  facultyEmail: string;
+  supervisorId: number;
+  empId?: string | null;
+  topicCodes: string[];
+  topicTitles: string[];
+}
+
+// Failure record for an unmatched faculty row
+export interface ITopicOnboardingFailureRecord {
+  rowNumber: number;
+  facultyName: string;
+  facultyEmail: string;
+  reason: string;
+}
+
+// Aggregated summary result of the bulk topic onboarding process
+export interface ITopicOnboardingResult {
+  success: boolean;
+  message: string;
+  totalRows: number;
+  matchedSupervisors: number;
+  unmatchedSupervisors: number;
+  totalTopicsCreated: number;
+  generatedIdRange?: {
+    start: string;
+    end: string;
+  };
+  successRecords: ITopicOnboardingSuccessRecord[];
+  failureRecords: ITopicOnboardingFailureRecord[];
+}
+
+
 
