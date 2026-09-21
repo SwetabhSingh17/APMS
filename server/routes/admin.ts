@@ -149,40 +149,139 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
         }
     });
 
-    /*
-     * NOTE: The following route was present in the original routes.ts but might be shadowed by auth.ts routes.
-     * It provides password hashing and allows Coordinators to update users.
-     * Since auth.ts registers a similar route matching /api/admin/users/:id first, this one might be unreachable
-     * unless the auth.ts one is removed or modified.
-     * We verify if we should keep it.
-     */
+    // Create a new user (Admin and Coordinator accessible)
+    router.post("/api/admin/users", requireRole([UserRole.ADMIN, UserRole.COORDINATOR]), async (req: Request, res: Response, next: any) => {
+        try {
+            const { confirmPassword, ...userData } = req.body;
+            const callerRole = (req.user as any)?.role;
+
+            const existingUser = await storage.getUserByUsername(userData.username);
+            if (existingUser) {
+                return res.status(400).json({ message: "Username already exists", code: "USERNAME_EXISTS" });
+            }
+
+            // RBAC checks for high-privilege roles
+            if (userData.role === UserRole.ADMIN) {
+                if (callerRole === UserRole.COORDINATOR) {
+                    return res.status(403).json({ message: "Coordinators cannot create Administrator accounts", code: "FORBIDDEN" });
+                }
+                const users = await storage.getAllUsers();
+                const existingAdmin = users.find(u => u.role === UserRole.ADMIN);
+                if (existingAdmin) {
+                    return res.status(403).json({
+                        message: "An Admin account already exists. Only one Admin account is allowed in the system.",
+                        code: "SINGLE_ADMIN_LIMIT"
+                    });
+                }
+            }
+
+            if (userData.role === UserRole.COORDINATOR) {
+                const users = await storage.getAllUsers();
+                const existingCoordinator = users.find(u => u.role === UserRole.COORDINATOR);
+                if (existingCoordinator) {
+                    return res.status(403).json({
+                        message: "A Coordinator account already exists. Only one Coordinator account is allowed in the system.",
+                        code: "SINGLE_COORDINATOR_LIMIT"
+                    });
+                }
+            }
+
+            // Validate enrollment number and course for students
+            if (userData.role === UserRole.STUDENT) {
+                if (!userData.enrollmentNumber) {
+                    return res.status(400).json({
+                        message: "Enrollment number is required for student registration",
+                        code: "ENROLLMENT_REQUIRED"
+                    });
+                }
+                const existingEnrollment = await storage.getUserByEnrollmentNumber(userData.enrollmentNumber);
+                if (existingEnrollment) {
+                    return res.status(400).json({
+                        message: "This enrollment number is already registered",
+                        code: "ENROLLMENT_EXISTS"
+                    });
+                }
+                if (userData.course && !["BCA", "MCA"].includes(userData.course)) {
+                    return res.status(400).json({ message: "Course must be either BCA or MCA", code: "INVALID_COURSE" });
+                }
+            }
+
+            if (!userData.password || userData.password.length < 6) {
+                return res.status(400).json({ message: "Password must be at least 6 characters long", code: "PASSWORD_TOO_SHORT" });
+            }
+
+            const hashedPassword = await hashPassword(userData.password);
+            const user = await storage.createUser({
+                ...userData,
+                password: hashedPassword,
+                forcePasswordReset: false,
+            });
+
+            const { password, ...userWithoutPassword } = user;
+            res.status(201).json(userWithoutPassword);
+        } catch (error) {
+            next(error);
+        }
+    });
+
+    // Update existing user (password change, profile details, course)
     router.patch("/api/admin/users/:id", requireRole([UserRole.ADMIN, UserRole.COORDINATOR]), async (req: Request, res: Response, next: any) => {
         try {
             const userId = parseInt(req.params.id);
-            const updateData = { ...req.body };
+            const { confirmPassword, id, ...updateData } = req.body;
+            const callerRole = (req.user as any)?.role;
+
+            const existingUser = await storage.getUser(userId);
+            if (!existingUser) {
+                return res.status(404).json({ message: "User not found", code: "USER_NOT_FOUND" });
+            }
+
+            // Security guardrails for Coordinators
+            if (callerRole === UserRole.COORDINATOR) {
+                if (existingUser.role === UserRole.ADMIN) {
+                    return res.status(403).json({
+                        message: "Coordinators cannot modify administrator accounts",
+                        code: "FORBIDDEN_TARGET_ADMIN"
+                    });
+                }
+                if (updateData.role === UserRole.ADMIN) {
+                    return res.status(403).json({
+                        message: "Coordinators cannot assign the Administrator role",
+                        code: "FORBIDDEN_ROLE_ELEVATION"
+                    });
+                }
+            }
 
             // Validate course if role is being updated to student or if user is a student
-            if (updateData.role === "student") {
+            if (updateData.role === "student" || (existingUser.role === "student" && updateData.course !== undefined)) {
                 if (updateData.course && !["BCA", "MCA"].includes(updateData.course)) {
-                    return res.status(400).json({ message: "Course must be either BCA or MCA" });
+                    return res.status(400).json({ message: "Course must be either BCA or MCA", code: "INVALID_COURSE" });
                 }
             } else if (updateData.role && updateData.role !== "student") {
                 // Clear course if role is changed to non-student
                 updateData.course = null;
             }
 
-            // If password is being updated, hash it first
+            // If password is being updated, validate length, hash it, and ensure forced reset is cleared
             if (updateData.password) {
-                updateData.password = await hashPassword(updateData.password);
+                if (typeof updateData.password !== "string" || updateData.password.trim().length < 6) {
+                    return res.status(400).json({
+                        message: "Password must be at least 6 characters long",
+                        code: "PASSWORD_TOO_SHORT"
+                    });
+                }
+                updateData.password = await hashPassword(updateData.password.trim());
+                // Explicitly clear forced password reset so students can log in directly without prompt
+                updateData.forcePasswordReset = false;
             }
 
             const user = await storage.updateUser(userId, updateData);
             if (!user) {
-                return res.status(404).json({ message: "User not found" });
+                return res.status(404).json({ message: "User not found", code: "USER_NOT_FOUND" });
             }
 
             // Notify Admins if a Coordinator made this change
-            if (req.user && (req.user as any).role === "coordinator") {
+            if (req.user && callerRole === "coordinator") {
                 const admins = await storage.getUsersByRole("admin" as any);
                 for (const admin of admins) {
                     await storage.createNotification({
@@ -195,6 +294,116 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
 
             const { password, ...userWithoutPassword } = user;
             res.status(200).json(userWithoutPassword);
+        } catch (error) {
+            next(error);
+        }
+    });
+
+    // Delete user (Admin and Coordinator accessible with safeguards)
+    router.delete("/api/admin/users/:id", requireRole([UserRole.ADMIN, UserRole.COORDINATOR]), async (req: Request, res: Response, next: any) => {
+        try {
+            const userId = parseInt(req.params.id);
+            const callerRole = (req.user as any)?.role;
+
+            const existingUser = await storage.getUser(userId);
+            if (!existingUser) {
+                return res.status(404).json({ message: "User not found", code: "USER_NOT_FOUND" });
+            }
+
+            // Coordinators cannot delete Administrator or Coordinator accounts
+            if (callerRole === UserRole.COORDINATOR) {
+                if (existingUser.role === UserRole.ADMIN || existingUser.role === UserRole.COORDINATOR) {
+                    return res.status(403).json({
+                        message: "Coordinators cannot delete administrator or coordinator accounts",
+                        code: "FORBIDDEN_DELETE_STAFF"
+                    });
+                }
+            }
+
+            const success = await storage.deleteUser(userId);
+            if (!success) {
+                return res.status(404).json({ message: "User not found", code: "USER_NOT_FOUND" });
+            }
+
+            res.status(200).json({ message: "User deleted successfully", code: "USER_DELETED" });
+        } catch (error) {
+            next(error);
+        }
+    });
+
+    // Reset user password to default credential (Enrollment No for Students, EmpID for Supervisors)
+    router.post("/api/admin/users/:id/reset-password", requireRole([UserRole.ADMIN, UserRole.COORDINATOR]), async (req: Request, res: Response, next: any) => {
+        try {
+            const userId = parseInt(req.params.id);
+            const callerRole = (req.user as any)?.role;
+
+            const targetUser = await storage.getUser(userId);
+            if (!targetUser) {
+                return res.status(404).json({ message: "User not found", code: "USER_NOT_FOUND" });
+            }
+
+            // RBAC checks: Coordinators cannot reset Admin or Coordinator accounts
+            if (callerRole === UserRole.COORDINATOR && (targetUser.role === UserRole.ADMIN || targetUser.role === UserRole.COORDINATOR)) {
+                return res.status(403).json({
+                    message: "Coordinators cannot reset passwords for administrator or coordinator accounts",
+                    code: "FORBIDDEN_TARGET_STAFF"
+                });
+            }
+
+            let defaultPassword = "";
+            let defaultType = "";
+
+            if (targetUser.role === UserRole.STUDENT) {
+                defaultPassword = targetUser.enrollmentNumber || targetUser.username;
+                defaultType = "Enrollment Number";
+                if (!defaultPassword) {
+                    return res.status(400).json({
+                        message: "Cannot reset password: user has no enrollment number configured",
+                        code: "NO_DEFAULT_CREDENTIAL"
+                    });
+                }
+            } else if (targetUser.role === UserRole.SUPERVISOR) {
+                defaultPassword = targetUser.empId || targetUser.username;
+                defaultType = "Employee ID";
+                if (!defaultPassword) {
+                    return res.status(400).json({
+                        message: "Cannot reset password: user has no Employee ID configured",
+                        code: "NO_DEFAULT_CREDENTIAL"
+                    });
+                }
+            } else {
+                return res.status(400).json({
+                    message: "Default password reset is only supported for students (Enrollment Number) and supervisors (Employee ID)",
+                    code: "UNSUPPORTED_ROLE"
+                });
+            }
+
+            // Hash the default password and set forcePasswordReset: true so user is prompted to change it on next login
+            const hashedPassword = await hashPassword(defaultPassword.trim());
+            const updatedUser = await storage.updateUser(userId, {
+                password: hashedPassword,
+                forcePasswordReset: true,
+            });
+
+            // Notify Admins if a Coordinator performed the reset
+            if (req.user && callerRole === UserRole.COORDINATOR) {
+                const admins = await storage.getUsersByRole(UserRole.ADMIN);
+                for (const admin of admins) {
+                    await storage.createNotification({
+                        userId: admin.id,
+                        title: "Password Reset to Default",
+                        message: `Coordinator ${(req.user as any).firstName} reset the password for ${targetUser.firstName} ${targetUser.lastName} (${targetUser.role}) to their default ${defaultType}.`
+                    });
+                }
+            }
+
+            const { password, ...userWithoutPassword } = updatedUser || targetUser;
+            res.status(200).json({
+                message: `Password successfully reset to default ${defaultType} (${defaultPassword}). The user will be required to set a new password on their next login.`,
+                code: "PASSWORD_RESET_DEFAULT_SUCCESS",
+                defaultType,
+                user: userWithoutPassword,
+            });
         } catch (error) {
             next(error);
         }

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, UserPlus, UserCog, Edit, Trash2, Eye, EyeOff, FileSpreadsheet, UserCheck } from "lucide-react";
+import { Search, UserPlus, UserCog, Edit, Trash2, Eye, EyeOff, FileSpreadsheet, UserCheck, RotateCcw, KeyRound } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
@@ -80,6 +80,7 @@ export default function UserManagement() {
 
   const [isEditUserOpen, setIsEditUserOpen] = useState(false);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+  const [resetPasswordUser, setResetPasswordUser] = useState<any>(null);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -240,6 +241,28 @@ export default function UserManagement() {
     }
   });
 
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (userId: number) => {
+      const res = await apiRequest("POST", `/api/admin/users/${userId}/reset-password`);
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Password Reset Successful",
+        description: data.message,
+      });
+      setResetPasswordUser(null);
+      queryClient.invalidateQueries({ queryKey: [`/api/users${getCourseQuery() ? `?${getCourseQuery()}` : ''}`] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to reset password",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
   const onSubmit = (data: UserFormValues) => {
     const { confirmPassword, ...userData } = data;
 
@@ -254,8 +277,10 @@ export default function UserManagement() {
   const onEditSubmit = (data: Partial<EditFormValues>) => {
     if (!selectedUser) return;
 
+    const { confirmPassword, ...restData } = data;
+
     // Remove undefined/empty fields
-    const updateData: Partial<InsertUser> = Object.entries(data).reduce((acc, [key, value]) => {
+    const updateData: Partial<InsertUser> = Object.entries(restData).reduce((acc, [key, value]) => {
       if (value !== undefined && value !== "" && value !== null) {
         acc[key as keyof InsertUser] = value as any;
       }
@@ -456,6 +481,17 @@ export default function UserManagement() {
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex space-x-2 justify-end">
+                                    {(user.role === UserRole.STUDENT || user.role === UserRole.SUPERVISOR) && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40"
+                                        title={`Reset password to default (${user.role === UserRole.SUPERVISOR ? 'Emp. ID' : 'Enrollment No.'})`}
+                                        onClick={() => setResetPasswordUser(user)}
+                                      >
+                                        <RotateCcw className="h-4 w-4" />
+                                      </Button>
+                                    )}
                                     <Button
                                       variant="outline"
                                       size="sm"
@@ -606,6 +642,15 @@ export default function UserManagement() {
                                   <Button
                                     variant="outline"
                                     size="sm"
+                                    className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40"
+                                    title="Reset password to default Employee ID"
+                                    onClick={() => setResetPasswordUser(user)}
+                                  >
+                                    <RotateCcw className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
                                     onClick={() => handleEditUser(user)}
                                   >
                                     <Edit className="h-4 w-4" />
@@ -671,6 +716,15 @@ export default function UserManagement() {
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex space-x-2 justify-end">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40"
+                                    title="Reset password to default Enrollment Number"
+                                    onClick={() => setResetPasswordUser(user)}
+                                  >
+                                    <RotateCcw className="h-4 w-4" />
+                                  </Button>
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -1096,6 +1150,34 @@ export default function UserManagement() {
 
 
               <div className="border-t pt-4 mt-4">
+                {(selectedUser?.role === UserRole.STUDENT || selectedUser?.role === UserRole.SUPERVISOR) && (
+                  <div className="flex items-center justify-between p-3 bg-amber-500/10 border border-amber-500/20 rounded-md mb-4">
+                    <div className="text-xs">
+                      <p className="font-semibold text-foreground flex items-center gap-1.5">
+                        <KeyRound className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                        Reset to Default Password
+                      </p>
+                      <p className="text-muted-foreground mt-0.5">
+                        Restores password to {selectedUser.role === UserRole.SUPERVISOR ? "Employee ID" : "Enrollment Number"}.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 font-medium text-xs shadow-none"
+                      onClick={() => {
+                        const userToReset = selectedUser;
+                        setIsEditUserOpen(false);
+                        setResetPasswordUser(userToReset);
+                      }}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Reset to Default
+                    </Button>
+                  </div>
+                )}
+
                 <h4 className="text-sm font-medium mb-2">Change Password</h4>
                 <p className="text-sm text-muted-foreground mb-4">Leave blank to keep the current password</p>
 
@@ -1151,11 +1233,8 @@ export default function UserManagement() {
           </DialogHeader>
           {selectedUser && (
             <div className="flex items-center space-x-3 py-2">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-primary font-medium text-sm">
-                  {selectedUser.firstName.charAt(0)}
-                  {selectedUser.lastName.charAt(0)}
-                </span>
+              <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center text-destructive font-semibold">
+                {selectedUser.firstName ? selectedUser.firstName.charAt(0) : "U"}
               </div>
               <div>
                 <p className="font-medium">{selectedUser.firstName} {selectedUser.lastName}</p>
@@ -1163,7 +1242,7 @@ export default function UserManagement() {
               </div>
             </div>
           )}
-          <DialogFooter className="pt-4">
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button
               variant="outline"
               onClick={() => setIsConfirmDeleteOpen(false)}
@@ -1176,6 +1255,51 @@ export default function UserManagement() {
               disabled={deleteUserMutation.isPending}
             >
               {deleteUserMutation.isPending ? "Deleting..." : "Delete User"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Password Reset Dialog */}
+      <Dialog open={!!resetPasswordUser} onOpenChange={(open) => !open && setResetPasswordUser(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              Reset Password to Default
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-sm text-foreground/80">
+              Are you sure you want to reset the password for{" "}
+              <strong className="text-foreground">{resetPasswordUser?.firstName} {resetPasswordUser?.lastName}</strong> ({resetPasswordUser?.role})?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 text-xs sm:text-sm text-muted-foreground bg-amber-500/10 border border-amber-500/20 p-3.5 rounded-md text-left space-y-1.5">
+            <p>
+              • The password will be restored to their default:{" "}
+              <strong className="text-foreground font-mono">
+                {resetPasswordUser?.role === UserRole.SUPERVISOR
+                  ? `Employee ID (${resetPasswordUser?.empId || resetPasswordUser?.username})`
+                  : `Enrollment Number (${resetPasswordUser?.enrollmentNumber || resetPasswordUser?.username})`}
+              </strong>.
+            </p>
+            <p>• The user will be intercepted on their next login and prompted to set a new password.</p>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setResetPasswordUser(null)}
+              disabled={resetPasswordMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="bg-amber-600 hover:bg-amber-700 text-white gap-1.5"
+              onClick={() => resetPasswordMutation.mutate(resetPasswordUser.id)}
+              disabled={resetPasswordMutation.isPending}
+            >
+              {resetPasswordMutation.isPending ? "Resetting..." : "Confirm Reset"}
             </Button>
           </DialogFooter>
         </DialogContent>

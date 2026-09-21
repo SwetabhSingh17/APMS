@@ -34,11 +34,34 @@ export async function hashPassword(password: string) {
   return `${buf.toString("hex")}.${salt}`;
 }
 
-export async function comparePasswords(supplied: string, stored: string) {
-  const [hashed, salt] = stored.split(".");
-  const hashedBuf = Buffer.from(hashed, "hex");
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
+export async function comparePasswords(supplied: string, stored: string): Promise<boolean> {
+  if (!supplied || !stored) return false;
+
+  try {
+    if (stored.includes(".")) {
+      const [hashed, salt] = stored.split(".");
+      if (hashed && salt) {
+        const hashedBuf = Buffer.from(hashed, "hex");
+        const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+        if (hashedBuf.length === suppliedBuf.length && timingSafeEqual(hashedBuf, suppliedBuf)) {
+          return true;
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Error evaluating hashed password:", err);
+  }
+
+  // Fallback for legacy or unhashed plaintext passwords in database
+  try {
+    if (stored === supplied) {
+      return true;
+    }
+  } catch (err) {
+    console.error("Error evaluating plaintext password match:", err);
+  }
+
+  return false;
 }
 
 // Role-based authorization middleware
@@ -99,13 +122,31 @@ export function setupAuth(app: Express, storage: DBStorage) {
     new LocalStrategy(async (username, password, done) => {
       try {
         const user = await storage.getUserByUsername(username);
-        if (!user || !(await comparePasswords(password, user.password))) {
-          return done(null, false);
-        } else {
-          return done(null, user);
+        if (!user) {
+          return done(null, false, { message: "Invalid username or password", code: "USER_NOT_FOUND" } as any);
         }
-      } catch (error) {
-        return done(error);
+        if (user.isDeleted) {
+          return done(null, false, { message: "This account has been deactivated. Please contact an administrator.", code: "ACCOUNT_DEACTIVATED" } as any);
+        }
+        const isMatch = await comparePasswords(password, user.password);
+        if (!isMatch) {
+          return done(null, false, { message: "Invalid username or password", code: "INVALID_PASSWORD" } as any);
+        }
+
+        // Automatic security upgrade: If user password was unhashed / plaintext, transparently rehash it
+        if (!user.password.includes(".")) {
+          try {
+            const upgradedHash = await hashPassword(password);
+            await storage.updateUser(user.id, { password: upgradedHash });
+          } catch (upgradeErr) {
+            console.error("Failed to automatically upgrade unhashed password:", upgradeErr);
+          }
+        }
+
+        return done(null, user);
+      } catch (error: any) {
+        console.error("Authentication internal error:", error);
+        return done(error, false, { message: "Internal server error during authentication", code: "AUTH_INTERNAL_ERROR" } as any);
       }
     }),
   );
@@ -185,13 +226,33 @@ export function setupAuth(app: Express, storage: DBStorage) {
 
   app.post("/api/login", authLimiter, (req: Request, res: Response, next: NextFunction) => {
     passport.authenticate("local", (err: any, user: Express.User | false, info: any) => {
-      if (err) return next(err);
-      if (!user) return res.status(401).json({ message: "Invalid username or password" });
+      if (err) {
+        console.error("Login authentication error:", err);
+        return res.status(500).json({
+          message: err.message || "An internal error occurred during authentication",
+          code: info?.code || "AUTH_SERVER_ERROR",
+        });
+      }
+      if (!user) {
+        return res.status(401).json({
+          message: info?.message || "Invalid username or password",
+          code: info?.code || "INVALID_CREDENTIALS",
+        });
+      }
 
       req.login(user, (err) => {
-        if (err) return next(err);
+        if (err) {
+          console.error("Login session establishment error:", err);
+          return res.status(500).json({
+            message: "Failed to establish user session",
+            code: "SESSION_CREATION_FAILED",
+          });
+        }
         const { password, ...userWithoutPassword } = user;
-        res.status(200).json(userWithoutPassword);
+        res.status(200).json({
+          ...userWithoutPassword,
+          code: "LOGIN_SUCCESS",
+        });
       });
     })(req, res, next);
   });
@@ -209,82 +270,7 @@ export function setupAuth(app: Express, storage: DBStorage) {
     res.json(userWithoutPassword);
   });
 
-  // Admin-only routes
-  app.post("/api/admin/users", requireRole([UserRole.ADMIN]), async (req, res, next) => {
-    try {
-      const existingUser = await storage.getUserByUsername(req.body.username);
-      if (existingUser) {
-        return res.status(400).json({ message: "Username already exists" });
-      }
 
-      // Check if trying to create Admin or Coordinator
-      if (req.body.role === UserRole.ADMIN || req.body.role === UserRole.COORDINATOR) {
-        // Check if an admin or coordinator already exists
-        const users = await storage.getAllUsers();
-        const existingAdmin = users.find(u => u.role === UserRole.ADMIN);
-        const existingCoordinator = users.find(u => u.role === UserRole.COORDINATOR);
-
-        if (req.body.role === UserRole.ADMIN && existingAdmin) {
-          return res.status(403).json({
-            message: "An Admin account already exists. Only one Admin account is allowed in the system."
-          });
-        }
-
-        if (req.body.role === UserRole.COORDINATOR && existingCoordinator) {
-          return res.status(403).json({
-            message: "A Coordinator account already exists. Only one Coordinator account is allowed in the system."
-          });
-        }
-      }
-
-      // Validate enrollment number for students
-      if (req.body.role === UserRole.STUDENT && !req.body.enrollmentNumber) {
-        return res.status(400).json({
-          message: "Enrollment number is required for student registration"
-        });
-      }
-
-      const hashedPassword = await hashPassword(req.body.password);
-      const user = await storage.createUser({
-        ...req.body,
-        password: hashedPassword,
-      });
-
-      const { password, ...userWithoutPassword } = user;
-      res.status(201).json(userWithoutPassword);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.patch("/api/admin/users/:id", requireRole([UserRole.ADMIN]), async (req, res, next) => {
-    try {
-      const userId = parseInt(req.params.id);
-      const user = await storage.updateUser(userId, req.body);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      const { password, ...userWithoutPassword } = user;
-      res.status(200).json(userWithoutPassword);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.delete("/api/admin/users/:id", requireRole([UserRole.ADMIN]), async (req, res, next) => {
-    try {
-      const userId = parseInt(req.params.id);
-      const success = await storage.deleteUser(userId);
-      if (!success) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      res.status(200).json({ message: "User deleted successfully" });
-    } catch (error) {
-      next(error);
-    }
-  });
 
   // Update own profile
   app.patch("/api/user/profile", async (req, res, next) => {

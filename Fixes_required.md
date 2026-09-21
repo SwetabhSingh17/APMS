@@ -6,6 +6,45 @@ This document outlines suggested architectural, security, and maintenance improv
 
 ## 🚨 Priority Bugs to be Resolved
 
+### 🟢 ACTIVE ISSUES RESOLVED (v1.9.5 - Completed & Verified)
+
+- [x] **Student Unable to Login After Admin/Coordinator Password Reset & Route Shadowing** — **COMPLETED**
+  - **Affected Files:** `server/auth.ts`, `server/routes/admin.ts`, `client/src/lib/queryClient.ts`, `client/src/pages/auth-page.tsx`, `client/src/pages/user-management.tsx`, `client/src/hooks/use-auth.tsx`
+  - **Root Cause Analysis:**
+    1. Route Shadowing: `setupAuth()` in `server/auth.ts` registered `PATCH /api/admin/users/:id` (Admin-only) before `server/routes/admin.ts` mounted the intended Admin+Coordinator route.
+    2. Coordinators received `403 Forbidden`, meaning user password changes by coordinators were rejected.
+    3. Admins bypassed password hashing: the handler in `auth.ts` saved `req.body.password` directly in plaintext to the database.
+    4. Plaintext passwords caused `comparePasswords()` to crash on `scryptAsync` due to `salt` being undefined (`TypeError: The "salt" argument must be of type string`). Because `/api/login` lacked error handling, the request hung or failed without a JSON response ("no error nothing, no response").
+    5. `forcePasswordReset` was not cleared when passwords were reset by admins, threatening to trap students in the first-login dialog requiring their enrollment number.
+  - **Resolution Implemented:**
+    1. Consolidated all `/api/admin/users` routes (`POST`, `PATCH`, `DELETE`) into `server/routes/admin.ts`, removing duplicate shadowed routes from `server/auth.ts`.
+    2. Added password hashing (`await hashPassword()`), validation (min 6 chars), and explicit `forcePasswordReset = false` clearing in `PATCH /api/admin/users/:id`.
+    3. Updated `comparePasswords()` to gracefully evaluate both scrypt hashes and legacy plaintext passwords without throwing exceptions.
+    4. Added automatic security migration in `LocalStrategy`: when a user with a plaintext password logs in, their password is automatically upgraded to an scrypt hash in the database.
+    5. Added granular error codes (`USER_NOT_FOUND`, `INVALID_PASSWORD`, `ACCOUNT_DEACTIVATED`, `AUTH_INTERNAL_ERROR`, `SESSION_CREATION_FAILED`, etc.) across server and client for precise diagnostic telemetry.
+    6. Updated `client/src/lib/queryClient.ts` with `ApiError` to parse JSON messages and error codes, and enhanced `client/src/pages/auth-page.tsx` with error banner telemetry.
+    7. Added One-Click "Reset Password to Default" button for Admins and Coordinators in User Management (`POST /api/admin/users/:id/reset-password`):
+       - Students: resets to their official `enrollmentNumber`.
+       - Supervisors: resets to their official `empId`.
+       - Automatically sets `forcePasswordReset: true` so the user is intercepted on their next login and prompted to choose a new secure password.
+       - Enforces RBAC safety: Coordinators are strictly prevented from resetting Admin or Coordinator passwords (`FORBIDDEN_TARGET_STAFF`).
+       - Sends notification to all system Administrators whenever a Coordinator performs a default password reset.
+       - Action buttons available across All Users, Students, Supervisors tabs, and within the Edit User dialog.
+    8. Login Screen Institutional Branding & Creator Attribution:
+       - Added the official `Department_Logo.png` in a responsive framed container above the login card.
+        - Updated the portal header typography to the university standard:
+          - `(I.U.A.P.M.P)`
+          - `Integral University Academic Project Management Portal`
+          - `Department of Computer Application`
+          - `INTEGRAL UNIVERSITY`
+       - Added institutional footer at the bottom (plain text):
+         - `❤️ Powered By : Binary Battalion.ai ❤️`
+         - `💻 Designed and Developed by : SWETABH SINGH 💻`
+    9. Registration Closed Frontend Layover:
+       - Added a frontend overlay over the Register tab on the login page stating `"Registrations are closed as of now, Teams have already been allotted."`.
+       - Clicking the Register tab or anywhere on the overlay displays a destructive toast notification informing the user that registrations are closed.
+       - Implemented strictly on the frontend (`IS_REGISTRATION_OPEN = false`) with zero backend modifications, preserving the registration pipeline for future re-enabling.
+
 ### 🟢 ACTIVE ISSUES RESOLVED (v1.9.4 - Completed & Verified)
 
 - [x] **Supervisor Search Bar in Admin & Coordinator Change Supervisor Dialog** — **COMPLETED**
@@ -219,9 +258,9 @@ This document outlines suggested architectural, security, and maintenance improv
   Selecting "BCA" or "MCA" in the header course filter returned 0 student groups and 0 accounts because member courses were missing from SQL projections and course matching was case-sensitive.
   *Resolution:* Included member course in `getAllStudentGroups()` projection, added case-insensitive matching across users and groups, and preserved admin accounts in user queries.
 
-- [ ] **Coordinator User-Edits Silently Fail (Route Shadowing)** — `server/auth.ts:238` vs `server/routes/admin.ts:117`
-  `setupAuth()` registers `PATCH /api/admin/users/:id` (Admin-only) at app level **before** `registerRoutes()` mounts the intended Admin+Coordinator version. Express matches the first handler, so Coordinator edits always return 403 and the admin.ts handler is unreachable dead code.
-  *Fix:* Remove one of the duplicates (keep the role-flexible router version).
+- [x] **Coordinator User-Edits Silently Fail (Route Shadowing)** — `server/auth.ts` vs `server/routes/admin.ts` — **FIXED**
+  `setupAuth()` registered `PATCH /api/admin/users/:id` (Admin-only) at app level **before** `registerRoutes()` mounted the intended Admin+Coordinator version. Express matched the first handler, causing Coordinator edits to return 403 and Admin edits to bypass password hashing.
+  *Resolution:* Removed redundant routes from `server/auth.ts` and consolidated `POST`, `PATCH`, and `DELETE /api/admin/users` into `server/routes/admin.ts` with proper password hashing, length validation, `forcePasswordReset` clearing, and coordinator guardrails.
 
 - [ ] **Backup Export/Restore Loses Data & Breaks on FK Order**
   - `exportData()` (`server/db-storage.ts`) exports only users, topics, projects, groups, members — **project_assessments (grades), project_milestones, and notifications are never archived**, so year-change backups silently drop all evaluation history.

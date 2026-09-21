@@ -53,9 +53,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setTimeout(() => setSplashState("idle"), 2500);
     },
     onError: (error: Error) => {
+      const code = (error as any).code;
       toast({
         title: "Login failed",
-        description: error.message,
+        description: code ? `${error.message} (${code})` : error.message,
         variant: "destructive",
       });
     },
