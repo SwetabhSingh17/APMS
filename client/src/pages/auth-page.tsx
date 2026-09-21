@@ -137,11 +137,11 @@ export default function AuthPage() {
         <Card className="w-full shadow-md border-border/80 bg-card">
           <CardHeader className="space-y-2 pb-4 text-center">
             <div className="flex justify-center">
-              <span className="text-xs sm:text-sm font-bold tracking-wider text-primary bg-primary/10 border border-primary/20 px-3 py-0.5 rounded-full">
-                ( I.U.A.P.M.P )
+              <span className="text-lg sm:text-xl font-bold tracking-wider text-primary bg-primary/10 border border-primary/20 px-3 py-0.5 rounded-full">
+                IU-APMP
               </span>
             </div>
-            <h1 className="font-bold text-primary text-lg sm:text-xl tracking-tight leading-snug">
+            <h1 className="font-bold text-primary text-sm sm:text-lg tracking-tight leading-snug">
               Integral University Academic Project Management Portal
             </h1>
             <p className="text-sm font-semibold text-foreground/90">
