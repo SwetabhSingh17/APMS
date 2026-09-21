@@ -141,7 +141,7 @@ export default function AuthPage() {
                 IU-APMP
               </span>
             </div>
-            <h1 className="font-bold text-primary text-sm sm:text-lg tracking-tight leading-snug">
+            <h1 className="font-bold text-primary text-s sm:text-sm tracking-tight leading-snug">
               Integral University Academic Project Management Portal
             </h1>
             <p className="text-sm font-semibold text-foreground/90">
