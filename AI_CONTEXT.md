@@ -9,15 +9,17 @@ This document provides comprehensive context about the APMS project. It is inten
 APMS is a comprehensive web-based project management system for educational institutions. It streamlines project topic approval, project team formation, supervisor mentoring, and progress tracking.
 
 ### Core Workflows:
-1. **Topic Proposals**: 
-   - **BCA**: Supervisors submit project topics. Coordinators review and approve them. Students then select from the approved pool.
+1. **Topic Proposals & Student Topic Confirmation**: 
+   - **BCA**: Supervisors submit project topics. Coordinators review and approve them. Students then select from the approved pool. An `AlertDialog` confirmation modal prompts students before selection is finalized, warning that topic selection is irreversible and automatically binds their entire project team.
    - **MCA**: Coordinators assign Supervisors to Students. MCA Students propose multiple topics directly to their assigned Supervisor. Supervisors use a dedicated "Student Suggestions" tab to review, endorse, or reject topics. Once endorsed by the Supervisor and approved by the Coordinator/Admin, the project status automatically transitions to active (Auto-Project Assignment).
 2. **Project Teams**: Students form groups, invite peers, and select approved topics. Strict course-based size limits are enforced: BCA teams must have 2 to 5 members, while MCA teams must have 1 to 2 members. Admins and Coordinators have exclusive authority to create single-member BCA teams and manage team members globally. Students and Supervisors do not have access to modify team rosters or leave teams; only Administrators and Coordinators can add, edit, or remove team members.
-3. **Mentorship & Tracking**: Supervisor mentors evaluate group progress, grade milestones, and provide final assessments.
-4. **Manage Project (Supervisor Allotment)**: Admins and Coordinators can view all project teams and manually reassign their supervisors via the dedicated `/manage-project` page with a searchable dropdown.
+3. **Supervisor Dedicated Project View ("My Topics & Teams")**: Supervisors navigating to `/projects` are given an isolated, focused portal showing only their submitted topics, live allotment status (`Picked` vs `Available`), PUGID codes, course, and allotted team rosters with enrollment numbers.
+4. **Manage Project (Pending & Assigned Tabs + Real-Time Supervisor Search)**: Admins and Coordinators view all project teams categorized into "Pending" (teams without an allotted topic) and "Assigned" tabs with live count badges. The Change Supervisor dialog features a high-performance, real-time search input filtering across 60+ faculty supervisors by name, title prefix, department, designation, and email.
 5. **Course Segregation**: The system strictly segregates operations based on the Student's course (BCA or MCA). Students are isolated to their course context, while Admins, Coordinators, and Supervisors use a global UI `CourseFilterContext` toggle to switch contexts. Course filtering across users, groups, and topics employs case-insensitive matching (`UPPER(course)`) and includes member-level affiliations while preserving administrative visibility.
-6. **Administration**: Admins manage users, generate Excel reports, and oversee system settings (including database backups/resets). User management supports complete roster retrieval (`limit=all`) with real-time tab counters and role segmentation.
-7. **Bulk Excel Onboarding, Real-Time Progress & First-Login Security**: Coordinators and Admins can bulk-provision cohorts from multi-sheet Excel files with live SSE progress streaming (tracking network upload, multi-sheet parsing, cryptographic account batching, and team formation). Built with an atomic progress state and native UI elements to eliminate React hook dispatcher desynchronization. The system automatically provisions accounts with initial passwords set to their enrollment number, forms project teams by `projectTeamId`, and sets `forcePasswordReset = true`. A non-dismissible modal and backend security interceptor enforce a mandatory password change on first login before operational APIs are accessible.
+6. **Administration & One-Click Default Password Reset**: Admins and Coordinators manage users with full roster visibility (`limit=all`), role segmentation, and one-click default password resets (`POST /api/admin/users/:id/reset-password`). Students reset to their enrollment number, supervisors to their employee ID, with `forcePasswordReset: true` enforced on next login. Strict RBAC prevents Coordinators from resetting Admin/Coordinator accounts (`FORBIDDEN_TARGET_STAFF`), and all staff resets notify Administrators.
+7. **Bulk Excel Onboarding, Real-Time Progress & First-Login Security**: Coordinators and Admins can bulk-provision cohorts from multi-sheet Excel files with live SSE progress streaming (tracking network upload, multi-sheet parsing, cryptographic account batching, and team formation). Built with an atomic progress state and native UI elements to eliminate React hook dispatcher desynchronization. The system automatically provisions accounts with initial passwords set to their identifier, forms project teams by `projectTeamId`, and sets `forcePasswordReset = true`. A non-dismissible modal and backend security interceptor enforce a mandatory password change on first login before operational APIs are accessible.
+8. **Institutional Branding & Registration Gate**: Features official institutional branding (`Department_Logo.png`), standardized University typography headers, creator attributions, and a registration closed overlay on the authentication screen (`IS_REGISTRATION_OPEN = false`).
+9. **Authentication Route Consolidation & Password Migration**: All user mutation routes (`POST`, `PATCH`, `DELETE`) are consolidated into `server/routes/admin.ts`. Legacy plaintext passwords are automatically upgraded to scrypt hashes on login, and standardized machine-readable error codes (`USER_NOT_FOUND`, `INVALID_PASSWORD`, `ACCOUNT_DEACTIVATED`, etc.) provide clean telemetry.
 
 ---
 
@@ -52,10 +54,16 @@ The repository is structured as a monorepo-style full-stack application:
   - `websocket.ts`: Session-authenticated WebSocket server for real-time notification delivery.
 - `shared/`: Types and schemas shared between client and server.
   - `schema.ts`: Core Drizzle tables, Zod schemas, and TypeScript interfaces (`IUser`, `IStudentGroup`, etc.).
-- `scripts/`: DB seeding, backup, restore, setup, reset, and verification scripts.
+- `scripts/`: DB seeding, backup, restore, setup, reset, and verification test suites.
   - `ensure_db.ts`: Production-safe bootstrap used by `start_server.bat` (`npm run db:ensure`).
-  - `verify_onboarding_and_access_control.ts`: Automated test suite for bulk onboarding, team linking, and access control.
   - `setup_db.ts`: Full destructive reset (wipes schema, pushes tables, seeds admin). Aliased as `db:hard-reset`.
+  - `verify_password_reset_and_login.ts`: Automated test suite for default password reset, scrypt hashing, legacy plaintext migration, and RBAC restrictions (`npm run test:password`).
+  - `verify_priority_bug_fixes.ts`: Automated test suite for priority bug fixes (`npm run test:fixes`).
+  - `verify_topic_selection_and_routing.ts`: Automated test suite for student topic confirmation, routing, and selection (`npm run test:selection`).
+  - `verify_onboarding_and_access_control.ts`: Automated test suite for student bulk onboarding, team linking, and access control (`npm run test:onboarding`).
+  - `verify_supervisor_onboarding_and_rbac.ts`: Automated test suite for faculty supervisor onboarding and profile RBAC (`npm run test:supervisor`).
+  - `verify_bulk_topic_onboarding.ts`: Automated test suite for Google Forms response spreadsheet topic onboarding & sequential PUGID generation (`npm run test:topics`).
+  - `e2e_verify.ts`: End-to-end integration and system verification suite (`npm run test:e2e`).
 ---
 
 
@@ -107,7 +115,7 @@ APMS includes a robust real-time notification system powered by WebSockets with 
 ---
 
 ## 7. Access Control (RBAC)
-- **Student**: Can browse topics, form groups, invite members, submit milestones. Segregated by Course (BCA/MCA).
-- **Supervisor**: Can propose topics, evaluate assigned groups, grade milestones, and manage MCA topic endorsements.
-- **Coordinator**: Can approve/reject topic proposals, oversee all projects, view department stats, and manually reassign supervisors to project teams via the Manage Project page.
-- **Admin**: Has full access, can perform destructive actions (DB resets), manage all users, and reassign supervisors.
+- **Student**: Can browse and search topics specific to their course (BCA/MCA), form groups, invite members, and submit milestones. Segregated by Course. Cannot leave or modify group rosters once formed.
+- **Supervisor**: Has dedicated "My Topics & Teams" view showing only own proposed topics and assigned student teams with rosters. Can evaluate assigned groups, grade milestones, and manage MCA topic endorsements. Cannot modify team memberships.
+- **Coordinator**: Can approve/reject topic proposals, oversee all projects, view department stats, and manually reassign supervisors to project teams with real-time faculty search. Can reset student and supervisor passwords to defaults, but is strictly prohibited from resetting or modifying Administrator or Coordinator accounts (`FORBIDDEN_TARGET_STAFF`).
+- **Admin**: Has full system access, can perform destructive actions (DB resets), manage all users and roles, reset any user's password, and reassign supervisors.

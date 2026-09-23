@@ -1,6 +1,43 @@
 # Version History
 
-## Version 1.9.4 (Current)
+## Version 1.9.5 (Current)
+### Default Password Reset, Route Consolidation, Institutional Branding & Registration Lock
+1. **One-Click Default Password Reset for Admins & Coordinators (`/user-management`)** —
+   - Added a dedicated "Reset Password to Default" button for Admins and Coordinators across All Users, Students, and Supervisors tables, as well as inside the Edit User dialog (`POST /api/admin/users/:id/reset-password`).
+   - Dynamically determines the official default credential based on user role:
+     - **Students**: Resets password to their university `enrollmentNumber`.
+     - **Supervisors**: Resets password to their university Employee ID (`empId`).
+   - Automatically sets `forcePasswordReset: true` in the database so that the user is intercepted on their next login and prompted with a mandatory reset dialog to configure a new password.
+   - Implemented strict RBAC protection: Coordinators are strictly prevented from resetting Admin or Coordinator passwords (`FORBIDDEN_TARGET_STAFF`).
+   - Automatically dispatches a system audit notification to all Administrators whenever a Coordinator executes a default password reset.
+2. **Authentication Route Shadowing & Route Consolidation** —
+   - Consolidated all `/api/admin/users` routes (`POST`, `PATCH`, `DELETE`) into `server/routes/admin.ts`.
+   - Removed duplicate, shadowed route registrations from `server/auth.ts`, fixing the issue where Coordinators received `403 Forbidden` when attempting to edit users or reset passwords.
+3. **Cryptographic Password Hashing & Automatic Scrypt Upgrade Migration** —
+   - Added password hashing (`await hashPassword()`) and validation (min 6 characters) in `PATCH /api/admin/users/:id` to ensure no passwords can be saved in plaintext.
+   - Updated `comparePasswords()` in `server/auth.ts` to gracefully evaluate both scrypt hashes and legacy plaintext records without throwing undefined-salt exceptions.
+   - Integrated automatic security migration in `LocalStrategy`: when a user with a legacy plaintext password logs in, their password is automatically upgraded in-place to an scrypt hash in PostgreSQL.
+4. **Granular Machine-Readable Error Codes & UI Diagnostic Telemetry** —
+   - Introduced standardized, machine-readable error codes across backend endpoints and frontend hooks (`USER_NOT_FOUND`, `INVALID_PASSWORD`, `ACCOUNT_DEACTIVATED`, `AUTH_INTERNAL_ERROR`, `SESSION_CREATION_FAILED`, `FORBIDDEN_TARGET_STAFF`, etc.).
+   - Enhanced `client/src/lib/queryClient.ts` with custom `ApiError` class extracting structured error codes from JSON responses.
+   - Enhanced `client/src/pages/auth-page.tsx` with high-contrast diagnostic error banners and alert badges for faster student troubleshooting.
+5. **Institutional Branding & Layout Refinement on Login Page** —
+   - Added the official `Department_Logo.png` in a responsive framed container above the login card.
+   - Updated the portal header typography to official university standards:
+     - `(I.U.A.P.M.P)`
+     - `Integral University Academic Project Management Portal`
+     - `Department of Computer Application`
+     - `INTEGRAL UNIVERSITY`
+   - Added institutional footer attributions:
+     - `❤️ Powered By : Binary Battalion.ai ❤️`
+     - `💻 Designed and Developed by : SWETABH SINGH 💻`
+   - Refined badge and typography sizing across mobile and desktop viewports.
+6. **Registration Closed Layover & Guard** —
+   - Implemented an aesthetic overlay over the Register tab on the login screen stating: `"Registrations are closed as of now, Teams have already been allotted."`.
+   - Displays a warning toast informing students that cohorts and accounts have already been provisioned if the Register tab is clicked.
+   - Controlled via frontend flag (`IS_REGISTRATION_OPEN = false`), keeping the backend registration pipeline intact for future academic cycles.
+
+## Version 1.9.4
 ### Supervisor Search Bar in Admin & Coordinator Change Supervisor Dialog
 1. **Searchable Supervisor Directory in Change Supervisor Modal (`/manage-project`)** —
    - Added a real-time name and department search bar to the Change Supervisor dialog accessible by Admin and Coordinator accounts.

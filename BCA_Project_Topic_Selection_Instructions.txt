@@ -1,0 +1,149 @@
+================================================================================
+INTEGRAL UNIVERSITY, LUCKNOW
+DEPARTMENT OF COMPUTER SCIENCE & APPLICATIONS / COMPUTER APPLICATION
+ACADEMIC PROJECT MANAGEMENT SYSTEM (APMS) — SESSION 2026-2027
+================================================================================
+NOTICE: PROJECT TOPIC SELECTION INSTRUCTIONS FOR BCA STUDENTS
+================================================================================
+
+
+Please read the following instructions carefully before logging into the portal 
+to review and select your project topic.
+
+--------------------------------------------------------------------------------
+1. PORTAL ACCESS URL
+--------------------------------------------------------------------------------
+Portal Link: http://192.168.6.11:3000
+
+* Note: Make sure your device is connected to the designated IU WIFI
+
+
+--------------------------------------------------------------------------------
+2. LOGIN CREDENTIALS
+--------------------------------------------------------------------------------
+Your accounts have already been provisioned in the system. You DO NOT need to 
+register a new account (registrations are closed).
+
+Please use the following credentials under the "Login" tab:
+
+  • Username:         Your University Enrollment Number 
+                      (e.g., 2100100XXX)
+  • Default Password: Your University Enrollment Number 
+                      (Same as your username)
+
+
+--------------------------------------------------------------------------------
+3. MANDATORY FIRST-TIME LOGIN PASSWORD RESET
+--------------------------------------------------------------------------------
+For security reasons:
+1. Upon your first successful login, a mandatory "Reset Password" window will 
+   appear automatically.
+2. Enter a new, secure password and confirm it.
+3. Once updated, your new password will be active for all future logins.
+4. Keep your password confidential. Do NOT share your credentials with anyone.
+
+
+--------------------------------------------------------------------------------
+4. TEAM VERIFICATION (IMPORTANT)
+--------------------------------------------------------------------------------
+1. Project teams (2 to 5 members) have already been mapped and allotted in 
+   the portal as per official records.
+2. After logging in, verify your assigned group members under the "My Project Team" 
+   section.
+3. Every team can choose ONLY ONE project topic.
+4. When any one authorized team member confirms a topic selection, that topic is 
+   automatically allotted to the ENTIRE team.
+5. All team members MUST discuss, coordinate, and agree on their preferred 
+   topics beforehand to avoid conflicting choices.
+
+
+--------------------------------------------------------------------------------
+5. STEP-BY-STEP TOPIC SELECTION PROCEDURE
+--------------------------------------------------------------------------------
+Follow these steps to select your project:
+
+Step 1: Open the Portal and Log In
+  - Go to the portal URL in your web browser (Chrome, Edge, Firefox, or Safari).
+  - Enter your Enrollment Number and Password.
+
+Step 2: Navigate to "Project Topics"
+  - In the left sidebar navigation menu, click on "Project Topics".
+  - You will see the complete catalog of faculty-approved project topics.
+
+Step 3: Browse, Search, and Filter Topics
+  - Search Bar: Search by project title, technology stack (e.g., Python, MERN, 
+    Flutter, Machine Learning, IoT), or PUGID code (e.g., PUGID26001).
+  - Category Tabs:
+      * "All Topics": Complete list of topics.
+      * "Available": Topics that are currently open for selection (Green indicator).
+      * "Unavailable": Topics already claimed/selected by other teams (Red indicator).
+
+Step 4: Review Topic Details
+  - Click on any topic card to review the complete description, faculty supervisor, 
+    prerequisites, and required technologies.
+
+Step 5: Select & Confirm Your Topic
+  - Once your team has agreed on an available topic, click the "Select Topic" button.
+  - A confirmation popup dialog will appear displaying the project title.
+  - Carefully verify the details, then click "Confirm".
+  - A green confirmation notification will appear: "Topic selected successfully".
+
+Step 6: Verify in "Projects" Section
+  - The chosen topic will now be locked for your team and featured at the top 
+    of your "Project Topics" page.
+  - You can also view your active project and future milestone submissions in 
+    the "Projects" menu (`/projects`).
+
+
+--------------------------------------------------------------------------------
+6. CRITICAL RULES & DEADLINES
+--------------------------------------------------------------------------------
+• FIRST-COME, FIRST-SERVED: Topic allotment is strictly on a first-come, 
+  first-served basis. Once a topic is confirmed by a team, it becomes unavailable 
+  to all other teams immediately.
+• SELECTION IS FINAL: Topic selection cannot be changed, reverted, or transferred 
+  by students once submitted. Do not make hasty selections without team agreement.
+• SINGLE SUBMISSION PER TEAM: Only one member needs to submit the selection on 
+  behalf of the entire team.
+
+================================================================================
+                          END OF INSTRUCTION CIRCULAR
+================================================================================
+
+
+
+================================================================================
+           SHORT VERSION (FOR WHATSAPP / TELEGRAM / CLASSROOM BROADCAST)
+================================================================================
+
+📢 *IMPORTANT ANNOUNCEMENT: BCA PROJECT TOPIC SELECTION PORTAL IS NOW LIVE* 📢
+
+Dear BCA Students,
+
+The Project Portal (APMS) is now open for project topic selection. All faculty-approved project topics have been uploaded.
+
+🔗 *Portal Link:* http://[YOUR-PORTAL-IP-OR-DOMAIN]:3000
+
+🔑 *Login Details:*
+• Username: Your University Enrollment Number
+• Default Password: Your University Enrollment Number
+*(Registrations are closed; do not use the register tab)*
+
+🔐 *First Login Requirement:*
+You will be prompted to reset your password on your first login. Please set a secure password and remember it.
+
+📌 *Key Guidelines for Topic Selection:*
+1. *Team-Based Selection:* All teams are already formed. Discuss with your team members and agree on a topic before selecting.
+2. *One Selection Per Team:* When one member selects a topic, it is allotted to the entire group.
+3. *First-Come, First-Served:* Once a topic is chosen by any team, it becomes unavailable to others.
+4. *Selection is Final:* You CANNOT change your topic after confirmation.
+
+🚀 *How to Select:*
+1. Login to the portal.
+2. Click on *Project Topics* in the sidebar.
+3. Filter by *Available* or search by technology/PUGID code.
+4. Review details and click *Select Topic* -> Confirm.
+
+
+For any queries or login assistance, contact the Project Coordinator immediately.
+================================================================================

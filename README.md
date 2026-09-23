@@ -26,19 +26,22 @@
   - **MCA**: Coordinators assign Supervisors → Students suggest topics → Supervisors endorse → Coordinators approve.
 - **Course Segregation (BCA / MCA)** — Strict isolation of student accounts, project topics, and project teams based on their registered course.
 - **Project Team Management** — Create project teams, invite members, assign supervisor mentors. Constraints strictly enforced (BCA: 2-5 members, MCA: 1-2 members). Admins & Coordinators have exclusive ability to manage team members directly and form single-member BCA teams. Students and supervisors do not have permission to modify rosters or leave teams.
-- **Manage Project** — Admins & Coordinators can view all project teams and manually reassign supervisors  
+- **Manage Project (Pending & Assigned Tabs + Supervisor Search)** — Admins & Coordinators can view all project teams segmented into "Pending" (unallotted) and "Assigned" tabs with live count badges. Includes a unified modal featuring real-time faculty directory search across 60+ supervisors by name, prefix, department, designation, and email.
+- **Dedicated Supervisor Portal ("My Topics & Teams")** — Supervisors enjoy an exclusive dashboard displaying only their proposed topics, real-time allotment status (`Picked` vs `Available`), PUGID codes, and full team roster details.
+- **Student Topic Confirmation Dialog** — Non-reversible confirmation alert dialog ensuring students review topic details, confirm team allotment, and prevent accidental selections.
 - **Progress Tracking** — Real-time dashboards with charts and department statistics  
 - **Project Assessments** — Supervisor grading with score and feedback  
 - **Real-Time Notifications** — WebSocket-powered instant notifications with role-based routing, plus a persistent per-user inbox (bell dropdown + notifications page with read/unread state)  
-- **User Management** — Admin panel for bulk user operations, role changes, password resets  
+- **User Management & One-Click Default Password Reset** — Admin panel for bulk user operations, role changes, and one-click default password resets (students reset to enrollment numbers, supervisors to employee IDs) with automatic `forcePasswordReset` enforcement, RBAC staff protections, and administrator audit notifications.
 - **Excel Bulk Onboarding & Real-Time Progress Streaming** — Coordinators and Admins can upload multi-sheet Excel files (`.xlsx`) to provision entire cohorts at once. Features real-time SSE progress telemetry with a smooth progress bar and collapsible live event terminal, automatic team linking by `projectTeamId`, institutional email generation, high-performance in-memory batching (700+ accounts provisioned in <1s), and downloadable demo Excel templates.
 - **Dedicated Supervisor Onboarding & Faculty Directory** — Isolated workflow with a distinct "Bulk Upload Supervisor" console supporting official staff lists (`.xls` and `.xlsx`). Extracts Employee ID, academic titles/prefixes, designation, mobile, and official email. Generates exact-match demo templates and provisions accounts with Employee ID credentials.
 - **Bulk Project Topic Upload & Sequential PUGID Generation** — Ingest Google Forms response spreadsheets (`.xlsx`) to bulk-upload faculty project suggestions. Cross-checks faculty Name and Email against existing supervisor accounts in PostgreSQL, skips unmatched records with an explicit Failure Report, and auto-generates sequential unique IDs (`PUGID26001`, `PUGID26002`, etc.) visible throughout topic approval and student views.
-- **First-Login Security Enforcement** — Students and faculty supervisors onboarded via Excel receive temporary initial passwords matching their identifier; upon first login, a non-dismissible modal and backend security interceptor enforce a mandatory password change before granting system access.
+- **First-Login Security Enforcement** — Students and faculty supervisors onboarded via Excel or default password reset receive temporary initial passwords matching their identifier; upon first login, a non-dismissible modal and backend security interceptor enforce a mandatory password change before granting system access.
+- **Institutional Branding & Registration Gate** — Features the official Department logo, university typography headers, creator attributions, and a registration closed overlay on the authentication page (`IS_REGISTRATION_OPEN = false`).
 - **Academic Profile Management & Designation RBAC** — Profile settings displays the supervisor's designation directly beneath their name. Faculty can update personal prefixes, name details, email, and mobile, while academic designation remains protected and immutable except by authorized administrators.
 - **System Management** — Database export/import, Excel reports, full reset capabilities  
-- **Security Hardened** — Helmet HTTP headers, rate-limited auth endpoints, soft-delete data retention, session-authenticated WebSockets, per-resource ownership checks, and password-verified destructive operations  
-- **Error Resilient** — Global React Error Boundaries with graceful fallback UI  
+- **Security Hardened** — Helmet HTTP headers, rate-limited auth endpoints, soft-delete data retention, session-authenticated WebSockets, automatic scrypt password migration, per-resource ownership checks, and password-verified destructive operations  
+- **Error Resilient** — Global React Error Boundaries with graceful fallback UI and standardized machine-readable API error codes
 - **Cybertruck Spatial UI** — Glassmorphism, dynamic context pill (iOS-style), holographic data grids, physics-based micro-interactions, and animated cinematic splash screens
 - **Dark/Light Theme** — System-aware with manual toggle  
 - **Responsive Design** — Mobile-friendly layouts with collapsible sidebar  
@@ -237,7 +240,10 @@ All configuration is managed through a `.env` file at the project root.
 | `npm run build` | Build for production (client + server) |
 | `npm start` | Start production server |
 | `npm run check` | Run TypeScript type checking |
-| `npm test` | Run TypeScript check and complete automated test suite (120 test assertions) |
+| `npm test` | Run TypeScript check and complete automated test suite (160+ test assertions across 6 test suites) |
+| `npm run test:password` | Run password reset, default credentials, RBAC & login verification suite |
+| `npm run test:fixes` | Run priority bug fixes verification suite |
+| `npm run test:selection` | Run student topic selection, confirmation & routing verification suite |
 | `npm run test:onboarding` | Run automated student Excel onboarding and access control verification suite |
 | `npm run test:supervisor` | Run automated supervisor onboarding and profile RBAC verification suite |
 | `npm run test:topics` | Run bulk topic onboarding, supervisor validation & sequential PUGID verification suite |
@@ -276,5 +282,5 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 ## 🤖 AI Context & Future Fixes
 
-- **AI Context**: A dedicated context file (`AI_CONTEXT.md`) provides LLMs and AI assistants with a comprehensive overview of the architecture, stack, and workflows. This file is ignored by git to keep it restricted to local workspace use.
+- **AI Context**: A dedicated context file (`AI_CONTEXT.md`) provides LLMs and AI assistants with a comprehensive overview of the architecture, stack, and workflows.
 - **Fixes Required**: A list of architectural, security, and maintenance suggestions is maintained in `Fixes_required.md`. Contributors can refer to it for planned refactoring.

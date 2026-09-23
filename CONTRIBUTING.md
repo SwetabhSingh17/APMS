@@ -48,9 +48,10 @@ If you prefer to set up manually:
    - Drizzle ORM for database queries
    - Zod for validation schemas
 
-3. Run type checking before committing:
+3. Run type checking and automated tests before committing:
    ```bash
    npm run check
+   npm test
    ```
 
 4. Commit with clear, descriptive messages:

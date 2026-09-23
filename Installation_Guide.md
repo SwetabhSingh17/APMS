@@ -232,19 +232,38 @@ If you already have the application running and need to update the code to the l
 
 ## 🧪 Step 5: Running System & Verification Tests
 
-To verify that your installation is working properly and all features (Excel bulk onboarding, access control, first-login security enforcement, and cohort isolation) are functional:
+To verify that your installation is working properly and all features (Excel bulk onboarding, access control, first-login security enforcement, cohort isolation, default password resets, and topic selection workflows) are functional:
 
 1. Check TypeScript compilation:
    ```bash
    npm run check
    ```
 
-2. Run the Onboarding & Access Control test suite:
+2. Run the complete automated test suite (160+ test assertions across 6 suites):
    ```bash
-   npx tsx scripts/verify_onboarding_and_access_control.ts
+   npm test
    ```
 
-3. Run the End-to-End System flow test:
+3. Or run specific individual test suites:
    ```bash
-   npx tsx scripts/e2e_verify.ts
+   # Test default password reset, legacy scrypt upgrade & RBAC
+   npm run test:password
+
+   # Test priority bug fixes & system integrity
+   npm run test:fixes
+
+   # Test student topic selection confirmation & routing
+   npm run test:selection
+
+   # Test student Excel onboarding & access control
+   npm run test:onboarding
+
+   # Test supervisor onboarding & faculty RBAC
+   npm run test:supervisor
+
+   # Test bulk topic ingestion & sequential PUGID generation
+   npm run test:topics
+
+   # Test end-to-end integration flows
+   npm run test:e2e
    ```

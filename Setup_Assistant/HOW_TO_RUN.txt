@@ -308,8 +308,9 @@ If you already have the application running and need to update it without losing
    - If using ZIP: Extract the new ZIP over the old folder, OR to a new folder and copy your old `.env` file into it.
 3. Open Terminal/PowerShell in the folder.
 4. Type: `npm install` (to install any new tools)
-5. Type: `npm run db:push` (to safely update the database schema without losing data)
+5. Type: `npm run db:ensure` (to safely verify and update the database schema without losing data)
 6. Type: `npm run dev` to start the server again!
+   (Note for Windows users: You can also simply double-click start_server.bat!)
 
 ════════════════════════════════════════════════════════════════════════
 
