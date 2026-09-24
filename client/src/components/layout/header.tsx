@@ -41,6 +41,9 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
       case "/user-management":
         setTitle("User Management");
         break;
+      case "/team-management":
+        setTitle("Team Management");
+        break;
       case "/settings":
         setTitle("Settings");
         break;

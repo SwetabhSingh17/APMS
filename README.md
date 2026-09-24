@@ -26,6 +26,8 @@
   - **MCA**: Coordinators assign Supervisors → Students suggest topics → Supervisors endorse → Coordinators approve.
 - **Course Segregation (BCA / MCA)** — Strict isolation of student accounts, project topics, and project teams based on their registered course.
 - **Project Team Management** — Create project teams, invite members, assign supervisor mentors. Constraints strictly enforced (BCA: 2-5 members, MCA: 1-2 members). Admins & Coordinators have exclusive ability to manage team members directly and form single-member BCA teams. Students and supervisors do not have permission to modify rosters or leave teams.
+- **Dedicated Team Management Portal (`/team-management`)** — Centralized administrative console for Admins and Coordinators to oversee all student project teams with five distinct status tabs (`All Teams`, `Pending Topics`, `Assigned Topics`, `With Supervisor`, `Without Supervisor`), global course filtering (BCA/MCA), live search across names, enrollments, topics, and supervisors, inline team detail editing, member addition/removal with course and capacity validation, and safe team dissolution preserving student user accounts intact.
+- **Decoupled & Optional Supervisor Allotment** — Reflecting institutional workflows where faculty supervisors are assigned upon project topic selection, supervisor assignment during team creation is fully optional. If unselected, teams are provisioned cleanly without a supervisor and seamlessly assigned once a project topic is chosen.
 - **Manage Project (Pending & Assigned Tabs + Supervisor Search)** — Admins & Coordinators can view all project teams segmented into "Pending" (unallotted) and "Assigned" tabs with live count badges. Includes a unified modal featuring real-time faculty directory search across 60+ supervisors by name, prefix, department, designation, and email.
 - **Dedicated Supervisor Portal ("My Topics & Teams")** — Supervisors enjoy an exclusive dashboard displaying only their proposed topics, real-time allotment status (`Picked` vs `Available`), PUGID codes, and full team roster details.
 - **Student Topic Confirmation Dialog** — Non-reversible confirmation alert dialog ensuring students review topic details, confirm team allotment, and prevent accidental selections.
@@ -103,7 +105,7 @@ graph TD
 APMS/
 ├── client/                 # Frontend SPA
 │   ├── src/
-│   │   ├── pages/          # 15 route pages (auth, dashboard, projects, etc.)
+│   │   ├── pages/          # 16 route pages (auth, dashboard, projects, team-management, etc.)
 │   │   ├── components/     # UI components (shadcn/ui + custom)
 │   │   │   ├── ui/         # 48 shadcn/ui primitives
 │   │   │   ├── layout/     # MainLayout, Sidebar, Header
@@ -240,7 +242,8 @@ All configuration is managed through a `.env` file at the project root.
 | `npm run build` | Build for production (client + server) |
 | `npm start` | Start production server |
 | `npm run check` | Run TypeScript type checking |
-| `npm test` | Run TypeScript check and complete automated test suite (160+ test assertions across 6 test suites) |
+| `npm test` | Run TypeScript check and complete automated test suite (175+ test assertions across 7 test suites) |
+| `npm run test:teams` | Run team management CRUD, safe dissolution & supervisor optional verification suite |
 | `npm run test:password` | Run password reset, default credentials, RBAC & login verification suite |
 | `npm run test:fixes` | Run priority bug fixes verification suite |
 | `npm run test:selection` | Run student topic selection, confirmation & routing verification suite |
@@ -261,8 +264,8 @@ All configuration is managed through a `.env` file at the project root.
 
 | Role | Capabilities |
 |------|-------------|
-| **Admin** | Full system access, user management, database operations, Excel reports, supervisor reassignment |
-| **Coordinator** | Approve/reject topics, track progress, manage users, view statistics, reassign supervisors, filter by course context |
+| **Admin** | Full system access, user management, team management, safe team dissolution, database operations, Excel reports, supervisor reassignment |
+| **Coordinator** | Approve/reject topics, track progress, manage users, team management, roster modification, safe team dissolution, view statistics, reassign supervisors, filter by course context |
 | **Supervisor** | Submit project topics (tied to specific course), evaluate assigned projects, view student progress |
 | **Student** | Browse & select topics specific to their course, form project teams within their course, invite members, track own progress |
 

@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User, UserRole } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Users, Search, ArrowRightLeft, UserPlus, FolderGit2, Clock, CheckCircle2, Check } from "lucide-react";
+import { Loader2, Users, Search, ArrowRightLeft, UserPlus, FolderGit2, Clock, CheckCircle2, Check, Trash2, AlertTriangle } from "lucide-react";
 import { useCourseFilter } from "@/hooks/course-filter-context";
 import { CreateTeamDialog } from "@/components/create-team-dialog";
 import { ManageMembersDialog } from "@/components/manage-members-dialog";
@@ -22,6 +22,7 @@ export default function ManageProject() {
   const [searchQuery, setSearchQuery] = useState("");
   const [changeSupervisorGroupId, setChangeSupervisorGroupId] = useState<number | null>(null);
   const [manageMembersGroupId, setManageMembersGroupId] = useState<number | null>(null);
+  const [deleteConfirmGroup, setDeleteConfirmGroup] = useState<any>(null);
   const [selectedSupervisorId, setSelectedSupervisorId] = useState<string>("");
   const [supervisorSearchQuery, setSupervisorSearchQuery] = useState<string>("");
   const { courseFilter, getCourseQuery } = useCourseFilter();
@@ -75,6 +76,38 @@ export default function ManageProject() {
     onError: (error) => {
       toast({
         title: "Failed to change supervisor",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete team mutation
+  const deleteTeamMutation = useMutation({
+    mutationFn: async (groupId: number) => {
+      const res = await apiRequest("DELETE", `/api/student-groups/${groupId}`);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Team Removed",
+        description: data.message || "The team has been removed. Member student accounts remain active.",
+      });
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === "string" && (
+            key.startsWith("/api/student-groups") ||
+            key.startsWith("/api/projects") ||
+            key.startsWith("/api/students")
+          );
+        },
+      });
+      setDeleteConfirmGroup(null);
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to remove team",
         description: error.message,
         variant: "destructive",
       });
@@ -137,6 +170,17 @@ export default function ManageProject() {
             <Badge variant="outline">
               {group.members?.length || 0} / {group.maxSize} Members
             </Badge>
+            {(user?.role === UserRole.ADMIN || user?.role === UserRole.COORDINATOR) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive h-8 px-2"
+                onClick={() => setDeleteConfirmGroup(group)}
+                title="Remove Team"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -474,6 +518,48 @@ export default function ManageProject() {
                   )}
                 </Button>
               </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Team Confirmation Dialog */}
+        <Dialog open={!!deleteConfirmGroup} onOpenChange={(open) => !open && setDeleteConfirmGroup(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="text-destructive flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                Remove Project Team
+              </DialogTitle>
+              <DialogDescription>
+                Are you sure you want to remove <strong>{deleteConfirmGroup?.name}</strong>?
+              </DialogDescription>
+            </DialogHeader>
+            <div className="text-sm space-y-2 py-3 bg-muted/40 rounded-lg p-3 border">
+              <p className="text-foreground font-medium">Important Information:</p>
+              <p className="text-muted-foreground">
+                • <strong>Student accounts will NOT be deleted</strong>. All {deleteConfirmGroup?.members?.length || 0} student member accounts remain completely active in the system.
+              </p>
+              <p className="text-muted-foreground">
+                • Members will be unassigned from this team and can be reassigned to a new team.
+              </p>
+              {deleteConfirmGroup?.project && (
+                <p className="text-amber-600 dark:text-amber-400 font-medium">
+                  • The currently selected project topic ({deleteConfirmGroup.project.topicCode || deleteConfirmGroup.project.topicTitle}) will be released.
+                </p>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 mt-4">
+              <Button variant="outline" onClick={() => setDeleteConfirmGroup(null)} disabled={deleteTeamMutation.isPending}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => deleteTeamMutation.mutate(deleteConfirmGroup.id)}
+                disabled={deleteTeamMutation.isPending}
+              >
+                {deleteTeamMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                Confirm Remove Team
+              </Button>
             </div>
           </DialogContent>
         </Dialog>

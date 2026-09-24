@@ -18,7 +18,7 @@ import { StudentSelect } from "./student-select";
 const createGroupSchema = z.object({
   name: z.string().min(3, "Team name must be at least 3 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
-  supervisorId: z.string().min(1, "Please select a supervisor"),
+  supervisorId: z.string().optional(),
   enrollmentNumbers: z.array(z.string().min(1, "Enrollment number is required")).min(1, "At least one member is required")
 });
 
@@ -45,7 +45,7 @@ export function CreateTeamDialog() {
     defaultValues: {
       name: "",
       description: "",
-      supervisorId: "",
+      supervisorId: "none",
       enrollmentNumbers: [],
     },
   });
@@ -57,17 +57,35 @@ export function CreateTeamDialog() {
 
   const createGroupMutation = useMutation({
     mutationFn: async (data: CreateGroupFormValues) => {
-      const res = await apiRequest("POST", "/api/student-groups", {
-        ...data,
-        supervisorId: parseInt(data.supervisorId),
-      });
+      const payload: any = {
+        name: data.name,
+        description: data.description,
+        enrollmentNumbers: data.enrollmentNumbers,
+      };
+      if (data.supervisorId && data.supervisorId !== "none" && data.supervisorId.trim() !== "") {
+        payload.supervisorId = parseInt(data.supervisorId);
+      }
+      const res = await apiRequest("POST", "/api/student-groups", payload);
       return res.json();
     },
     onSuccess: () => {
       toast({ title: "Project Team Created", description: "The team was successfully created." });
-      queryClient.invalidateQueries({ queryKey: ["/api/student-groups/all"] });
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === "string" && (
+            key.startsWith("/api/student-groups") ||
+            key.startsWith("/api/students")
+          );
+        },
+      });
       setOpen(false);
-      form.reset();
+      form.reset({
+        name: "",
+        description: "",
+        supervisorId: "none",
+        enrollmentNumbers: [],
+      });
       setEnrollmentNumbers([]);
     },
     onError: (error) => {
@@ -128,19 +146,26 @@ export function CreateTeamDialog() {
               name="supervisorId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Assign Supervisor</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <div className="flex items-center justify-between">
+                    <FormLabel>Assign Supervisor</FormLabel>
+                    <span className="text-xs text-muted-foreground font-normal">Optional</span>
+                  </div>
+                  <Select onValueChange={field.onChange} value={field.value || "none"}>
                     <FormControl>
-                      <SelectTrigger><SelectValue placeholder="Select a supervisor" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Select a supervisor (Optional)" /></SelectTrigger>
                     </FormControl>
                     <SelectContent>
+                      <SelectItem value="none">None (Allotted after topic selection)</SelectItem>
                       {supervisors?.map((sup: any) => (
                         <SelectItem key={sup.id} value={sup.id.toString()}>
-                          {sup.firstName} {sup.lastName} ({sup.department})
+                          {sup.prefix ? `${sup.prefix} ` : ""}{sup.firstName} {sup.lastName} ({sup.department || sup.designation || "Faculty"})
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-[11px] text-muted-foreground">
+                    Optional: The supervisor is automatically allotted to the team after they select their project topic.
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}

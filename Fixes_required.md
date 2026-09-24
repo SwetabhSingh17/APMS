@@ -6,6 +6,20 @@ This document outlines suggested architectural, security, and maintenance improv
 
 ## 🚨 Priority Bugs to be Resolved
 
+### 🟢 ACTIVE ISSUES RESOLVED (v1.9.6 - Completed & Verified)
+
+- [x] **Team Management Portal for Admins & Coordinators (`/team-management`)** — **COMPLETED**
+  - **Affected Files:** `client/src/App.tsx`, `client/src/pages/team-management.tsx`, `client/src/components/layout/sidebar.tsx`, `client/src/components/layout/header.tsx`, `server/routes/groups.ts`, `server/db-storage.ts`
+  - **Resolution:** Implemented a full-featured `/team-management` console accessible by Admins and Coordinators. Includes 5 status tabs (`All Teams`, `Pending Topics`, `Assigned Topics`, `With Supervisor`, `Without Supervisor`), global course filtering (BCA/MCA), live search across names, enrollments, topics, and supervisors, inline team editing (`PATCH /api/student-groups/:groupId`), member management (`POST /api/student-groups/:groupId/members` and `DELETE /api/student-groups/:groupId/members/:userId`), and team dissolution.
+
+- [x] **Safe Team Dissolution with 100% Student User Account Retention** — **COMPLETED**
+  - **Affected Files:** `server/db-storage.ts`, `server/routes/groups.ts`, `client/src/pages/manage-project.tsx`, `client/src/pages/team-management.tsx`
+  - **Resolution:** Added safe team dissolution (`DELETE /api/student-groups/:groupId`) which unlinks all student members (`users.groupId = null`), cleans up project milestones/assessments, sends automated notifications to members, and frees up students to join or form new teams while preserving their user accounts completely intact. Added confirmation dialogs in both `/team-management` and `/manage-project`.
+
+- [x] **Decoupled & Optional Supervisor Allotment at Team Creation** — **COMPLETED**
+  - **Affected Files:** `server/routes/groups.ts`, `client/src/pages/student-groups.tsx`, `client/src/components/create-team-dialog.tsx`
+  - **Resolution:** Decoupled supervisor allotment from team creation to match academic procedures where supervisors are assigned upon topic selection. Made supervisor selection optional across student and administrator team creation forms, defaulted missing values to `null`, and updated supervisor assignment route to support unassigning.
+
 ### 🟢 ACTIVE ISSUES RESOLVED (v1.9.5 - Completed & Verified)
 
 - [x] **Student Unable to Login After Admin/Coordinator Password Reset & Route Shadowing** — **COMPLETED**

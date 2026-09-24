@@ -86,8 +86,8 @@ export function registerUserRoutes(router: Router, storage: DBStorage) {
             }
 
             // Return stripped down data for safety
-            const safeStudents = students.map(({ id, firstName, lastName, enrollmentNumber, course }) => ({
-                id, firstName, lastName, enrollmentNumber, course
+            const safeStudents = students.map(({ id, firstName, lastName, enrollmentNumber, course, groupId }) => ({
+                id, firstName, lastName, enrollmentNumber, course, groupId
             }));
 
             res.json(safeStudents);

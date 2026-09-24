@@ -14,7 +14,8 @@ import {
   Bell,
   ClipboardCheck,
   Database,
-  FolderCog
+  FolderCog,
+  Users2
 } from "lucide-react";
 
 export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?: () => void }) {
@@ -154,6 +155,11 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?
             <Link href="/user-management" onClick={isMobile ? onClose : undefined} className={linkClass("/user-management")}>
               <Users className="w-5 h-5" />
               <span>User Management</span>
+            </Link>
+
+            <Link href="/team-management" onClick={isMobile ? onClose : undefined} className={linkClass("/team-management")}>
+              <Users2 className="w-5 h-5" />
+              <span>Team Management</span>
             </Link>
 
             {user?.role === UserRole.ADMIN && (

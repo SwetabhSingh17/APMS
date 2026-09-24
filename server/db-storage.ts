@@ -673,10 +673,74 @@ export class DBStorage {
   }
 
   async removeStudentFromGroup(userId: number, groupId: number): Promise<boolean> {
+    // Unlink any student projects so the student does not have orphaned project references
+    const projects = await db.select().from(studentProjects).where(eq(studentProjects.studentId, userId));
+    for (const proj of projects) {
+      await db.delete(projectAssessments).where(eq(projectAssessments.projectId, proj.id));
+      await db.delete(projectMilestones).where(eq(projectMilestones.projectId, proj.id));
+      await db.delete(studentProjects).where(eq(studentProjects.id, proj.id));
+    }
+
     await db.delete(studentGroupMembers)
       .where(and(eq(studentGroupMembers.userId, userId), eq(studentGroupMembers.groupId, groupId)));
-    await db.update(users).set({ groupId: null }).where(eq(users.id, userId));
+    await db.update(users).set({ groupId: null, updatedAt: new Date() }).where(eq(users.id, userId));
     return true;
+  }
+
+  async deleteStudentGroup(groupId: number): Promise<boolean> {
+    const group = await this.getGroup(groupId);
+    if (!group) return false;
+
+    // Fetch members to clean up projects and notify
+    const members = await this.getStudentGroupMembers(groupId);
+    for (const member of members) {
+      const projects = await db.select().from(studentProjects).where(eq(studentProjects.studentId, member.id));
+      for (const proj of projects) {
+        await db.delete(projectAssessments).where(eq(projectAssessments.projectId, proj.id));
+        await db.delete(projectMilestones).where(eq(projectMilestones.projectId, proj.id));
+        await db.delete(studentProjects).where(eq(studentProjects.id, proj.id));
+      }
+
+      await this.createNotification({
+        userId: member.id,
+        title: "Project Team Dissolved",
+        message: `Your project team "${group.name}" has been removed by an administrator. Your student account remains active and you are now available to join or form a new team.`
+      });
+    }
+
+    // Unlink all users associated with this group without deleting their user accounts
+    await db.update(users).set({ groupId: null, updatedAt: new Date() }).where(eq(users.groupId, groupId));
+
+    // Delete group membership records
+    await db.delete(studentGroupMembers).where(eq(studentGroupMembers.groupId, groupId));
+
+    // Notify supervisor if one was assigned
+    if (group.supervisorId) {
+      await this.createNotification({
+        userId: group.supervisorId,
+        title: "Project Team Removed",
+        message: `The project team "${group.name}" has been removed by an administrator.`
+      });
+    }
+
+    // Delete the group record itself
+    await db.delete(studentGroups).where(eq(studentGroups.id, groupId));
+
+    return true;
+  }
+
+  async updateStudentGroup(groupId: number, data: { name?: string; description?: string; course?: string; supervisorId?: number | null }): Promise<StudentGroup | undefined> {
+    const updateData: any = { updatedAt: new Date() };
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.course !== undefined) updateData.course = data.course;
+    if (data.supervisorId !== undefined) updateData.supervisorId = data.supervisorId;
+
+    const [updated] = await db.update(studentGroups)
+      .set(updateData)
+      .where(eq(studentGroups.id, groupId))
+      .returning();
+    return updated as StudentGroup | undefined;
   }
 
   async acceptGroupInvite(userId: number, groupId: number): Promise<boolean> {

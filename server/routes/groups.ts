@@ -23,10 +23,17 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
                 }
             }
 
-            // Validate supervisor exists
-            const supervisor = await storage.getUser(supervisorId);
-            if (!supervisor || supervisor.role !== UserRole.SUPERVISOR) {
-                return res.status(400).json({ message: "Invalid supervisor mentor" });
+            // Validate supervisor exists if provided (supervisor is allotted after picking topic)
+            let parsedSupervisorId: number | null = null;
+            if (supervisorId !== undefined && supervisorId !== null && supervisorId !== "" && supervisorId !== "none" && supervisorId !== "0" && supervisorId !== 0) {
+                const sid = typeof supervisorId === "string" ? parseInt(supervisorId) : Number(supervisorId);
+                if (!isNaN(sid) && sid > 0) {
+                    const supervisor = await storage.getUser(sid);
+                    if (!supervisor || supervisor.role !== UserRole.SUPERVISOR) {
+                        return res.status(400).json({ message: "Invalid supervisor mentor" });
+                    }
+                    parsedSupervisorId = sid;
+                }
             }
 
             // If created by a student, they are part of the team
@@ -87,7 +94,7 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
             const group = await storage.createStudentGroup({
                 name,
                 description,
-                supervisorId,
+                supervisorId: parsedSupervisorId,
                 maxSize,
                 course: teamCourse
             } as any, req.user.id, enrollmentNumbers, !isStudent);
@@ -310,6 +317,7 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
     });
 
     // Change supervisor allotment for a group (coordinators and admins only)
+    // Change supervisor allotment for a group (coordinators and admins only)
     router.patch("/api/student-groups/:groupId/supervisor", requireRole([UserRole.COORDINATOR, UserRole.ADMIN]), async (req: Request, res: Response) => {
         if (!isAuthenticatedRequest(req)) {
             return res.status(401).json({ message: "Unauthorized" });
@@ -319,18 +327,33 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
             const groupId = parseInt(req.params.groupId);
             const { supervisorId } = req.body;
 
-            if (!supervisorId || typeof supervisorId !== "number") {
-                return res.status(400).json({ message: "A valid supervisorId is required" });
-            }
-
             // Validate the group exists
             const group = await storage.getGroup(groupId);
             if (!group) {
                 return res.status(404).json({ message: "Group not found" });
             }
 
+            // Unassign supervisor if null, 0, or "none"
+            if (supervisorId === null || supervisorId === 0 || supervisorId === "none" || supervisorId === "") {
+                const previousSupervisorId = group.supervisorId;
+                const updatedGroup = await storage.updateStudentGroup(groupId, { supervisorId: null });
+                if (previousSupervisorId) {
+                    await storage.createNotification({
+                        userId: previousSupervisorId,
+                        title: "Supervisor Unassigned",
+                        message: `You have been unassigned as the supervisor for group "${group.name}".`,
+                    });
+                }
+                return res.json(updatedGroup);
+            }
+
+            const targetSupervisorId = typeof supervisorId === "string" ? parseInt(supervisorId) : supervisorId;
+            if (!targetSupervisorId || typeof targetSupervisorId !== "number" || isNaN(targetSupervisorId)) {
+                return res.status(400).json({ message: "A valid supervisorId is required" });
+            }
+
             // Validate the target user is a supervisor
-            const supervisor = await storage.getUser(supervisorId);
+            const supervisor = await storage.getUser(targetSupervisorId);
             if (!supervisor || supervisor.role !== UserRole.SUPERVISOR) {
                 return res.status(400).json({ message: "The selected user is not a valid supervisor" });
             }
@@ -338,17 +361,17 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
             const previousSupervisorId = group.supervisorId;
 
             // Update the group
-            const updatedGroup = await storage.updateStudentGroupSupervisor(groupId, supervisorId);
+            const updatedGroup = await storage.updateStudentGroupSupervisor(groupId, targetSupervisorId);
 
             // Notify the newly assigned supervisor
             await storage.createNotification({
-                userId: supervisorId,
+                userId: targetSupervisorId,
                 title: "Supervisor Assignment",
                 message: `You have been assigned as the supervisor for group "${group.name}" by ${req.user.firstName} ${req.user.lastName}.`,
             });
 
             // Notify the previous supervisor if there was one and it changed
-            if (previousSupervisorId && previousSupervisorId !== supervisorId) {
+            if (previousSupervisorId && previousSupervisorId !== targetSupervisorId) {
                 await storage.createNotification({
                     userId: previousSupervisorId,
                     title: "Supervisor Reassignment",
@@ -360,6 +383,153 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
         } catch (error) {
             console.error("Error updating supervisor allotment:", error);
             res.status(500).json({ message: "Failed to update supervisor allotment" });
+        }
+    });
+
+    // Update team basic details (Admin and Coordinator only)
+    router.patch("/api/student-groups/:groupId", requireRole([UserRole.COORDINATOR, UserRole.ADMIN]), async (req: Request, res: Response) => {
+        if (!isAuthenticatedRequest(req)) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        try {
+            const groupId = parseInt(req.params.groupId);
+            const { name, description, course } = req.body;
+
+            const group = await storage.getGroup(groupId);
+            if (!group) return res.status(404).json({ message: "Team not found" });
+
+            const updated = await storage.updateStudentGroup(groupId, { name, description, course });
+            res.json(updated);
+        } catch (error) {
+            console.error("Error updating team details:", error);
+            res.status(500).json({ message: error instanceof Error ? error.message : "Internal Server Error" });
+        }
+    });
+
+    // Delete / dissolve a team entirely while preserving student accounts (Admin and Coordinator only)
+    router.delete("/api/student-groups/:groupId", requireRole([UserRole.COORDINATOR, UserRole.ADMIN]), async (req: Request, res: Response) => {
+        if (!isAuthenticatedRequest(req)) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        try {
+            const groupId = parseInt(req.params.groupId);
+            if (isNaN(groupId)) {
+                return res.status(400).json({ message: "Invalid team ID" });
+            }
+
+            const group = await storage.getGroup(groupId);
+            if (!group) {
+                return res.status(404).json({ message: "Team not found" });
+            }
+
+            const success = await storage.deleteStudentGroup(groupId);
+            if (!success) {
+                return res.status(500).json({ message: "Failed to remove team" });
+            }
+
+            res.json({
+                success: true,
+                message: `Team "${group.name}" has been removed. All member student accounts are intact and free to join or form a new team.`
+            });
+        } catch (error) {
+            console.error("Error deleting team:", error);
+            res.status(500).json({ message: error instanceof Error ? error.message : "Internal Server Error" });
+        }
+    });
+
+    // Remove a single member from a team (Admin and Coordinator only)
+    router.delete("/api/student-groups/:groupId/members/:userId", requireRole([UserRole.COORDINATOR, UserRole.ADMIN]), async (req: Request, res: Response) => {
+        if (!isAuthenticatedRequest(req)) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        try {
+            const groupId = parseInt(req.params.groupId);
+            const userId = parseInt(req.params.userId);
+
+            const group = await storage.getGroup(groupId);
+            if (!group) return res.status(404).json({ message: "Team not found" });
+
+            const student = await storage.getUser(userId);
+            if (!student) return res.status(404).json({ message: "Student not found" });
+
+            await storage.removeStudentFromGroup(userId, groupId);
+
+            await storage.createNotification({
+                userId,
+                title: "Removed from Project Team",
+                message: `You have been removed from the project team "${group.name}" by ${req.user.firstName} ${req.user.lastName}.`
+            });
+
+            res.json({
+                success: true,
+                message: `Student ${student.firstName} ${student.lastName} has been removed from the team.`
+            });
+        } catch (error) {
+            console.error("Error removing member:", error);
+            res.status(500).json({ message: error instanceof Error ? error.message : "Internal Server Error" });
+        }
+    });
+
+    // Add a single member to a team (Admin and Coordinator only)
+    router.post("/api/student-groups/:groupId/members", requireRole([UserRole.COORDINATOR, UserRole.ADMIN]), async (req: Request, res: Response) => {
+        if (!isAuthenticatedRequest(req)) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        try {
+            const groupId = parseInt(req.params.groupId);
+            const { enrollmentNumber, userId } = req.body;
+
+            const group = await storage.getGroup(groupId);
+            if (!group) return res.status(404).json({ message: "Team not found" });
+
+            let student: any;
+            if (userId) {
+                student = await storage.getUser(userId);
+            } else if (enrollmentNumber) {
+                student = await storage.getUserByEnrollmentNumber(enrollmentNumber);
+            }
+
+            if (!student || student.role !== UserRole.STUDENT) {
+                return res.status(400).json({ message: "Invalid student or enrollment number" });
+            }
+
+            // Check if student already in another team
+            const existingGroup = await storage.getUserGroup(student.id);
+            if (existingGroup) {
+                return res.status(400).json({ message: `Student ${student.firstName} ${student.lastName} is already in team "${existingGroup.name}".` });
+            }
+
+            // Check course consistency
+            if (group.course && student.course && student.course !== group.course) {
+                return res.status(400).json({ message: `Student course (${student.course}) does not match team course (${group.course}).` });
+            }
+
+            // Check max size
+            const members = await storage.getStudentGroupMembers(groupId);
+            const maxLimit = group.course === "MCA" ? 2 : 5;
+            if (members.length >= maxLimit) {
+                return res.status(400).json({ message: `Team is already at maximum capacity (${maxLimit} members).` });
+            }
+
+            await storage.addStudentToGroup(student.id, groupId);
+
+            await storage.createNotification({
+                userId: student.id,
+                title: "Added to Project Team",
+                message: `You have been added to the project team "${group.name}".`
+            });
+
+            res.json({
+                success: true,
+                message: `Student ${student.firstName} ${student.lastName} has been added to "${group.name}".`
+            });
+        } catch (error) {
+            console.error("Error adding member:", error);
+            res.status(500).json({ message: error instanceof Error ? error.message : "Internal Server Error" });
         }
     });
 }

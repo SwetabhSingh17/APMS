@@ -10,7 +10,7 @@ Currently, the following versions of this project are actively supported with se
 | v1.8.x  | :white_check_mark: |
 | < v1.8  | :x:                |
 
-## Security Posture (v1.9.5)
+## Security Posture (v1.9.6)
 
 APMS ships with the following protections in place:
 
@@ -21,7 +21,7 @@ APMS ships with the following protections in place:
 - **First-Login Password Reset Interceptor** — Accounts provisioned via Excel or default reset are flagged with `forcePasswordReset: true`. Operational APIs (topic browsing, team interactions, submissions) are intercepted with HTTP 403 `PASSWORD_RESET_REQUIRED` and frontend non-dismissible modals until default credentials are replaced.
 - **Granular Error Codes & Leakage Prevention** — Standardized machine-readable error codes (`USER_NOT_FOUND`, `INVALID_PASSWORD`, `ACCOUNT_DEACTIVATED`, etc.) prevent internal stack trace leakage while providing clear diagnostic telemetry. Password hashes and internal salts are strictly stripped from all API responses.
 - **Strict Cohort/Program Isolation** — BCA and MCA topic visibility, team rosters, and proposal catalogs are strictly partitioned; students are isolated to their registered curriculum to prevent cross-cohort data leakage.
-- **Team Access Control & Integrity** — Students and Supervisors are prohibited from modifying or leaving project teams. Only Administrators and Coordinators have authorization to modify team rosters or reassign supervisor mentorship.
+- **Team Access Control, Safe Dissolution & Account Retention** — Students and Supervisors are prohibited from modifying or leaving project teams. Only Administrators and Coordinators have authorization to modify team rosters, reassign supervisor mentorship, or dissolve teams. Team dissolution strictly retains member student user accounts intact without data loss, safely unlinking team associations and milestones so students remain active and eligible for future team allotment.
 - **Authorization** — Role-based access control (Admin / Coordinator / Supervisor / Student) enforced server-side via `requireRole()` plus per-resource ownership checks (projects, assessments, notifications).
 - **Rate Limiting** — `express-rate-limit` on `/api/login` and `/api/register`.
 - **Security Headers & Network Hardening** — Helmet middleware with intranet/LAN-calibrated cross-origin policies, private caching headers on sensitive endpoints, and host adapter binding (`0.0.0.0`).

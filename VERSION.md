@@ -1,6 +1,51 @@
 # Version History
 
-## Version 1.9.5 (Current)
+## Version 1.9.6 (Current)
+### Team Management Portal, Safe Team Dissolution with Account Retention & Optional Supervisor Allotment
+1. **Dedicated Team Management Portal for Admins & Coordinators (`/team-management`)** —
+   - Added a dedicated, full-featured Team Management portal accessible to Administrators and Coordinators from the sidebar navigation (`Users2` icon) and header.
+   - Comprehensive team categorization tabs:
+     - **All Teams**: Full directory of student project teams with live count badges.
+     - **Pending Topics**: Teams that have not yet selected or been allotted a project topic.
+     - **Assigned Topics**: Teams with an active, confirmed project topic.
+     - **With Supervisor**: Teams that currently have an assigned faculty supervisor mentor.
+     - **Without Supervisor**: Teams awaiting supervisor allotment (post topic selection).
+   - Global course filter integration (`CourseFilterContext`: All, BCA, MCA).
+   - High-performance live search across team names, descriptions, member names, enrollment numbers, supervisor names, and topic codes/titles.
+   - Detailed team card previews showing:
+     - Project team ID, course badge, and member capacity counter.
+     - Assigned project topic with PUGID code, topic title, and status.
+     - Assigned supervisor details with honorific prefix, department, and email.
+     - Member roster with initials avatars, full names, and university enrollment numbers.
+2. **Comprehensive Team Administration Operations** —
+   - **Edit Team Details (`PATCH /api/student-groups/:groupId`)**: Allows Admins and Coordinators to modify team name, description, and registered course context with instant UI update.
+   - **Manage Team Members Dialog**:
+     - **Add Member (`POST /api/student-groups/:groupId/members`)**: Add students by university enrollment number or user ID with real-time validation (ensuring the student is not already in another team, course consistency matches the team, and team capacity limits are respected: BCA max 5, MCA max 2).
+     - **Remove Member (`DELETE /api/student-groups/:groupId/members/:userId`)**: Safely removes individual students from a team, unlinking their project references, resetting their `groupId` to `null`, and notifying the student, while preserving their student account completely active.
+   - **Safe Team Dissolution (`DELETE /api/student-groups/:groupId`)**:
+     - Allows Admins and Coordinators to dissolve/remove a team entirely.
+     - **Preserves student user accounts 100% intact**: Unlinks all members (`users.groupId = null`), deletes group project linkages and assessments to prevent orphaned references, and frees up all former members to join or form new teams.
+     - Dispatches automated notifications to all former team members and the assigned supervisor.
+     - Integrated a direct "Remove Team" button on team cards in `/manage-project` with an explicit confirmation dialog detailing that student accounts are not deleted.
+3. **Decoupled & Optional Supervisor Allotment at Team Creation** —
+   - Updated the team formation workflow to reflect academic guidelines: supervisors are allotted after students select their project topic.
+   - Updated student team creation (`client/src/pages/student-groups.tsx`):
+     - Supervisor selection marked "Optional" with a new default option: `"None (Allotted after topic selection)"`.
+     - Informative guidance note explaining that supervisors are allotted upon topic selection.
+   - Updated Admin/Coordinator Create Team Dialog (`client/src/components/create-team-dialog.tsx`):
+     - Made supervisor selection optional with `"None (Allotted after topic selection)"` fallback.
+   - Backend route hardening (`server/routes/groups.ts`):
+     - Updated `POST /api/student-groups` to accept optional/null `supervisorId`, properly defaulting `parsedSupervisorId` to `null`.
+     - Updated `PATCH /api/student-groups/:groupId/supervisor` to allow explicit unassignment or assignment (`targetSupervisorId = supervisorId === null || supervisorId === 0 ? null : supervisorId`).
+4. **Automated Verification Test Suite (`npm run test:teams`)** —
+   - Created `scripts/verify_team_management_and_supervisor_fix.ts` covering 17 automated assertions:
+     - Verification of team creation without supervisor (`supervisorId: null`).
+     - Verification of updating team name, description, and course.
+     - Verification of removing individual members and account preservation.
+     - Verification of re-adding members with course and capacity checks.
+     - Verification of team dissolution with 100% active student account retention.
+
+## Version 1.9.5
 ### Default Password Reset, Route Consolidation, Institutional Branding & Registration Lock
 1. **One-Click Default Password Reset for Admins & Coordinators (`/user-management`)** —
    - Added a dedicated "Reset Password to Default" button for Admins and Coordinators across All Users, Students, and Supervisors tables, as well as inside the Edit User dialog (`POST /api/admin/users/:id/reset-password`).

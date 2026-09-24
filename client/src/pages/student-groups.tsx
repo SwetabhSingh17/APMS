@@ -25,7 +25,7 @@ import { Loader2, UserPlus, Users, Info, Check, X } from "lucide-react";
 const createGroupSchema = z.object({
   name: z.string().min(3, "Group name must be at least 3 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
-  supervisorId: z.number(),
+  supervisorId: z.number().optional(),
   enrollmentNumbers: z.array(z.string().min(1, "Enrollment number is required"))
     .min(2, "You need at least 2 other students to form a group")
     .max(4, "Maximum 4 other students can be added"),
@@ -156,18 +156,21 @@ export default function StudentGroups() {
     defaultValues: {
       name: "",
       description: "",
-      supervisorId: 0,
+      supervisorId: undefined,
       enrollmentNumbers: [],
     },
   });
 
   const onCreateGroupSubmit = (data: CreateGroupFormValues) => {
-    createGroupMutation.mutate({
-      ...data,
+    const payload: any = {
+      name: data.name,
+      description: data.description,
       enrollmentNumbers: [...enrollmentNumbers, user?.enrollmentNumber || ""],
-      // Filter out user's own enrollment number in case it was added manually? 
-      // User's own enrollmentNumber is added here, checking user input validation is already done by UI and backend.
-    });
+    };
+    if (data.supervisorId && data.supervisorId > 0) {
+      payload.supervisorId = data.supervisorId;
+    }
+    createGroupMutation.mutate(payload);
   };
 
 
@@ -546,21 +549,28 @@ export default function StudentGroups() {
                       name="supervisorId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Supervisor</FormLabel>
-                          <Select onValueChange={(value) => field.onChange(Number(value))}>
+                          <div className="flex items-center justify-between">
+                            <FormLabel>Supervisor</FormLabel>
+                            <span className="text-xs text-muted-foreground font-normal">Optional</span>
+                          </div>
+                          <Select onValueChange={(value) => field.onChange(value === "none" ? undefined : Number(value))} value={field.value ? field.value.toString() : "none"}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select a supervisor" />
+                                <SelectValue placeholder="Select a supervisor (Optional)" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
+                              <SelectItem value="none">None (Allotted after topic selection)</SelectItem>
                               {supervisors?.map((supervisor: User) => (
                                 <SelectItem key={supervisor.id} value={supervisor.id.toString()}>
-                                  {supervisor.firstName} {supervisor.lastName}
+                                  {supervisor.prefix ? `${supervisor.prefix} ` : ""}{supervisor.firstName} {supervisor.lastName}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
+                          <p className="text-[11px] text-muted-foreground">
+                            Optional: A supervisor will be allotted automatically when your team selects a project topic.
+                          </p>
                           <FormMessage />
                         </FormItem>
                       )}

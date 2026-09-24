@@ -239,13 +239,16 @@ To verify that your installation is working properly and all features (Excel bul
    npm run check
    ```
 
-2. Run the complete automated test suite (160+ test assertions across 6 suites):
+2. Run the complete automated test suite (175+ test assertions across 7 suites):
    ```bash
    npm test
    ```
 
 3. Or run specific individual test suites:
    ```bash
+   # Test team management, safe dissolution & supervisor optional fix
+   npm run test:teams
+
    # Test default password reset, legacy scrypt upgrade & RBAC
    npm run test:password
 

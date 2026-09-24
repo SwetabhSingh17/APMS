@@ -29,6 +29,7 @@ const SupervisorEvaluations = lazy(() => import("@/pages/supervisor-evaluations"
 const StudentGroups = lazy(() => import("@/pages/student-groups"));
 const SystemManagement = lazy(() => import("@/pages/system-management"));
 const ManageProject = lazy(() => import("@/pages/manage-project"));
+const TeamManagement = lazy(() => import("@/pages/team-management"));
 const CreatorInfoPage = lazy(() => import("@/pages/creator-info"));
 
 function PageLoader() {
@@ -90,6 +91,11 @@ function Router() {
           path="/manage-project"
           component={ManageProject}
           allowedRoles={[UserRole.COORDINATOR, UserRole.ADMIN]}
+        />
+        <ProtectedRoute
+          path="/team-management"
+          component={TeamManagement}
+          allowedRoles={[UserRole.ADMIN, UserRole.COORDINATOR]}
         />
         <ProtectedRoute path="/settings" component={Settings} />
         <ProtectedRoute path="/notifications" component={Notifications} />
