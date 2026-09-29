@@ -6,7 +6,7 @@ This document outlines suggested architectural, security, and maintenance improv
 
 ## 🚨 Priority Bugs to be Resolved
 
-### 🟢 ACTIVE ISSUES RESOLVED (v1.9.8 - Completed & Verified)
+### 🟢 ACTIVE ISSUES RESOLVED (v2.0.0 / v2 - Completed & Verified)
 
 - [x] **Supervisor Management Portal for Admins & Coordinators (`/supervisor-management`)** — **COMPLETED**
   - **Affected Files:** `client/src/App.tsx`, `client/src/pages/supervisor-management.tsx`, `client/src/components/layout/sidebar.tsx`, `client/src/components/layout/header.tsx`, `server/routes/admin.ts`, `server/routes/topics.ts`, `server/routes/groups.ts`, `server/db-storage.ts`

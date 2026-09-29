@@ -1,7 +1,7 @@
 # Version History
 
-## Version 1.9.8 (Current)
-### Supervisor Management Portal, Reactive Roster, Specific Group Topic Allotment & Workload Governance
+## Version 2.0.0 (Current) [v2]
+### Major Release (v2.0): Supervisor Management Portal, Reactive Roster, Specific Group Topic Allotment & Workload Governance
 1. **Dedicated Supervisor Management Portal (`/supervisor-management`)** —
    - **Centralized Faculty Governance Console**: Added a full-featured administrative portal accessible by Administrators and Coordinators from the sidebar navigation (`GraduationCap` icon) and header sync.
    - **Real-Time Key Metrics Cards**: Displays live metric tiles for Total Supervisors, Active Mentors, Available Supervisors, Proposed Topics, Approved Topics, and Teams Supervised.

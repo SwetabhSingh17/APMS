@@ -6,11 +6,12 @@ Currently, the following versions of this project are actively supported with se
 
 | Version | Supported          |
 | ------- | ------------------ |
+| v2.x    | :white_check_mark: |
 | v1.9.x  | :white_check_mark: |
 | v1.8.x  | :white_check_mark: |
 | < v1.8  | :x:                |
 
-## Security Posture (v1.9.6)
+## Security Posture (v2.0)
 
 APMS ships with the following protections in place:
 

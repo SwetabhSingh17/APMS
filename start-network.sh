@@ -4,7 +4,7 @@
 IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -n 1)
 
 echo "========================================="
-echo "Starting APMS Server for Network (v1.9.8)"
+echo "Starting APMS Server for Network (v2.0.0)"
 echo "========================================="
 echo ""
 echo "Local IP Address: $IP"
