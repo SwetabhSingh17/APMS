@@ -15,7 +15,8 @@ import {
   ClipboardCheck,
   Database,
   FolderCog,
-  Users2
+  Users2,
+  GraduationCap
 } from "lucide-react";
 
 export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?: () => void }) {
@@ -160,6 +161,11 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?
             <Link href="/team-management" onClick={isMobile ? onClose : undefined} className={linkClass("/team-management")}>
               <Users2 className="w-5 h-5" />
               <span>Team Management</span>
+            </Link>
+
+            <Link href="/supervisor-management" onClick={isMobile ? onClose : undefined} className={linkClass("/supervisor-management")}>
+              <GraduationCap className="w-5 h-5" />
+              <span>Supervisor Management</span>
             </Link>
 
             {user?.role === UserRole.ADMIN && (

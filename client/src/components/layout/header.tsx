@@ -44,6 +44,9 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
       case "/team-management":
         setTitle("Team Management");
         break;
+      case "/supervisor-management":
+        setTitle("Supervisor Management");
+        break;
       case "/settings":
         setTitle("Settings");
         break;

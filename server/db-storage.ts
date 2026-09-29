@@ -419,8 +419,11 @@ export class DBStorage {
     return topic as ProjectTopic | undefined;
   }
 
-  async updateProjectTopic(id: number, data: InsertProjectTopic): Promise<ProjectTopic> {
-    const [topic] = await db.update(projectTopics).set(data).where(eq(projectTopics.id, id)).returning();
+  async updateProjectTopic(id: number, data: Partial<InsertProjectTopic> & { status?: string; feedback?: string }): Promise<ProjectTopic> {
+    const [topic] = await db.update(projectTopics)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(projectTopics.id, id))
+      .returning();
     return topic as ProjectTopic;
   }
 
@@ -1097,6 +1100,187 @@ export class DBStorage {
       group: updatedGroup,
       topic,
       affectedStudentsCount: members.length,
+    };
+  }
+
+  async unassignStudentGroupTopic(groupId: number): Promise<boolean> {
+    const group = await this.getGroup(groupId);
+    if (!group) throw new Error("Project team not found");
+
+    const members = await this.getStudentGroupMembers(groupId);
+    for (const member of members) {
+      const projects = await db.select().from(studentProjects).where(eq(studentProjects.studentId, member.id));
+      for (const proj of projects) {
+        await db.delete(projectAssessments).where(eq(projectAssessments.projectId, proj.id));
+        await db.delete(projectMilestones).where(eq(projectMilestones.projectId, proj.id));
+        await db.delete(studentProjects).where(eq(studentProjects.id, proj.id));
+      }
+      await this.createNotification({
+        userId: member.id,
+        title: "Project Topic Unassigned",
+        message: `The project topic for team "${group.name}" has been unassigned by the Academic Coordinator. The team is now open for a new topic assignment.`,
+      });
+    }
+    return true;
+  }
+
+  async getSupervisorsSummary(courseFilter?: string): Promise<{
+    supervisors: any[];
+    stats: {
+      totalSupervisors: number;
+      activeSupervisors: number;
+      availableSupervisors: number;
+      totalTopicsSubmitted: number;
+      totalTopicsApproved: number;
+      totalTopicsAssigned: number;
+      totalTeamsAssigned: number;
+      totalStudentsSupervised: number;
+    };
+  }> {
+    const normalizedCourse = courseFilter && courseFilter !== "all" ? courseFilter.trim().toUpperCase() : null;
+
+    // 1. Fetch all supervisors
+    const supervisorUsers = await db.select({
+      id: users.id,
+      username: users.username,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+      empId: users.empId,
+      prefix: users.prefix,
+      designation: users.designation,
+      mobile: users.mobile,
+      department: users.department,
+      course: users.course,
+      createdAt: users.createdAt,
+    })
+    .from(users)
+    .where(and(eq(users.role, UserRole.SUPERVISOR), eq(users.isDeleted, false)))
+    .orderBy(asc(users.firstName), asc(users.lastName));
+
+    // 2. Fetch all non-deleted topics
+    const allTopics = await db.select().from(projectTopics)
+      .where(eq(projectTopics.isDeleted, false))
+      .orderBy(desc(projectTopics.createdAt));
+
+    // 3. Fetch all groups with members and project info
+    const allGroups = await this.getAllStudentGroups();
+
+    // Map: topicId -> assigned group info
+    const topicToGroupMap = new Map<number, any>();
+    for (const group of allGroups) {
+      if (group.project && group.project.topicId) {
+        topicToGroupMap.set(group.project.topicId, {
+          id: group.id,
+          name: group.name,
+          projectTeamId: group.projectTeamId,
+          course: group.course,
+          maxSize: group.maxSize,
+          memberCount: group.members?.length || 0,
+          members: group.members || [],
+          projectStatus: group.project.status,
+          progress: group.project.progress || 0,
+        });
+      }
+    }
+
+    // Map: supervisorId -> assigned groups
+    const supervisorToGroupsMap = new Map<number, any[]>();
+    for (const group of allGroups) {
+      if (group.supervisorId) {
+        const list = supervisorToGroupsMap.get(group.supervisorId) || [];
+        list.push({
+          id: group.id,
+          name: group.name,
+          projectTeamId: group.projectTeamId,
+          course: group.course,
+          maxSize: group.maxSize,
+          memberCount: group.members?.length || 0,
+          members: group.members || [],
+          project: group.project,
+        });
+        supervisorToGroupsMap.set(group.supervisorId, list);
+      }
+    }
+
+    // Map: supervisorId -> submitted topics with assigned team info
+    const supervisorToTopicsMap = new Map<number, any[]>();
+    for (const topic of allTopics) {
+      const list = supervisorToTopicsMap.get(topic.submittedById) || [];
+      const assignedTeam = topicToGroupMap.get(topic.id) || null;
+      list.push({
+        ...topic,
+        assignedTeam,
+      });
+      supervisorToTopicsMap.set(topic.submittedById, list);
+    }
+
+    // Compute summary per supervisor
+    const supervisors = supervisorUsers.map(sup => {
+      let supTopics = supervisorToTopicsMap.get(sup.id) || [];
+      let supTeams = supervisorToGroupsMap.get(sup.id) || [];
+
+      // Filter by course if specified
+      if (normalizedCourse) {
+        supTopics = supTopics.filter(t => (t.course || '').trim().toUpperCase() === normalizedCourse);
+        supTeams = supTeams.filter(g => (g.course || '').trim().toUpperCase() === normalizedCourse);
+      }
+
+      const totalTopics = supTopics.length;
+      const approvedTopics = supTopics.filter(t => t.status === "approved").length;
+      const pendingTopics = supTopics.filter(t => t.status === "pending" || t.status === "pending_supervisor").length;
+      const rejectedTopics = supTopics.filter(t => t.status === "rejected").length;
+      const assignedTopics = supTopics.filter(t => !!t.assignedTeam).length;
+      const availableTopics = supTopics.filter(t => t.status === "approved" && !t.assignedTeam).length;
+      const assignedTeams = supTeams.length;
+      const totalStudentsSupervised = supTeams.reduce((sum, g) => sum + (g.memberCount || 0), 0);
+
+      let workloadStatus: "available" | "optimal" | "high" | "maximum" = "available";
+      if (assignedTeams === 0) workloadStatus = "available";
+      else if (assignedTeams <= 3) workloadStatus = "optimal";
+      else if (assignedTeams <= 5) workloadStatus = "high";
+      else workloadStatus = "maximum";
+
+      return {
+        ...sup,
+        submittedTopics: supTopics,
+        assignedTeams: supTeams,
+        metrics: {
+          totalTopics,
+          approvedTopics,
+          pendingTopics,
+          rejectedTopics,
+          assignedTopics,
+          availableTopics,
+          assignedTeams,
+          totalStudentsSupervised,
+          workloadStatus,
+        }
+      };
+    });
+
+    // Compute overall stats
+    const totalSupervisors = supervisors.length;
+    const activeSupervisors = supervisors.filter(s => s.metrics.assignedTeams > 0).length;
+    const availableSupervisors = supervisors.filter(s => s.metrics.assignedTeams === 0).length;
+    const totalTopicsSubmitted = supervisors.reduce((sum, s) => sum + s.metrics.totalTopics, 0);
+    const totalTopicsApproved = supervisors.reduce((sum, s) => sum + s.metrics.approvedTopics, 0);
+    const totalTopicsAssigned = supervisors.reduce((sum, s) => sum + s.metrics.assignedTopics, 0);
+    const totalTeamsAssigned = supervisors.reduce((sum, s) => sum + s.metrics.assignedTeams, 0);
+    const totalStudentsSupervised = supervisors.reduce((sum, s) => sum + s.metrics.totalStudentsSupervised, 0);
+
+    return {
+      supervisors,
+      stats: {
+        totalSupervisors,
+        activeSupervisors,
+        availableSupervisors,
+        totalTopicsSubmitted,
+        totalTopicsApproved,
+        totalTopicsAssigned,
+        totalTeamsAssigned,
+        totalStudentsSupervised,
+      }
     };
   }
 

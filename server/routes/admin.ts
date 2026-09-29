@@ -45,6 +45,18 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
         }
     });
 
+    // Supervisor Management Summary (Admin and Coordinator only)
+    router.get("/api/admin/supervisors-summary", requireRole([UserRole.ADMIN, UserRole.COORDINATOR]), async (req: Request, res: Response) => {
+        try {
+            const course = req.query.course as string | undefined;
+            const summary = await storage.getSupervisorsSummary(course);
+            res.json(summary);
+        } catch (error) {
+            console.error("Error fetching supervisors summary:", error);
+            res.status(500).json({ message: "Failed to fetch supervisors summary" });
+        }
+    });
+
     // Export Database Data
     router.post("/api/admin/export", requireRole([UserRole.ADMIN]), async (req: Request, res: Response) => {
         try {

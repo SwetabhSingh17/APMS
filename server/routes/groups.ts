@@ -424,6 +424,26 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
         }
     });
 
+    // Unassign project topic from a group (coordinators and admins only)
+    router.delete("/api/student-groups/:groupId/topic", requireRole([UserRole.COORDINATOR, UserRole.ADMIN]), async (req: Request, res: Response) => {
+        if (!isAuthenticatedRequest(req)) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        try {
+            const groupId = parseInt(req.params.groupId);
+            if (isNaN(groupId)) {
+                return res.status(400).json({ message: "Invalid team ID" });
+            }
+
+            await storage.unassignStudentGroupTopic(groupId);
+            res.json({ success: true, message: "Project topic unassigned successfully." });
+        } catch (error: any) {
+            console.error("Error unassigning group topic:", error);
+            res.status(400).json({ message: error?.message || "Failed to unassign project topic" });
+        }
+    });
+
     // Update team basic details (Admin and Coordinator only)
     router.patch("/api/student-groups/:groupId", requireRole([UserRole.COORDINATOR, UserRole.ADMIN]), async (req: Request, res: Response) => {
         if (!isAuthenticatedRequest(req)) {

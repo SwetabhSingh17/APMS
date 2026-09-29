@@ -371,7 +371,7 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
     });
 
     // Update topic
-    router.put("/api/topics/:id", requireRole([UserRole.SUPERVISOR]), async (req: Request, res: Response) => {
+    router.put("/api/topics/:id", requireRole([UserRole.SUPERVISOR, UserRole.COORDINATOR, UserRole.ADMIN]), async (req: Request, res: Response) => {
         if (!isAuthenticatedRequest(req)) {
             return res.status(401).json({ message: "Unauthorized" });
         }
@@ -384,25 +384,32 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
                 return res.status(404).json({ message: "Topic not found" });
             }
 
-            if (existingTopic.submittedById !== req.user.id) {
-                return res.status(403).json({ message: "You can only edit your own topics" });
+            const isPrivileged = req.user.role === UserRole.ADMIN || req.user.role === UserRole.COORDINATOR;
+
+            if (!isPrivileged) {
+                if (existingTopic.submittedById !== req.user.id) {
+                    return res.status(403).json({ message: "You can only edit your own topics" });
+                }
+
+                if (existingTopic.status !== 'pending') {
+                    return res.status(403).json({ message: "You can only edit pending topics" });
+                }
             }
 
-            if (existingTopic.status !== 'pending') {
-                return res.status(403).json({ message: "You can only edit pending topics" });
-            }
+            const { title, description, technology, projectType, course, estimatedComplexity, status, feedback } = req.body;
+            const updateFields: any = {};
+            if (title !== undefined) updateFields.title = title;
+            if (description !== undefined) updateFields.description = description;
+            if (technology !== undefined) updateFields.technology = technology;
+            if (projectType !== undefined) updateFields.projectType = projectType;
+            if (course !== undefined) updateFields.course = course;
+            if (estimatedComplexity !== undefined) updateFields.estimatedComplexity = estimatedComplexity;
+            if (isPrivileged && status !== undefined) updateFields.status = status;
+            if (isPrivileged && feedback !== undefined) updateFields.feedback = feedback;
 
-            const validatedData = insertProjectTopicSchema.parse({
-                ...req.body,
-                submittedById: req.user.id
-            });
-
-            const updatedTopic = await storage.updateProjectTopic(topicId, validatedData);
+            const updatedTopic = await storage.updateProjectTopic(topicId, updateFields);
             res.json(updatedTopic);
         } catch (error) {
-            if (error instanceof z.ZodError) {
-                return res.status(400).json({ message: "Invalid topic data", errors: error.errors });
-            }
             console.error("Error updating topic:", error);
             res.status(500).json({ message: "Failed to update topic" });
         }

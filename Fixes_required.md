@@ -6,6 +6,24 @@ This document outlines suggested architectural, security, and maintenance improv
 
 ## 🚨 Priority Bugs to be Resolved
 
+### 🟢 ACTIVE ISSUES RESOLVED (v1.9.8 - Completed & Verified)
+
+- [x] **Supervisor Management Portal for Admins & Coordinators (`/supervisor-management`)** — **COMPLETED**
+  - **Affected Files:** `client/src/App.tsx`, `client/src/pages/supervisor-management.tsx`, `client/src/components/layout/sidebar.tsx`, `client/src/components/layout/header.tsx`, `server/routes/admin.ts`, `server/routes/topics.ts`, `server/routes/groups.ts`, `server/db-storage.ts`
+  - **Resolution:** Added dedicated Supervisor Management console allowing Administrators and Coordinators to inspect faculty supervisor profiles, topic submissions, team allotments, and mentorship loads with live metric tiles and cohort filtering.
+
+- [x] **Direct Specific Group Allotment under Supervisor Topics & Safe Topic Unassignment** — **COMPLETED**
+  - **Affected Files:** `server/routes/groups.ts`, `server/db-storage.ts`, `client/src/pages/supervisor-management.tsx`
+  - **Resolution:** Added direct team assignment modal allowing Admins/Coordinators to assign specific student teams directly to specific topics under the submitting supervisor (`PATCH /api/student-groups/:groupId/topic`), along with one-click safe topic unassignment (`DELETE /api/student-groups/:groupId/topic`) preserving student group records and account integrity.
+
+- [x] **Fully Reactive UI & Elimination of Horizontal Scroll for Manage/Edit/View Actions** — **COMPLETED**
+  - **Affected Files:** `client/src/pages/supervisor-management.tsx`
+  - **Resolution:** Replaced rigid multi-column table constraint with a default responsive **Cards View** reflowing smoothly across all viewports (mobile, tablet, laptop, desktop). Positioned Manage, Edit, and View actions prominently in the supervisor header, ensuring they are always visible without horizontal scrolling. Added a **Table View Toggle** with pinned sticky right actions for tabular review.
+
+- [x] **Display All Submitted Topics Without Truncation** — **COMPLETED**
+  - **Affected Files:** `client/src/pages/supervisor-management.tsx`
+  - **Resolution:** Removed the two-topic truncation limit and collapse/expand toggle, directly mapping and displaying all submitted topics per supervisor with their associated team allotments, tech stack, and approval status.
+
 ### 🟢 ACTIVE ISSUES RESOLVED (v1.9.7 - Completed & Verified)
 
 - [x] **Enrollment Number Conflict Detection & Resolution UI on Dashboard & User Management** — **COMPLETED**

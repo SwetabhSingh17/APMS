@@ -1,6 +1,31 @@
 # Version History
 
-## Version 1.9.7 (Current)
+## Version 1.9.8 (Current)
+### Supervisor Management Portal, Reactive Roster, Specific Group Topic Allotment & Workload Governance
+1. **Dedicated Supervisor Management Portal (`/supervisor-management`)** —
+   - **Centralized Faculty Governance Console**: Added a full-featured administrative portal accessible by Administrators and Coordinators from the sidebar navigation (`GraduationCap` icon) and header sync.
+   - **Real-Time Key Metrics Cards**: Displays live metric tiles for Total Supervisors, Active Mentors, Available Supervisors, Proposed Topics, Approved Topics, and Teams Supervised.
+   - **Cohort & Status Segmentation**: Integrated with global `CourseFilterContext` (BCA, MCA, All Cohorts) and categorized tabs (`All`, `Active Mentors`, `Available`, `Pending Topics`).
+   - **Comprehensive Supervisor Profiles**: Displays faculty initials avatar, full name with honorific prefix, employee ID, academic designation, department, email, and mobile phone number.
+   - **Mentorship Load & Capacity Tracking**: Visual progress bar tracking assigned teams against the 5-team institutional capacity ceiling, total students mentored, and automatic workload status flags (`available`, `optimal`, `high`, `maxed`).
+2. **Direct Specific Group Allotment under Supervisor Submitted Topics** —
+   - Displays all submitted project topics directly under each supervisor without truncation, showing topic code, title, course, tech stack, complexity, and approval status.
+   - Directly displays the assigned student group beside/below each topic, including team name, project team ID, member count, and full member roster with university enrollment numbers.
+   - **Direct Assignment Modal**: Interactive dialog (`PATCH /api/student-groups/:groupId/topic`) allowing Admins/Coordinators to search, filter (unassigned/assigned/all), and assign a specific student team directly to a specific topic under the faculty member who submitted it.
+   - **Change & Unassign Controls**: Easy team reassignment and one-click topic unassignment (`DELETE /api/student-groups/:groupId/topic`), preserving student group records, accounts, and project links with zero data loss.
+3. **Fully Reactive UI & Zero Horizontal Boundary Overflow** —
+   - **Default Responsive Cards View**: Renders each supervisor as a standalone responsive card that reflows gracefully on all viewports from mobile (375px) to 4K displays.
+   - **Manage, Edit, and View Actions Prominently Positioned**: The primary governance actions (`View`, `Edit`, `Manage Topics`) are placed directly in the supervisor card header beside the workload widget, remaining immediately accessible on any screen width without horizontal scrolling.
+   - **Table View Toggle with Sticky Actions**: Includes a view switcher (`Cards View` / `Table View`). In Table View, the Actions column is pinned sticky (`sticky right-0 bg-background z-10 border-l shadow-sm`) with additional shortcut actions in Column 1, guaranteeing that actions are never clipped or pushed out of boundary.
+4. **Supervisor & Topic Management Operations** —
+   - **Edit Faculty Profile (`PATCH /api/admin/users/:id`)**: Edit supervisor prefix, names, emp ID, designation, department, email, and contact number.
+   - **Review, Approve & Reject Topics (`PUT /api/topics/:id`)**: Direct approval, rejection with coordinator feedback dialog, and inline topic details editing (title, tech stack, course, complexity).
+   - **General Team Allotment**: Modal to allot student teams to supervisors with live group search.
+5. **Production Safety & Non-Destructive Live System Compatibility** —
+   - Built with 100% backward-compatible database queries and storage functions.
+   - Zero database migrations or schema alterations required, preserving ongoing live production system state.
+
+## Version 1.9.7
 ### Enrollment Conflict Detection & Resolution UI, Project Topic Reassignment, Student Phone Numbers & Tentative Supervisor
 1. **Enrollment Conflict Detection & Interactive Resolution UI (`/` & `/user-management`)** —
    - **Root Cause & Detection**: When importing student data via Excel, discrepancies in raw university spreadsheets can assign the same enrollment number to multiple distinct students, causing login credential overlap. Implemented automatic detection via `GET /api/admin/enrollment-conflicts` querying grouped active student accounts with duplicate enrollment numbers.
