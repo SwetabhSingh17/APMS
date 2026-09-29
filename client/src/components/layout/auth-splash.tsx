@@ -27,11 +27,11 @@ export function AuthSplash({ isVisible, type, username }: AuthSplashProps) {
                 className="text-center"
               >
                 <h1 className="text-4xl md:text-6xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">
-                  WELCOME_{username?.toUpperCase()}
+                  WELCOME {username?.toUpperCase()}
                 </h1>
                 <div className="mt-8 flex justify-center">
                   <div className="w-16 h-1 bg-primary/20 rounded-full overflow-hidden">
-                    <motion.div 
+                    <motion.div
                       className="h-full bg-primary"
                       initial={{ width: "0%" }}
                       animate={{ width: "100%" }}
@@ -49,7 +49,7 @@ export function AuthSplash({ isVisible, type, username }: AuthSplashProps) {
               >
                 <Loader2 className="w-12 h-12 animate-spin text-primary" />
                 <h2 className="text-2xl font-bold tracking-widest text-muted-foreground">
-                  LOGGING_OUT
+                  LOGGING OUT
                 </h2>
               </motion.div>
             )}

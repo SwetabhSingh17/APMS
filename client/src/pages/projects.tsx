@@ -38,7 +38,8 @@ import {
   Building, 
   ArrowRight,
   FileText,
-  GraduationCap
+  GraduationCap,
+  Phone
 } from "lucide-react";
 import { useCourseFilter } from "@/hooks/course-filter-context";
 
@@ -58,7 +59,7 @@ interface ISupervisorTopicWithTeam {
     groupName: string;
     projectTeamId: string | null;
     course: string | null;
-    members: { id: number; firstName: string; lastName: string; enrollmentNumber: string | null; email: string }[];
+    members: { id: number; firstName: string; lastName: string; enrollmentNumber: string | null; email: string; mobile?: string | null }[];
     progress: number;
   };
 }
@@ -479,13 +480,19 @@ export default function Projects() {
                                 <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
                                   {member.firstName[0]}{member.lastName[0]}
                                 </div>
-                                <div className="min-w-0">
+                                <div className="min-w-0 flex-1">
                                   <p className="text-xs font-semibold text-foreground truncate">
                                     {member.firstName} {member.lastName}
                                   </p>
-                                  <p className="text-[11px] text-muted-foreground truncate">
+                                  <p className="text-[11px] text-muted-foreground truncate font-mono">
                                     {member.enrollmentNumber || member.email}
                                   </p>
+                                  {member.mobile && (
+                                    <p className="text-[11px] text-foreground/80 font-mono flex items-center gap-1 mt-0.5">
+                                      <Phone className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
+                                      {member.mobile}
+                                    </p>
+                                  )}
                                 </div>
                               </div>
                             ))}
@@ -1178,9 +1185,15 @@ export default function Projects() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-card/50 p-3 rounded-lg backdrop-blur-sm">
                   <p className="text-sm font-medium">Student</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-foreground font-semibold">
                     {selectedProject.student ? `${selectedProject.student.firstName} ${selectedProject.student.lastName}` : 'Unknown Student'}
                   </p>
+                  {selectedProject.student?.mobile && (
+                    <p className="text-xs font-mono text-muted-foreground mt-0.5 flex items-center gap-1">
+                      <Phone className="h-3 w-3 text-muted-foreground shrink-0" />
+                      {selectedProject.student.mobile}
+                    </p>
+                  )}
                 </div>
                 <div className="bg-card/50 p-3 rounded-lg backdrop-blur-sm">
                   <p className="text-sm font-medium">Start Date</p>

@@ -8,11 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, UserPlus, UserCog, Edit, Trash2, Eye, EyeOff, FileSpreadsheet, UserCheck, RotateCcw, KeyRound } from "lucide-react";
+import { Search, UserPlus, UserCog, Edit, Trash2, Eye, EyeOff, FileSpreadsheet, UserCheck, RotateCcw, KeyRound, AlertTriangle, AlertCircle, Users } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import { InsertUser, UserRole } from "@shared/schema";
+import { InsertUser, UserRole, IEnrollmentConflict } from "@shared/schema";
 import { BulkOnboardingModal } from "@/components/admin/bulk-onboarding-modal";
 import { SupervisorBulkOnboardingModal } from "@/components/admin/supervisor-bulk-onboarding-modal";
 import { useForm } from "react-hook-form";
@@ -97,6 +97,50 @@ export default function UserManagement() {
     }
   });
 
+  const { data: conflictData } = useQuery<{ conflicts: IEnrollmentConflict[], count: number }>({
+    queryKey: ["/api/admin/enrollment-conflicts"],
+    enabled: !!user && (user.role === UserRole.ADMIN || user.role === UserRole.COORDINATOR),
+    refetchInterval: 15000
+  });
+  const conflicts = conflictData?.conflicts || [];
+  const conflictingEnrollmentSet = new Set(conflicts.map(c => c.enrollmentNumber));
+  const conflictedStudentCount = conflicts.reduce((sum, c) => sum + (c.students?.length || 0), 0);
+
+  // State for enrollment conflict resolution dialog
+  const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
+  const [resolvingStudentId, setResolvingStudentId] = useState<number | null>(null);
+  const [newEnrollmentInputs, setNewEnrollmentInputs] = useState<Record<number, string>>({});
+  const [showOnlyConflicts, setShowOnlyConflicts] = useState(false);
+  const [activeTab, setActiveTab] = useState("all-users");
+
+  const resolveConflictMutation = useMutation({
+    mutationFn: async ({ userId, newEnrollmentNumber }: { userId: number, newEnrollmentNumber: string }) => {
+      const res = await apiRequest("POST", "/api/admin/resolve-enrollment-conflict", {
+        userId,
+        newEnrollmentNumber
+      });
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Conflict Resolved",
+        description: data.message || "Enrollment number updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/enrollment-conflicts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+      setResolvingStudentId(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to resolve conflict",
+        description: error.message,
+        variant: "destructive",
+      });
+      setResolvingStudentId(null);
+    }
+  });
+
   // Define form schema
   const userFormSchema = insertUserSchema.extend({
     confirmPassword: z.string().min(1, "Please confirm your password"),
@@ -105,9 +149,10 @@ export default function UserManagement() {
     path: ["confirmPassword"],
   }).refine((data) => {
     // Enrollment number is required only for student accounts
-    if (data.role === UserRole.STUDENT && !data.enrollmentNumber) {
+    if (data.role === UserRole.STUDENT && (!data.enrollmentNumber || data.enrollmentNumber.trim() === "")) {
       return false;
     }
+    return true;
   }, {
     message: "Enrollment number is required for student registration",
     path: ["enrollmentNumber"]
@@ -136,6 +181,7 @@ export default function UserManagement() {
       role: UserRole.STUDENT,
       enrollmentNumber: "",
       course: "BCA",
+      mobile: "",
     }
   });
 
@@ -169,6 +215,7 @@ export default function UserManagement() {
       password: "",
       confirmPassword: "",
       course: "BCA",
+      mobile: "",
     }
   });
 
@@ -266,9 +313,12 @@ export default function UserManagement() {
   const onSubmit = (data: UserFormValues) => {
     const { confirmPassword, ...userData } = data;
 
-    // Remove enrollment number for non-student roles
+    // Clean up student-only fields for non-student roles
     if (userData.role !== UserRole.STUDENT) {
       delete userData.enrollmentNumber;
+      delete userData.course;
+    } else if (userData.enrollmentNumber) {
+      userData.enrollmentNumber = userData.enrollmentNumber.trim();
     }
 
     createUserMutation.mutate(userData);
@@ -303,6 +353,7 @@ export default function UserManagement() {
       role: user.role,
       enrollmentNumber: user.enrollmentNumber || null,
       course: user.course || "BCA",
+      mobile: user.mobile || "",
     });
     setIsEditUserOpen(true);
   };
@@ -425,21 +476,84 @@ export default function UserManagement() {
             </div>
           </div>
 
+          {conflicts.length > 0 && (
+            <div className="mb-6 p-4 rounded-xl border-2 border-amber-500/50 bg-amber-500/10 dark:bg-amber-950/20 backdrop-blur flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
+              <div className="flex items-start gap-3 text-amber-950 dark:text-amber-200">
+                <div className="p-2 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-base">Enrolment Conflict Detected</span>
+                    <span className="bg-destructive text-destructive-foreground text-xs font-bold px-2 py-0.5 rounded-full">
+                      {conflicts.length} {conflicts.length === 1 ? "Conflict" : "Conflicts"} ({conflictedStudentCount} Students)
+                    </span>
+                  </div>
+                  <p className="text-xs text-amber-900/80 dark:text-amber-300/80 mt-1 max-w-2xl leading-relaxed">
+                    Multiple students share the exact same university enrolment number. Resolve the conflict below to assign distinct enrolment numbers and ensure unique credentials.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-amber-500/40 text-amber-900 dark:text-amber-200 hover:bg-amber-500/20 text-xs font-medium"
+                  onClick={() => {
+                    setActiveTab("students");
+                    setShowOnlyConflicts(!showOnlyConflicts);
+                  }}
+                >
+                  <Users className="w-3.5 h-3.5 mr-1.5" />
+                  {showOnlyConflicts ? "Show All Students" : `Show Conflicted Only (${conflictedStudentCount})`}
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="font-semibold text-xs shadow-sm"
+                  onClick={() => setIsConflictModalOpen(true)}
+                >
+                  <AlertCircle className="w-3.5 h-3.5 mr-1.5" />
+                  Resolve Enrolment Conflict
+                </Button>
+              </div>
+            </div>
+          )}
+
           {(() => {
             const adminsList = filteredUsers ? filteredUsers.filter(u => u.role === UserRole.ADMIN) : [];
             const supervisorsList = filteredUsers ? filteredUsers.filter(u => u.role === UserRole.SUPERVISOR) : [];
             const coordinatorsList = filteredUsers ? filteredUsers.filter(u => u.role === UserRole.COORDINATOR) : [];
-            const studentsList = filteredUsers ? filteredUsers.filter(u => u.role === UserRole.STUDENT) : [];
+            const rawStudentsList = filteredUsers ? filteredUsers.filter(u => u.role === UserRole.STUDENT) : [];
+            const studentsList = showOnlyConflicts
+              ? rawStudentsList.filter(u => u.enrollmentNumber && conflictingEnrollmentSet.has(u.enrollmentNumber))
+              : rawStudentsList;
             const allUsersCount = filteredUsers ? filteredUsers.length : 0;
 
             return (
-              <Tabs defaultValue="all-users">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="mb-4">
                   <TabsTrigger value="all-users">All Users ({allUsersCount})</TabsTrigger>
                   <TabsTrigger value="admins">Admins ({adminsList.length})</TabsTrigger>
                   <TabsTrigger value="supervisors">Supervisors ({supervisorsList.length})</TabsTrigger>
                   <TabsTrigger value="coordinators">Coordinators ({coordinatorsList.length})</TabsTrigger>
-                  <TabsTrigger value="students">Students ({studentsList.length})</TabsTrigger>
+                  <TabsTrigger value="students" className="relative">
+                    Students ({rawStudentsList.length})
+                    {conflictedStudentCount > 0 && (
+                      <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                        {conflictedStudentCount} conflicts
+                      </span>
+                    )}
+                  </TabsTrigger>
+                  {conflicts.length > 0 && (
+                    <TabsTrigger
+                      value="conflicts"
+                      className="text-amber-700 dark:text-amber-300 font-semibold border border-amber-500/30 data-[state=active]:bg-amber-500/15"
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5 mr-1 text-amber-600 dark:text-amber-400" />
+                      Conflicts ({conflictedStudentCount})
+                    </TabsTrigger>
+                  )}
                 </TabsList>
 
                 <TabsContent value="all-users">
@@ -459,8 +573,10 @@ export default function UserManagement() {
                         </TableHeader>
                         <TableBody>
                           {filteredUsers && filteredUsers.length > 0 ? (
-                            filteredUsers.map((user) => (
-                              <TableRow key={user.id} className="hover:bg-muted/50">
+                            filteredUsers.map((user) => {
+                              const isConflicted = user.enrollmentNumber ? conflictingEnrollmentSet.has(user.enrollmentNumber) : false;
+                              return (
+                              <TableRow key={user.id} className={`hover:bg-muted/50 ${isConflicted ? "bg-amber-500/10 dark:bg-amber-950/20 border-l-4 border-l-amber-500" : ""}`}>
                                 <TableCell>
                                   <div className="flex items-center space-x-2">
                                     <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -469,7 +585,15 @@ export default function UserManagement() {
                                         {user.lastName.charAt(0)}
                                       </span>
                                     </div>
-                                    <span>{user.firstName} {user.lastName}</span>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span>{user.firstName} {user.lastName}</span>
+                                      {isConflicted && (
+                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                                          <AlertTriangle className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                                          Conflict
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
                                 </TableCell>
                                 <TableCell>{user.username}</TableCell>
@@ -481,6 +605,18 @@ export default function UserManagement() {
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex space-x-2 justify-end">
+                                    {isConflicted && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 font-medium text-xs gap-1"
+                                        title="Resolve enrolment conflict"
+                                        onClick={() => setIsConflictModalOpen(true)}
+                                      >
+                                        <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                                        Resolve
+                                      </Button>
+                                    )}
                                     {(user.role === UserRole.STUDENT || user.role === UserRole.SUPERVISOR) && (
                                       <Button
                                         variant="outline"
@@ -510,7 +646,7 @@ export default function UserManagement() {
                                   </div>
                                 </TableCell>
                               </TableRow>
-                            ))
+                            );})
                           ) : (
                             <TableRow>
                               <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
@@ -680,6 +816,22 @@ export default function UserManagement() {
                 </TabsContent>
 
                 <TabsContent value="students">
+                  {showOnlyConflicts && (
+                    <div className="mb-3 flex items-center justify-between p-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-xs">
+                      <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-medium">
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                        <span>Showing only conflicted students ({studentsList.length}). These students share identical enrolment numbers with others.</span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-amber-900 dark:text-amber-200 hover:bg-amber-500/20 underline"
+                        onClick={() => setShowOnlyConflicts(false)}
+                      >
+                        Show all students
+                      </Button>
+                    </div>
+                  )}
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
@@ -687,14 +839,17 @@ export default function UserManagement() {
                           <TableHead>Name</TableHead>
                           <TableHead>Email</TableHead>
                           <TableHead>Enrollment #</TableHead>
+                          <TableHead>Mobile</TableHead>
                           <TableHead>Project Status</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {studentsList.length > 0 ? (
-                          studentsList.map((user) => (
-                            <TableRow key={user.id} className="hover:bg-muted/50">
+                          studentsList.map((user) => {
+                            const isConflicted = user.enrollmentNumber ? conflictingEnrollmentSet.has(user.enrollmentNumber) : false;
+                            return (
+                            <TableRow key={user.id} className={`hover:bg-muted/50 ${isConflicted ? "bg-amber-500/10 dark:bg-amber-950/20 border-l-4 border-l-amber-500" : ""}`}>
                               <TableCell>
                                 <div className="flex items-center space-x-2">
                                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -703,11 +858,35 @@ export default function UserManagement() {
                                       {user.lastName.charAt(0)}
                                     </span>
                                   </div>
-                                  <span>{user.firstName} {user.lastName}</span>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span>{user.firstName} {user.lastName}</span>
+                                    {isConflicted && (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                                        <AlertTriangle className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                                        Conflict
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               </TableCell>
-                              <TableCell>{user.email}</TableCell>
-                              <TableCell>{user.enrollmentNumber || 'N/A'}</TableCell>
+                              <TableCell className="text-sm">{user.email}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono text-xs font-semibold">{user.enrollmentNumber || 'N/A'}</span>
+                                  {isConflicted && (
+                                    <span 
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30"
+                                      title="This enrolment number is shared with another student. Click resolve to fix."
+                                    >
+                                      <AlertTriangle className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                                      Conflict
+                                    </span>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <span className="font-mono text-xs text-muted-foreground">{user.mobile || "—"}</span>
+                              </TableCell>
                               <TableCell>
                                 {user.projectStatus
                                   ? <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Active</span>
@@ -716,6 +895,18 @@ export default function UserManagement() {
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex space-x-2 justify-end">
+                                  {isConflicted && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 font-medium text-xs gap-1"
+                                      title="Resolve enrolment conflict"
+                                      onClick={() => setIsConflictModalOpen(true)}
+                                    >
+                                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                                      Resolve
+                                    </Button>
+                                  )}
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -743,11 +934,11 @@ export default function UserManagement() {
                                 </div>
                               </TableCell>
                             </TableRow>
-                          ))
+                          );})
                         ) : (
                           <TableRow>
-                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                              No students found
+                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                              {showOnlyConflicts ? "No conflicted students found" : "No students found"}
                             </TableCell>
                           </TableRow>
                         )}
@@ -755,6 +946,103 @@ export default function UserManagement() {
                     </Table>
                   </div>
                 </TabsContent>
+
+                {conflicts.length > 0 && (
+                  <TabsContent value="conflicts">
+                    <div className="space-y-4">
+                      <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                          <div>
+                            <h4 className="font-semibold text-sm text-foreground">
+                              {conflicts.length} Enrolment {conflicts.length === 1 ? "Conflict Group" : "Conflict Groups"} ({conflictedStudentCount} Students)
+                            </h4>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Students listed below share the same enrolment number. Update each student's enrolment number with their correct distinct value.
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="shrink-0 font-medium text-xs gap-1.5"
+                          onClick={() => setIsConflictModalOpen(true)}
+                        >
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          Open Conflict Resolution Modal
+                        </Button>
+                      </div>
+
+                      <div className="space-y-4">
+                        {conflicts.map((conflict, idx) => (
+                          <Card key={conflict.enrollmentNumber} className="border border-border/80 shadow-xs overflow-hidden">
+                            <CardHeader className="bg-muted/40 py-2.5 px-4 border-b border-border/60">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                  Conflict Group #{idx + 1}
+                                </span>
+                                <span className="font-mono text-xs font-bold bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded">
+                                  Enrolment: {conflict.enrollmentNumber} ({conflict.count} Students)
+                                </span>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="p-3">
+                              <div className="divide-y divide-border/60">
+                                {conflict.students.map((student) => (
+                                  <div key={student.id} className="py-3 first:pt-0 last:pb-0 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-semibold text-sm text-foreground">{student.firstName} {student.lastName}</span>
+                                        <span className="text-xs text-muted-foreground">({student.course || "BCA"})</span>
+                                        <span className="inline-block text-[11px] font-medium px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                                          {student.projectTeamId ? `Team ${student.projectTeamId}` : (student.groupName || "No Team Assigned")}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-4 text-xs text-muted-foreground font-mono flex-wrap">
+                                        <span>Email: {student.email}</span>
+                                        {student.mobile && <span>Mobile: {student.mobile}</span>}
+                                        <span>Current: <strong className="text-amber-600 dark:text-amber-400">{student.enrollmentNumber}</strong></span>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
+                                      <Input
+                                        placeholder={`New enrolment for ${student.firstName}`}
+                                        value={newEnrollmentInputs[student.id] ?? ""}
+                                        onChange={(e) => setNewEnrollmentInputs(prev => ({ ...prev, [student.id]: e.target.value }))}
+                                        className="font-mono text-xs h-8 max-w-[220px]"
+                                      />
+                                      <Button
+                                        size="sm"
+                                        className="h-8 text-xs shrink-0 font-medium"
+                                        disabled={
+                                          (resolveConflictMutation.isPending && resolvingStudentId === student.id) ||
+                                          !newEnrollmentInputs[student.id]?.trim() ||
+                                          newEnrollmentInputs[student.id]?.trim() === student.enrollmentNumber
+                                        }
+                                        onClick={() => {
+                                          const val = newEnrollmentInputs[student.id]?.trim();
+                                          if (!val) return;
+                                          setResolvingStudentId(student.id);
+                                          resolveConflictMutation.mutate({
+                                            userId: student.id,
+                                            newEnrollmentNumber: val
+                                          });
+                                        }}
+                                      >
+                                        {resolveConflictMutation.isPending && resolvingStudentId === student.id ? "Saving..." : "Update"}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  </TabsContent>
+                )}
 
                 <TabsContent value="coordinators">
                   <div className="overflow-x-auto">
@@ -874,19 +1162,34 @@ export default function UserManagement() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Username</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Username" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Username</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Username" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="mobile"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Mobile Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="10-digit mobile" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField
@@ -1081,29 +1384,45 @@ export default function UserManagement() {
                 )}
               />
 
-              <FormField
-                control={editForm.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="role"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Role</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a role" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value={UserRole.ADMIN}>Admin</SelectItem>
+                          <SelectItem value={UserRole.COORDINATOR}>Coordinator</SelectItem>
+                          <SelectItem value={UserRole.SUPERVISOR}>Supervisor</SelectItem>
+                          <SelectItem value={UserRole.STUDENT}>Student</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name="mobile"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Mobile Number</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a role" />
-                        </SelectTrigger>
+                        <Input placeholder="Mobile number" {...field} value={field.value || ''} />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value={UserRole.ADMIN}>Admin</SelectItem>
-                        <SelectItem value={UserRole.COORDINATOR}>Coordinator</SelectItem>
-                        <SelectItem value={UserRole.SUPERVISOR}>Supervisor</SelectItem>
-                        <SelectItem value={UserRole.STUDENT}>Student</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               {editForm.watch("role") === UserRole.STUDENT && (
                 <>
@@ -1300,6 +1619,91 @@ export default function UserManagement() {
               disabled={resetPasswordMutation.isPending}
             >
               {resetPasswordMutation.isPending ? "Resetting..." : "Confirm Reset"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Enrollment Conflict Resolution Modal */}
+      <Dialog open={isConflictModalOpen} onOpenChange={setIsConflictModalOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="h-5 w-5" />
+              <DialogTitle>Resolve Enrolment Conflict</DialogTitle>
+            </div>
+            <DialogDescription>
+              Multiple students are currently assigned the same enrolment number. Update the enrolment number for the student(s) to resolve the conflict. Their username and default login password will automatically update.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 my-2">
+            {conflicts.map((conflict, idx) => (
+              <Card key={conflict.enrollmentNumber} className="border border-border shadow-none">
+                <CardHeader className="bg-muted/40 py-2.5 px-4 border-b border-border">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Conflict Group #{idx + 1}
+                    </span>
+                    <span className="font-mono text-xs font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 px-2 py-0.5 rounded">
+                      Enrolment: {conflict.enrollmentNumber} ({conflict.count} Students)
+                    </span>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-3 space-y-3">
+                  {conflict.students.map((student) => (
+                    <div key={student.id} className="p-3 rounded-lg border border-border/70 bg-card/60 space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-sm">
+                        <div>
+                          <span className="font-semibold text-foreground">{student.firstName} {student.lastName}</span>
+                          <span className="text-xs text-muted-foreground ml-2">({student.course || "BCA"})</span>
+                          <p className="text-xs text-muted-foreground font-mono">{student.email} {student.mobile ? `• ${student.mobile}` : ''}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className="inline-block text-xs font-medium px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                            {student.projectTeamId ? `Team ${student.projectTeamId}` : (student.groupName || "No Team Assigned")}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <Input
+                          placeholder={`Enter new enrolment for ${student.firstName}`}
+                          value={newEnrollmentInputs[student.id] ?? ""}
+                          onChange={(e) => setNewEnrollmentInputs(prev => ({ ...prev, [student.id]: e.target.value }))}
+                          className="font-mono text-sm h-8"
+                        />
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs shrink-0"
+                          disabled={
+                            (resolveConflictMutation.isPending && resolvingStudentId === student.id) ||
+                            !newEnrollmentInputs[student.id]?.trim() ||
+                            newEnrollmentInputs[student.id]?.trim() === student.enrollmentNumber
+                          }
+                          onClick={() => {
+                            const val = newEnrollmentInputs[student.id]?.trim();
+                            if (!val) return;
+                            setResolvingStudentId(student.id);
+                            resolveConflictMutation.mutate({
+                              userId: student.id,
+                              newEnrollmentNumber: val
+                            });
+                          }}
+                        >
+                          {resolveConflictMutation.isPending && resolvingStudentId === student.id ? "Updating..." : "Update Enrolment"}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button variant="outline" onClick={() => setIsConflictModalOpen(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

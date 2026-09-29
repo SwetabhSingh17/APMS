@@ -5,7 +5,8 @@ import {
   users, projectTopics, studentProjects, studentGroups, projectAssessments, notifications, projectMilestones, studentGroupMembers,
   IStudentOnboardingRow, IOnboardingResult, IOnboardingProgress,
   ISupervisorOnboardingRow, ISupervisorOnboardingResult,
-  ITopicOnboardingRow, ITopicOnboardingResult, ITopicOnboardingSuccessRecord, ITopicOnboardingFailureRecord
+  ITopicOnboardingRow, ITopicOnboardingResult, ITopicOnboardingSuccessRecord, ITopicOnboardingFailureRecord,
+  IEnrollmentConflict, IEnrollmentConflictStudent
 } from "@shared/schema";
 import { db } from "./db";
 import { notifyUser, disconnectAllClients } from "./websocket";
@@ -88,14 +89,184 @@ export class DBStorage {
     return (user as User) || null;
   }
 
+  async getUserByEmail(email: string): Promise<User | null> {
+    const [user] = await db.select().from(users).where(and(eq(users.email, email.toLowerCase().trim()), eq(users.isDeleted, false)));
+    return (user as User) || null;
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user as User;
   }
 
   async updateUser(id: number, data: Partial<InsertUser>): Promise<User | undefined> {
-    const [user] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    const existing = await this.getUser(id);
+    if (!existing) return undefined;
+
+    const updatePayload = { ...data };
+
+    // Synchronize username when enrollment number is changed on student accounts
+    if (updatePayload.enrollmentNumber && existing.role === UserRole.STUDENT) {
+      const cleanEnrollment = String(updatePayload.enrollmentNumber).trim();
+      updatePayload.enrollmentNumber = cleanEnrollment;
+
+      const oldEnrollment = existing.enrollmentNumber;
+      if (!updatePayload.username || updatePayload.username === existing.username) {
+        if (
+          existing.username === oldEnrollment ||
+          (oldEnrollment && existing.username.startsWith(`${oldEnrollment}_`)) ||
+          existing.username.includes("conflict")
+        ) {
+          const [taken] = await db.select().from(users).where(
+            and(eq(users.username, cleanEnrollment), ne(users.id, id))
+          );
+          if (!taken) {
+            updatePayload.username = cleanEnrollment;
+          }
+        }
+      }
+    }
+
+    const [user] = await db.update(users).set(updatePayload).where(eq(users.id, id)).returning();
     return user as User | undefined;
+  }
+
+  async getEnrollmentConflicts(): Promise<IEnrollmentConflict[]> {
+    const duplicates = await db.execute(sql`
+      SELECT enrollment_number, COUNT(*) as count
+      FROM users
+      WHERE enrollment_number IS NOT NULL
+        AND TRIM(enrollment_number) != ''
+        AND is_deleted = false
+        AND role = 'student'
+      GROUP BY enrollment_number
+      HAVING COUNT(*) > 1
+      ORDER BY enrollment_number ASC
+    `);
+
+    const dupRows = Array.isArray(duplicates) ? duplicates : ((duplicates as any)?.rows || []);
+    if (!dupRows || dupRows.length === 0) {
+      return [];
+    }
+
+    const conflictingEnrollments = dupRows.map((d: any) => String(d.enrollment_number));
+    const inListSql = sql.join(conflictingEnrollments.map((en: string) => sql`${en}`), sql`, `);
+
+    const studentsWithTeams = await db.execute(sql`
+      SELECT 
+        u.id,
+        u.username,
+        u.first_name as "firstName",
+        u.last_name as "lastName",
+        u.email,
+        u.mobile,
+        u.course,
+        u.enrollment_number as "enrollmentNumber",
+        u.created_at as "createdAt",
+        sg.id as "groupId",
+        sg.name as "groupName",
+        sg.project_team_id as "projectTeamId"
+      FROM users u
+      LEFT JOIN student_group_members sgm ON sgm.user_id = u.id
+      LEFT JOIN student_groups sg ON sg.id = sgm.group_id
+      WHERE u.enrollment_number IN (${inListSql})
+        AND u.is_deleted = false
+        AND u.role = 'student'
+      ORDER BY u.enrollment_number, u.id
+    `);
+
+    const conflictMap = new Map<string, IEnrollmentConflictStudent[]>();
+    for (const row of studentsWithTeams as any[]) {
+      const en = String(row.enrollmentNumber);
+      if (!conflictMap.has(en)) {
+        conflictMap.set(en, []);
+      }
+      conflictMap.get(en)!.push({
+        id: Number(row.id),
+        username: String(row.username),
+        enrollmentNumber: en,
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
+        email: String(row.email),
+        course: row.course ? String(row.course) : null,
+        groupId: row.groupId ? Number(row.groupId) : null,
+        groupName: row.groupName ? String(row.groupName) : null,
+        projectTeamId: row.projectTeamId ? String(row.projectTeamId) : null,
+        createdAt: row.createdAt,
+      });
+    }
+
+    return Array.from(conflictMap.entries()).map(([enrollmentNumber, students]) => ({
+      enrollmentNumber,
+      count: students.length,
+      students,
+    }));
+  }
+
+  async resolveEnrollmentConflict(userId: number, newEnrollmentNumber: string): Promise<User> {
+    const cleanNewEnrollment = newEnrollmentNumber.trim();
+    if (!cleanNewEnrollment) {
+      throw new Error("New enrollment number cannot be empty");
+    }
+
+    const [existingUser] = await db.select().from(users).where(eq(users.id, userId));
+    if (!existingUser) {
+      throw new Error("Student record not found");
+    }
+    if (existingUser.role !== UserRole.STUDENT) {
+      throw new Error("Only student accounts have enrollment numbers");
+    }
+
+    // Check if newEnrollmentNumber is already used by another active user
+    const [inUse] = await db.select().from(users).where(
+      and(
+        eq(users.enrollmentNumber, cleanNewEnrollment),
+        eq(users.isDeleted, false),
+        ne(users.id, userId)
+      )
+    );
+    if (inUse) {
+      throw new Error(`Enrollment number ${cleanNewEnrollment} is already assigned to ${inUse.firstName} ${inUse.lastName}`);
+    }
+
+    let newUsername = existingUser.username;
+    const oldEnrollment = existingUser.enrollmentNumber;
+
+    if (
+      existingUser.username === oldEnrollment ||
+      (oldEnrollment && existingUser.username.startsWith(`${oldEnrollment}_`)) ||
+      existingUser.username.includes("conflict")
+    ) {
+      const [usernameTaken] = await db.select().from(users).where(
+        and(eq(users.username, cleanNewEnrollment), ne(users.id, userId))
+      );
+      if (!usernameTaken) {
+        newUsername = cleanNewEnrollment;
+      }
+    }
+
+    let newEmail = existingUser.email;
+    if (oldEnrollment && existingUser.email.toLowerCase().startsWith(oldEnrollment.toLowerCase())) {
+      const prospectiveEmail = `${cleanNewEnrollment.toLowerCase()}@student.iul.ac.in`;
+      const [emailTaken] = await db.select().from(users).where(
+        and(eq(users.email, prospectiveEmail), ne(users.id, userId))
+      );
+      if (!emailTaken) {
+        newEmail = prospectiveEmail;
+      }
+    }
+
+    const [updatedUser] = await db.update(users)
+      .set({
+        enrollmentNumber: cleanNewEnrollment,
+        username: newUsername,
+        email: newEmail,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId))
+      .returning();
+
+    return updatedUser as User;
   }
 
   async deleteUser(id: number): Promise<boolean> {
@@ -498,6 +669,7 @@ export class DBStorage {
             lastName: m.lastName,
             enrollmentNumber: m.enrollmentNumber,
             email: m.email,
+            mobile: m.mobile,
           })),
           progress: projectData.progress,
         } : {
@@ -802,6 +974,7 @@ export class DBStorage {
           lastName: m.lastName,
           email: m.email,
           enrollmentNumber: m.enrollmentNumber,
+          mobile: m.mobile,
           role: m.role,
           course: m.course,
         })),
@@ -826,6 +999,105 @@ export class DBStorage {
       .where(eq(studentGroups.id, groupId))
       .returning();
     return updated as StudentGroup | undefined;
+  }
+
+  async updateStudentGroupTopic(
+    groupId: number,
+    topicId: number,
+    options?: {
+      updateSupervisor?: boolean;
+      adminUser?: { id: number; firstName: string; lastName: string };
+    }
+  ): Promise<{
+    group: StudentGroup;
+    topic: ProjectTopic;
+    affectedStudentsCount: number;
+  }> {
+    const group = await this.getGroup(groupId);
+    if (!group) {
+      throw new Error("Project team not found");
+    }
+
+    const topic = await this.getProjectTopic(topicId);
+    if (!topic) {
+      throw new Error("Project topic not found");
+    }
+    if (topic.status !== "approved") {
+      throw new Error("Selected topic is not approved");
+    }
+
+    const members = await this.getStudentGroupMembers(groupId);
+    if (members.length === 0) {
+      throw new Error("Cannot assign topic to a team with no members");
+    }
+
+    const memberIds = new Set(members.map(m => m.id));
+
+    // Check if topic is already allotted to another team/student
+    const existingProjectsWithTopic = await db.select()
+      .from(studentProjects)
+      .where(eq(studentProjects.topicId, topicId));
+
+    const takenByOther = existingProjectsWithTopic.some(p => !memberIds.has(p.studentId));
+    if (takenByOther) {
+      throw new Error("This topic has already been selected by another project team");
+    }
+
+    // Update or insert student_projects for all team members
+    for (const member of members) {
+      const [existingProject] = await db.select()
+        .from(studentProjects)
+        .where(eq(studentProjects.studentId, member.id));
+
+      if (existingProject) {
+        await db.update(studentProjects)
+          .set({ topicId, updatedAt: new Date() })
+          .where(eq(studentProjects.id, existingProject.id));
+      } else {
+        await db.insert(studentProjects).values({
+          studentId: member.id,
+          topicId,
+          progress: 0,
+          status: "in_progress",
+        });
+      }
+    }
+
+    // Update group supervisor if requested (default to true if topic has submittedById)
+    let updatedGroup = group;
+    const shouldUpdateSupervisor = options?.updateSupervisor !== undefined ? options.updateSupervisor : true;
+    if (shouldUpdateSupervisor && topic.submittedById) {
+      const [ug] = await db.update(studentGroups)
+        .set({ supervisorId: topic.submittedById, updatedAt: new Date() })
+        .where(eq(studentGroups.id, groupId))
+        .returning();
+      if (ug) updatedGroup = ug as StudentGroup;
+    }
+
+    // Notify all group members
+    const changerName = options?.adminUser ? `${options.adminUser.firstName} ${options.adminUser.lastName}` : "the Academic Coordinator";
+    for (const member of members) {
+      await this.createNotification({
+        userId: member.id,
+        title: "Project Topic Updated",
+        message: `Your project team's topic has been updated to "${topic.title}" (${topic.topicCode || 'Topic #' + topic.id}) by ${changerName}.`,
+      });
+    }
+
+    // Also notify supervisor if assigned
+    if (updatedGroup.supervisorId) {
+      await this.createNotification({
+        userId: updatedGroup.supervisorId,
+        title: "Project Team Assigned",
+        message: `Team "${group.name}" (${group.projectTeamId || ''}) has been assigned to topic "${topic.title}".`,
+      });
+    }
+
+    return {
+      group: updatedGroup,
+      topic,
+      affectedStudentsCount: members.length,
+    };
   }
 
   // Notification operations
@@ -1338,7 +1610,12 @@ export class DBStorage {
     }
 
     // Process students in concurrent batches of 15 for optimal performance and steady progress updates
-    const studentMap = new Map<string, User>();
+    interface IProvisionedEntry {
+      student: User;
+      teamId: string;
+      enrollmentNumber: string;
+    }
+    const provisionedEntries: IProvisionedEntry[] = [];
     const validRows = studentRows.filter(r => String(r.enrollmentNumber || "").trim().length > 0);
     const totalStudents = validRows.length;
     const BATCH_SIZE = 15;
@@ -1360,7 +1637,27 @@ export class DBStorage {
         try {
           const existingStudent = existingByEnrollment.get(cleanEnrollment) || existingByUsername.get(cleanEnrollment);
 
+          let isSameStudent = false;
           if (existingStudent) {
+            const existingFullName = `${existingStudent.firstName} ${existingStudent.lastName}`.trim().toLowerCase();
+            const newFullName = rawName.toLowerCase().replace(/[^a-z0-9]/g, " ").trim();
+            const existingTokens = existingFullName.replace(/[^a-z0-9]/g, " ").split(/\s+/).filter(Boolean);
+            const newTokens = newFullName.split(/\s+/).filter(Boolean);
+
+            const matchingTokens = newTokens.filter(t => 
+              existingTokens.includes(t) || 
+              (t === "mohd" && existingTokens.includes("mohammad")) || 
+              (t === "mohammad" && existingTokens.includes("mohd")) ||
+              (t === "md" && existingTokens.includes("mohd")) ||
+              (t === "md" && existingTokens.includes("mohammad"))
+            );
+
+            isSameStudent = matchingTokens.length >= 2 || 
+              (newTokens.length === 1 && matchingTokens.length === 1 && existingTokens.length === 1) ||
+              (existingTokens.length === 0 && rawName.length === 0);
+          }
+
+          if (existingStudent && isSameStudent) {
             let finalEmail = existingStudent.email;
             if (rawEmail && rawEmail.includes("@") && rawEmail !== existingStudent.email.toLowerCase()) {
               if (!existingEmails.has(rawEmail)) {
@@ -1369,47 +1666,77 @@ export class DBStorage {
               }
             }
 
+            let rawMob = row.mobileNo ? String(row.mobileNo).replace(/[^0-9]/g, "") : "";
+            if (rawMob.length === 12 && rawMob.startsWith("91")) rawMob = rawMob.slice(2);
+            if (rawMob.length === 11 && rawMob.startsWith("0")) rawMob = rawMob.slice(1);
+            const cleanMobile = rawMob.length === 10 ? rawMob : (rawMob || null);
+
             const [updatedStudent] = await db.update(users)
               .set({
                 course,
                 firstName: firstName || existingStudent.firstName,
                 lastName: lastName !== "." ? lastName : existingStudent.lastName,
                 email: finalEmail,
+                mobile: cleanMobile || existingStudent.mobile,
                 updatedAt: new Date()
               })
               .where(eq(users.id, existingStudent.id))
               .returning();
 
-            studentMap.set(cleanEnrollment, updatedStudent as User);
+            provisionedEntries.push({
+              student: updatedStudent as User,
+              teamId: (row.projectTeamId || "").trim(),
+              enrollmentNumber: cleanEnrollment
+            });
             existingByEnrollment.set(cleanEnrollment, updatedStudent as User);
           } else {
+            // New student, or different student with identical enrollment number (Enrollment Conflict!)
             let newEmail = (rawEmail && rawEmail.includes("@") && !existingEmails.has(rawEmail))
               ? rawEmail
               : `${cleanEnrollment.toLowerCase()}@student.iul.ac.in`;
 
             if (existingEmails.has(newEmail)) {
-              newEmail = `${cleanEnrollment.toLowerCase()}.${cleanEnrollment.slice(-4)}@student.iul.ac.in`;
+              newEmail = `${cleanEnrollment.toLowerCase()}.${cleanEnrollment.slice(-4)}_${Math.floor(100 + Math.random() * 900)}@student.iul.ac.in`;
             }
             existingEmails.add(newEmail);
 
+            let rawMob = row.mobileNo ? String(row.mobileNo).replace(/[^0-9]/g, "") : "";
+            if (rawMob.length === 12 && rawMob.startsWith("91")) rawMob = rawMob.slice(2);
+            if (rawMob.length === 11 && rawMob.startsWith("0")) rawMob = rawMob.slice(1);
+            const cleanMobile = rawMob.length === 10 ? rawMob : (rawMob || null);
+
             const initialHashedPassword = await hashPassword(cleanEnrollment);
 
+            // Generate unique username: if enrollment is already taken as a username, append unique suffix
+            let uniqueUsername = cleanEnrollment;
+            if (existingByUsername.has(cleanEnrollment)) {
+              uniqueUsername = `${cleanEnrollment}_${Math.floor(1000 + Math.random() * 9000)}`;
+            }
+
             const [newStudent] = await db.insert(users).values({
-              username: cleanEnrollment,
+              username: uniqueUsername,
               password: initialHashedPassword,
               firstName,
               lastName,
               email: newEmail,
               role: UserRole.STUDENT,
               enrollmentNumber: cleanEnrollment,
+              mobile: cleanMobile,
               course,
               forcePasswordReset: true,
               isDeleted: false,
             }).returning();
 
-            studentMap.set(cleanEnrollment, newStudent as User);
-            existingByEnrollment.set(cleanEnrollment, newStudent as User);
-            existingByUsername.set(cleanEnrollment, newStudent as User);
+            existingByUsername.set(uniqueUsername, newStudent as User);
+            if (!existingByEnrollment.has(cleanEnrollment)) {
+              existingByEnrollment.set(cleanEnrollment, newStudent as User);
+            }
+
+            provisionedEntries.push({
+              student: newStudent as User,
+              teamId: (row.projectTeamId || "").trim(),
+              enrollmentNumber: cleanEnrollment
+            });
           }
         } catch (userErr: any) {
           result.errors?.push(`Error provisioning student ${cleanEnrollment}: ${userErr.message}`);
@@ -1417,7 +1744,7 @@ export class DBStorage {
       }));
 
       processedSoFar += batch.length;
-      result.totalStudentsProcessed = studentMap.size;
+      result.totalStudentsProcessed = provisionedEntries.length;
 
       onProgress?.({
         stage: "provisioning",
@@ -1430,18 +1757,16 @@ export class DBStorage {
     }
 
     // Step 3: Group students by their parsed ProjectTeam ID
-    const teamGroupsMap = new Map<string, string[]>();
-    for (const row of studentRows) {
-      const cleanEnrollment = String(row.enrollmentNumber).trim();
-      const teamId = (row.projectTeamId || "").trim();
-      if (!cleanEnrollment || !teamId) continue;
+    const teamGroupsMap = new Map<string, { studentId: number; enrollmentNumber: string }[]>();
+    for (const entry of provisionedEntries) {
+      if (!entry.teamId || !entry.student.id) continue;
 
-      if (!teamGroupsMap.has(teamId)) {
-        teamGroupsMap.set(teamId, []);
+      if (!teamGroupsMap.has(entry.teamId)) {
+        teamGroupsMap.set(entry.teamId, []);
       }
-      const list = teamGroupsMap.get(teamId)!;
-      if (!list.includes(cleanEnrollment)) {
-        list.push(cleanEnrollment);
+      const list = teamGroupsMap.get(entry.teamId)!;
+      if (!list.some(item => item.studentId === entry.student.id)) {
+        list.push({ studentId: entry.student.id, enrollmentNumber: entry.enrollmentNumber });
       }
     }
 
@@ -1457,7 +1782,7 @@ export class DBStorage {
       if (g.projectTeamId) existingGroupsMap.set(g.projectTeamId.trim(), g as StudentGroup);
     }
 
-    for (const [teamId, enrollmentNumbers] of Array.from(teamGroupsMap.entries())) {
+    for (const [teamId, studentItems] of Array.from(teamGroupsMap.entries())) {
       try {
         const existingGroup = existingGroupsMap.get(teamId);
         let currentGroupId: number;
@@ -1480,23 +1805,20 @@ export class DBStorage {
         }
 
         // Set each student's groupId in users table and ensure accepted membership
-        for (const enroll of enrollmentNumbers) {
-          const student = studentMap.get(enroll);
-          if (!student) continue;
-
+        for (const item of studentItems) {
           await db.update(users)
             .set({ groupId: currentGroupId, updatedAt: new Date() })
-            .where(eq(users.id, student.id));
+            .where(eq(users.id, item.studentId));
 
           const [existingMember] = await db.select().from(studentGroupMembers)
             .where(and(
-              eq(studentGroupMembers.userId, student.id),
+              eq(studentGroupMembers.userId, item.studentId),
               eq(studentGroupMembers.groupId, currentGroupId)
             ));
 
           if (!existingMember) {
             await db.insert(studentGroupMembers).values({
-              userId: student.id,
+              userId: item.studentId,
               groupId: currentGroupId,
               status: 'accepted'
             });
@@ -1507,11 +1829,13 @@ export class DBStorage {
           }
         }
 
+        const enrollmentNumbers = studentItems.map(s => s.enrollmentNumber);
         result.teams.push({
           teamId,
-          studentCount: enrollmentNumbers.length,
+          studentCount: studentItems.length,
           enrollmentNumbers,
         });
+
 
         teamsCreatedCount++;
         if (teamsCreatedCount % 5 === 0 || teamsCreatedCount === totalTeams) {

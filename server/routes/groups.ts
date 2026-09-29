@@ -386,6 +386,44 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
         }
     });
 
+    // Change project topic for a group (coordinators and admins only)
+    router.patch("/api/student-groups/:groupId/topic", requireRole([UserRole.COORDINATOR, UserRole.ADMIN]), async (req: Request, res: Response) => {
+        if (!isAuthenticatedRequest(req)) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        try {
+            const groupId = parseInt(req.params.groupId);
+            const { topicId, updateSupervisor } = req.body;
+
+            if (!topicId) {
+                return res.status(400).json({ message: "Topic ID is required" });
+            }
+
+            const parsedTopicId = typeof topicId === "string" ? parseInt(topicId) : topicId;
+            if (isNaN(parsedTopicId)) {
+                return res.status(400).json({ message: "Invalid Topic ID" });
+            }
+
+            const result = await storage.updateStudentGroupTopic(groupId, parsedTopicId, {
+                updateSupervisor: updateSupervisor !== false,
+                adminUser: req.user ? {
+                    id: req.user.id,
+                    firstName: req.user.firstName,
+                    lastName: req.user.lastName
+                } : undefined
+            });
+
+            res.json({
+                message: `Project topic updated successfully to "${result.topic.title}". ${result.affectedStudentsCount} student(s) notified.`,
+                ...result
+            });
+        } catch (error: any) {
+            console.error("Error updating group topic:", error);
+            res.status(400).json({ message: error?.message || "Failed to update project topic" });
+        }
+    });
+
     // Update team basic details (Admin and Coordinator only)
     router.patch("/api/student-groups/:groupId", requireRole([UserRole.COORDINATOR, UserRole.ADMIN]), async (req: Request, res: Response) => {
         if (!isAuthenticatedRequest(req)) {

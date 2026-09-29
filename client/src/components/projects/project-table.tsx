@@ -47,7 +47,10 @@ export default function ProjectTable({ projects, onViewDetails }: ProjectTablePr
                       </span>
                     </div>
                     <div>
-                      <p>{`${project.student.firstName} ${project.student.lastName}`}</p>
+                      <p className="font-medium">{`${project.student.firstName} ${project.student.lastName}`}</p>
+                      {project.student.mobile && (
+                        <p className="text-[11px] font-mono text-muted-foreground">{project.student.mobile}</p>
+                      )}
                     </div>
                   </div>
                 ) : (

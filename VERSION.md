@@ -1,6 +1,40 @@
 # Version History
 
-## Version 1.9.6 (Current)
+## Version 1.9.7 (Current)
+### Enrollment Conflict Detection & Resolution UI, Project Topic Reassignment, Student Phone Numbers & Tentative Supervisor
+1. **Enrollment Conflict Detection & Interactive Resolution UI (`/` & `/user-management`)** —
+   - **Root Cause & Detection**: When importing student data via Excel, discrepancies in raw university spreadsheets can assign the same enrollment number to multiple distinct students, causing login credential overlap. Implemented automatic detection via `GET /api/admin/enrollment-conflicts` querying grouped active student accounts with duplicate enrollment numbers.
+   - **Dashboard Interactive Alert**: Prominent alert card for Administrators and Coordinators with live conflict counts, conflict details (shared enrollment number, students involved, team assignments), and a direct modal launcher.
+   - **User Management Integration (`/user-management`)**:
+     - **Interactive Warning Card**: Displays live conflict count with "Show Conflicted Only ({count})" toggle and "Resolve Enrolment Conflict" button.
+     - **Direct Row Highlighting**: Conflicted student rows are highlighted with an amber border and background (`border-l-4 border-l-amber-500 bg-amber-500/10`) with `Conflict` badges across All Users and Students tables.
+     - **Direct Action Buttons**: In both All Users and Students tables, conflicted rows display a direct "Resolve" button for quick access.
+     - **Dedicated Conflicts Tab**: Added a dedicated `Conflicts ({count})` tab trigger in `TabsList` that directly displays a full directory of conflict groups, each student, email, phone number, and inline input with one-click "Update" button.
+     - **Resolution Modal**: Interactive dialog (`POST /api/admin/resolve-enrollment-conflict`) allowing Admins/Coordinators to assign unique enrollment numbers to conflicted students, automatically synchronizing their `username` and login credentials without data loss.
+2. **Fixed Admin Single User Creation Error (`POST /api/admin/users`)** —
+   - Hardened user creation in `server/routes/admin.ts` to ensure default passwords, roles, usernames, and courses are sanitized and normalized before insertion.
+   - Fixed schema and database constraints that previously caused validation or duplication errors when creating single accounts.
+3. **Frontend Renaming: "Current supervisor" to "Tentative Supervisor"** —
+   - Updated supervisor display labels in `/manage-project` cards and headers to "Tentative Supervisor" to accurately reflect that faculty supervisor allotments prior to topic confirmation are tentative.
+4. **Student Mobile Phone Numbers Backfilled & Exposed** —
+   - Backfilled mobile phone numbers for 702 students from institutional Excel master records into PostgreSQL `users.mobile` column.
+   - Exposed student phone numbers to Administrators, Coordinators, and Supervisors across:
+     - Manage Project (`/manage-project`)
+     - User Management (`/user-management`)
+     - Supervisor Evaluations (`/supervisor-evaluations`)
+     - Team Management (`/team-management`)
+     - Projects Directory (`/projects`)
+     - Student Selection dialogs (`client/src/components/student-select.tsx`)
+     - Project Tables (`client/src/components/projects/project-table.tsx`)
+5. **Project Topic Change & Reassignment for Teams (`/manage-project`)** —
+   - Added "Change Topic" / "Assign Topic" button and interactive modal dialog on team cards in `/manage-project`.
+   - Allows Admins and Coordinators to search through approved topics with course filtering, view topic PUGID, title, description, and supervisor.
+   - Updates `student_groups.projectTopicId` via `PATCH /api/student-groups/:groupId/topic`, resynchronizes project milestones, and dispatches automated real-time notifications to all team members informing them of the topic change.
+6. **Zero Data Loss Guarantee & Live System Compatibility** —
+   - Executed full database backup before applying modifications.
+   - All migrations and backfills were strictly non-destructive and backward compatible with running database state.
+
+## Version 1.9.6
 ### Team Management Portal, Safe Team Dissolution with Account Retention & Optional Supervisor Allotment
 1. **Dedicated Team Management Portal for Admins & Coordinators (`/team-management`)** —
    - Added a dedicated, full-featured Team Management portal accessible to Administrators and Coordinators from the sidebar navigation (`Users2` icon) and header.

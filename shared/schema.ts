@@ -422,5 +422,23 @@ export interface ITopicOnboardingResult {
   failureRecords: ITopicOnboardingFailureRecord[];
 }
 
+export interface IEnrollmentConflictStudent {
+  id: number;
+  username: string;
+  enrollmentNumber: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  mobile?: string | null;
+  course: string | null;
+  groupId: number | null;
+  groupName: string | null;
+  projectTeamId: string | null;
+  createdAt: string | Date;
+}
 
-
+export interface IEnrollmentConflict {
+  enrollmentNumber: string;
+  count: number;
+  students: IEnrollmentConflictStudent[];
+}

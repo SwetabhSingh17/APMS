@@ -149,15 +149,87 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
         }
     });
 
+    // Retrieve all active student enrollment number conflicts
+    router.get("/api/admin/enrollment-conflicts", requireRole([UserRole.ADMIN, UserRole.COORDINATOR]), async (_req: Request, res: Response) => {
+        try {
+            const conflicts = await storage.getEnrollmentConflicts();
+            res.json({ conflicts, count: conflicts.length });
+        } catch (error: any) {
+            console.error("Failed to fetch enrollment conflicts:", error);
+            res.status(500).json({ message: "Failed to fetch enrollment conflicts" });
+        }
+    });
+
+    // Resolve an enrollment conflict by changing a student's enrollment number
+    router.post("/api/admin/resolve-enrollment-conflict", requireRole([UserRole.ADMIN, UserRole.COORDINATOR]), async (req: Request, res: Response) => {
+        try {
+            const { userId, newEnrollmentNumber } = req.body;
+            const parsedUserId = parseInt(userId);
+
+            if (isNaN(parsedUserId) || parsedUserId <= 0) {
+                return res.status(400).json({ message: "Valid student ID is required", code: "INVALID_USER_ID" });
+            }
+
+            if (!newEnrollmentNumber || typeof newEnrollmentNumber !== "string" || !newEnrollmentNumber.trim()) {
+                return res.status(400).json({ message: "New enrollment number is required", code: "ENROLLMENT_REQUIRED" });
+            }
+
+            const cleanEnrollment = newEnrollmentNumber.trim();
+            const updatedStudent = await storage.resolveEnrollmentConflict(parsedUserId, cleanEnrollment);
+
+            // Notify Admins if a Coordinator resolved the conflict
+            const callerRole = (req.user as any)?.role;
+            if (callerRole === UserRole.COORDINATOR) {
+                const admins = await storage.getUsersByRole(UserRole.ADMIN);
+                for (const admin of admins) {
+                    await storage.createNotification({
+                        userId: admin.id,
+                        title: "Enrollment Conflict Resolved",
+                        message: `Coordinator ${(req.user as any).firstName} updated enrollment for ${updatedStudent.firstName} ${updatedStudent.lastName} to ${cleanEnrollment}.`
+                    });
+                }
+            }
+
+            const { password, ...userWithoutPassword } = updatedStudent;
+            res.status(200).json({
+                message: "Enrollment conflict resolved successfully",
+                user: userWithoutPassword
+            });
+        } catch (error: any) {
+            console.error("Failed to resolve enrollment conflict:", error);
+            res.status(400).json({ message: error.message || "Failed to resolve enrollment conflict", code: "RESOLVE_FAILED" });
+        }
+    });
+
     // Create a new user (Admin and Coordinator accessible)
     router.post("/api/admin/users", requireRole([UserRole.ADMIN, UserRole.COORDINATOR]), async (req: Request, res: Response, next: any) => {
         try {
             const { confirmPassword, ...userData } = req.body;
             const callerRole = (req.user as any)?.role;
 
-            const existingUser = await storage.getUserByUsername(userData.username);
+            const username = String(userData.username || "").trim();
+            const email = String(userData.email || "").trim().toLowerCase();
+            const firstName = String(userData.firstName || "").trim();
+            const lastName = String(userData.lastName || "").trim();
+
+            if (!username) {
+                return res.status(400).json({ message: "Username is required", code: "USERNAME_REQUIRED" });
+            }
+            if (!email) {
+                return res.status(400).json({ message: "Email is required", code: "EMAIL_REQUIRED" });
+            }
+            if (!firstName) {
+                return res.status(400).json({ message: "First name is required", code: "FIRST_NAME_REQUIRED" });
+            }
+
+            const existingUser = await storage.getUserByUsername(username);
             if (existingUser) {
                 return res.status(400).json({ message: "Username already exists", code: "USERNAME_EXISTS" });
+            }
+
+            const existingEmail = await storage.getUserByEmail(email);
+            if (existingEmail) {
+                return res.status(400).json({ message: "Email is already registered", code: "EMAIL_EXISTS" });
             }
 
             // RBAC checks for high-privilege roles
@@ -188,13 +260,14 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
 
             // Validate enrollment number and course for students
             if (userData.role === UserRole.STUDENT) {
-                if (!userData.enrollmentNumber) {
+                const cleanEnrollment = String(userData.enrollmentNumber || "").trim();
+                if (!cleanEnrollment) {
                     return res.status(400).json({
                         message: "Enrollment number is required for student registration",
                         code: "ENROLLMENT_REQUIRED"
                     });
                 }
-                const existingEnrollment = await storage.getUserByEnrollmentNumber(userData.enrollmentNumber);
+                const existingEnrollment = await storage.getUserByEnrollmentNumber(cleanEnrollment);
                 if (existingEnrollment) {
                     return res.status(400).json({
                         message: "This enrollment number is already registered",
@@ -204,6 +277,11 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
                 if (userData.course && !["BCA", "MCA"].includes(userData.course)) {
                     return res.status(400).json({ message: "Course must be either BCA or MCA", code: "INVALID_COURSE" });
                 }
+                userData.enrollmentNumber = cleanEnrollment;
+            } else {
+                // Non-student accounts should not store student enrollment or course
+                userData.enrollmentNumber = null;
+                userData.course = null;
             }
 
             if (!userData.password || userData.password.length < 6) {
@@ -213,14 +291,25 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
             const hashedPassword = await hashPassword(userData.password);
             const user = await storage.createUser({
                 ...userData,
+                username,
+                email,
+                firstName,
+                lastName,
                 password: hashedPassword,
                 forcePasswordReset: false,
             });
 
             const { password, ...userWithoutPassword } = user;
             res.status(201).json(userWithoutPassword);
-        } catch (error) {
-            next(error);
+        } catch (error: any) {
+            console.error("Failed to create user:", error);
+            if (error?.code === "23505") {
+                return res.status(400).json({
+                    message: "A user with this username or email already exists.",
+                    code: "DUPLICATE_ENTRY"
+                });
+            }
+            res.status(500).json({ message: error?.message || "Failed to create user" });
         }
     });
 
@@ -260,6 +349,52 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
             } else if (updateData.role && updateData.role !== "student") {
                 // Clear course if role is changed to non-student
                 updateData.course = null;
+                updateData.enrollmentNumber = null;
+            }
+
+            // Validate enrollment number uniqueness if modified
+            if (updateData.enrollmentNumber !== undefined && updateData.enrollmentNumber !== null) {
+                const cleanEnrollment = String(updateData.enrollmentNumber).trim();
+                updateData.enrollmentNumber = cleanEnrollment;
+                if (cleanEnrollment && cleanEnrollment !== existingUser.enrollmentNumber) {
+                    const conflictingStudent = await storage.getUserByEnrollmentNumber(cleanEnrollment);
+                    if (conflictingStudent && conflictingStudent.id !== userId) {
+                        return res.status(400).json({
+                            message: `Enrollment number ${cleanEnrollment} is already assigned to ${conflictingStudent.firstName} ${conflictingStudent.lastName}`,
+                            code: "ENROLLMENT_EXISTS"
+                        });
+                    }
+                }
+            }
+
+            // Validate email uniqueness if modified
+            if (updateData.email) {
+                const cleanEmail = String(updateData.email).trim().toLowerCase();
+                updateData.email = cleanEmail;
+                if (cleanEmail && cleanEmail !== existingUser.email?.toLowerCase()) {
+                    const existingEmail = await storage.getUserByEmail(cleanEmail);
+                    if (existingEmail && existingEmail.id !== userId) {
+                        return res.status(400).json({
+                            message: `Email ${cleanEmail} is already registered to another user`,
+                            code: "EMAIL_EXISTS"
+                        });
+                    }
+                }
+            }
+
+            // Validate username uniqueness if modified
+            if (updateData.username) {
+                const cleanUsername = String(updateData.username).trim();
+                updateData.username = cleanUsername;
+                if (cleanUsername && cleanUsername !== existingUser.username) {
+                    const existingUsername = await storage.getUserByUsername(cleanUsername);
+                    if (existingUsername && existingUsername.id !== userId) {
+                        return res.status(400).json({
+                            message: `Username ${cleanUsername} is already taken`,
+                            code: "USERNAME_EXISTS"
+                        });
+                    }
+                }
             }
 
             // If password is being updated, validate length, hash it, and ensure forced reset is cleared
@@ -294,8 +429,15 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
 
             const { password, ...userWithoutPassword } = user;
             res.status(200).json(userWithoutPassword);
-        } catch (error) {
-            next(error);
+        } catch (error: any) {
+            console.error("Failed to update user:", error);
+            if (error?.code === "23505") {
+                return res.status(400).json({
+                    message: "A user with this username or email already exists.",
+                    code: "DUPLICATE_ENTRY"
+                });
+            }
+            res.status(500).json({ message: error?.message || "Failed to update user" });
         }
     });
 

@@ -6,6 +6,28 @@ This document outlines suggested architectural, security, and maintenance improv
 
 ## 🚨 Priority Bugs to be Resolved
 
+### 🟢 ACTIVE ISSUES RESOLVED (v1.9.7 - Completed & Verified)
+
+- [x] **Enrollment Number Conflict Detection & Resolution UI on Dashboard & User Management** — **COMPLETED**
+  - **Affected Files:** `server/db-storage.ts`, `server/routes/admin.ts`, `client/src/pages/dashboard.tsx`, `client/src/pages/user-management.tsx`, `shared/schema.ts`
+  - **Resolution:** Implemented `GET /api/admin/enrollment-conflicts` and `POST /api/admin/resolve-enrollment-conflict`. On the Dashboard and in User Management, Administrators and Coordinators receive real-time conflict alert cards. In User Management, conflicted students are highlighted with amber left borders and badges across All Users and Students tables, with direct "Resolve" action buttons and a dedicated "Conflicts" directory tab. The resolution modal dynamically updates student enrollment numbers and aligns usernames with zero data loss.
+
+- [x] **Admin Single User Creation Error (`POST /api/admin/users`)** — **COMPLETED**
+  - **Affected Files:** `server/routes/admin.ts`, `server/db-storage.ts`
+  - **Resolution:** Sanitized and normalized input payloads for manual user creation, ensuring proper default password generation, hashing, and avoiding constraint violations.
+
+- [x] **Rename "Current supervisor" to "Tentative Supervisor"** — **COMPLETED**
+  - **Affected Files:** `client/src/pages/manage-project.tsx`
+  - **Resolution:** Renamed supervisor allotment labels in `/manage-project` to "Tentative Supervisor" to clearly communicate the academic status prior to final topic confirmation.
+
+- [x] **Student Phone Numbers Backfilled and Exposed across System** — **COMPLETED**
+  - **Affected Files:** `server/db-storage.ts`, `client/src/pages/manage-project.tsx`, `client/src/pages/user-management.tsx`, `client/src/pages/supervisor-evaluations.tsx`, `client/src/pages/team-management.tsx`, `client/src/pages/projects.tsx`, `client/src/components/student-select.tsx`, `client/src/components/projects/project-table.tsx`
+  - **Resolution:** Backfilled student phone numbers for 702 students from master institutional Excel sheets into `users.mobile` and exposed contact information to Administrators, Coordinators, and Supervisors.
+
+- [x] **Change / Assign Project Topic for Teams in Manage Project** — **COMPLETED**
+  - **Affected Files:** `server/db-storage.ts`, `server/routes/groups.ts`, `client/src/pages/manage-project.tsx`
+  - **Resolution:** Added `PATCH /api/student-groups/:groupId/topic` and an interactive "Change Topic" / "Assign Topic" modal in `/manage-project` with live topic search and course filtering. Automatically dispatches system notifications to team members upon topic reassignment.
+
 ### 🟢 ACTIVE ISSUES RESOLVED (v1.9.6 - Completed & Verified)
 
 - [x] **Team Management Portal for Admins & Coordinators (`/team-management`)** — **COMPLETED**

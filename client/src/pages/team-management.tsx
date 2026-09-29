@@ -52,6 +52,7 @@ import {
   GraduationCap,
   Layers,
   UserCheck,
+  Phone,
 } from "lucide-react";
 import { User, UserRole } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -72,6 +73,7 @@ export interface ITeamMember {
   enrollmentNumber: string;
   role: string;
   course?: string | null;
+  mobile?: string | null;
 }
 
 export interface ITeamSupervisor {
@@ -583,7 +585,7 @@ export default function TeamManagement() {
                                   key={member.id}
                                   className="flex items-center justify-between p-1.5 rounded-md bg-muted/60 text-xs group/member"
                                 >
-                                  <div className="min-w-0 pr-1 flex items-center gap-1.5">
+                                  <div className="min-w-0 pr-1 flex items-center gap-1.5 flex-wrap">
                                     <div className="w-5 h-5 rounded-full bg-primary/15 text-primary flex items-center justify-center text-[10px] font-semibold shrink-0">
                                       {member.firstName[0]}{member.lastName[0]}
                                     </div>
@@ -593,6 +595,12 @@ export default function TeamManagement() {
                                     <span className="text-[10px] text-muted-foreground font-mono">
                                       ({member.enrollmentNumber})
                                     </span>
+                                    {member.mobile && (
+                                      <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-0.5">
+                                        <Phone className="h-2.5 w-2.5 shrink-0" />
+                                        {member.mobile}
+                                      </span>
+                                    )}
                                   </div>
                                   <Button
                                     variant="ghost"

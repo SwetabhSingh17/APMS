@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { UserRole } from "@shared/schema";
 import Modal from "@/components/ui/modal";
-import { Search } from "lucide-react";
+import { Search, Phone } from "lucide-react";
 import { useCourseFilter } from "@/hooks/course-filter-context";
 
 interface StudentProject {
@@ -23,6 +23,8 @@ interface StudentProject {
     lastName: string;
     email: string;
     department: string;
+    enrollmentNumber?: string | null;
+    mobile?: string | null;
   };
   topic: {
     id: number;
@@ -212,6 +214,17 @@ export default function SupervisorEvaluations() {
                           <div>
                             <p className="font-medium">{project.student.firstName} {project.student.lastName}</p>
                             <p className="text-sm text-muted-foreground">{project.student.email}</p>
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground mt-0.5">
+                              {project.student.enrollmentNumber && (
+                                <span className="font-mono text-[11px]">{project.student.enrollmentNumber}</span>
+                              )}
+                              {project.student.mobile && (
+                                <span className="font-mono flex items-center gap-1 text-[11px] text-foreground/80 font-medium">
+                                  <Phone className="h-3 w-3 text-muted-foreground shrink-0" />
+                                  {project.student.mobile}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>

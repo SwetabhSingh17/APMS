@@ -12,6 +12,7 @@ interface Student {
   enrollmentNumber: string;
   course: string;
   department: string;
+  mobile?: string | null;
 }
 
 interface StudentSelectProps {
@@ -38,11 +39,12 @@ export function StudentSelect({ selectedEnrollments, onChange, courseFilter, max
       // Exclude already selected
       if (selectedEnrollments.includes(student.enrollmentNumber)) return false;
 
-      // Match name or enrollment
+      // Match name, enrollment, or mobile
       return (
         student.firstName.toLowerCase().includes(query) ||
         student.lastName.toLowerCase().includes(query) ||
-        student.enrollmentNumber.toLowerCase().includes(query)
+        student.enrollmentNumber.toLowerCase().includes(query) ||
+        (student.mobile && student.mobile.includes(query))
       );
     }).slice(0, 10); // Show max 10 suggestions
   }, [students, search, courseFilter, selectedEnrollments]);
@@ -81,7 +83,12 @@ export function StudentSelect({ selectedEnrollments, onChange, courseFilter, max
                     onClick={() => addStudent(student.enrollmentNumber)}
                   >
                     <span>{student.firstName} {student.lastName}</span>
-                    <Badge variant="outline">{student.enrollmentNumber}</Badge>
+                    <div className="flex items-center gap-1.5">
+                      <Badge variant="outline">{student.enrollmentNumber}</Badge>
+                      {student.mobile && (
+                        <span className="text-xs text-muted-foreground font-mono">{student.mobile}</span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </ScrollArea>

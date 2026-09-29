@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link, useLocation } from "wouter";
-import { UserRole, ProjectTopic, User } from "@shared/schema";
+import { UserRole, ProjectTopic, User, IEnrollmentConflict } from "@shared/schema";
 import { useCourseFilter } from "@/hooks/course-filter-context";
 import { useState } from "react";
 import Modal from "@/components/ui/modal";
@@ -60,6 +60,10 @@ export default function Dashboard() {
   const [isTopicModalOpen, setIsTopicModalOpen] = useState(false);
   const [feedback, setFeedback] = useState("");
 
+  // State for enrollment conflict resolution
+  const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
+  const [resolvingStudentId, setResolvingStudentId] = useState<number | null>(null);
+  const [newEnrollmentInputs, setNewEnrollmentInputs] = useState<Record<number, string>>({});
 
   const { courseFilter, getCourseQuery } = useCourseFilter();
 
@@ -67,6 +71,42 @@ export default function Dashboard() {
     queryKey: [`/api/stats${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
     enabled: !!user,
     refetchInterval: 30000 // Refresh every 30 seconds
+  });
+
+  // Query for student enrollment conflicts (Admin and Coordinator only)
+  const { data: conflictData } = useQuery<{ conflicts: IEnrollmentConflict[], count: number }>({
+    queryKey: ["/api/admin/enrollment-conflicts"],
+    enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN),
+    refetchInterval: 15000 // Refresh every 15 seconds
+  });
+  const conflicts = conflictData?.conflicts || [];
+
+  const resolveConflictMutation = useMutation({
+    mutationFn: async ({ userId, newEnrollmentNumber }: { userId: number, newEnrollmentNumber: string }) => {
+      const res = await apiRequest("POST", "/api/admin/resolve-enrollment-conflict", {
+        userId,
+        newEnrollmentNumber
+      });
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Conflict Resolved",
+        description: data.message || "Enrollment number updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/enrollment-conflicts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setResolvingStudentId(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to resolve conflict",
+        description: error.message,
+        variant: "destructive",
+      });
+      setResolvingStudentId(null);
+    }
   });
 
   const { data: pendingTopics = [], isLoading: isLoadingTopics } = useQuery<PendingTopic[]>({
@@ -208,6 +248,67 @@ export default function Dashboard() {
             )}
           </div>
         </div>
+
+        {/* Enrollment Conflict Alert Banner for Admin and Coordinator */}
+        {(user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN) && conflicts.length > 0 && (
+          <Card className="mb-6 border-2 border-amber-500/60 bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-orange-500/15 shadow-sm">
+            <CardHeader className="pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+                    <AlertTriangle className="h-5 w-5 animate-pulse" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-lg font-bold text-amber-900 dark:text-amber-300">
+                        Enrolment Conflict Detected
+                      </CardTitle>
+                      <span className="bg-destructive text-destructive-foreground text-xs font-bold px-2 py-0.5 rounded-full">
+                        {conflicts.length} {conflicts.length === 1 ? "Conflict" : "Conflicts"}
+                      </span>
+                    </div>
+                    <CardDescription className="text-amber-800/90 dark:text-amber-400/90 mt-0.5">
+                      The system detected multiple students sharing the same enrolment number. Please resolve the conflict by changing their enrolment number.
+                    </CardDescription>
+                  </div>
+                </div>
+                <Button
+                  variant="destructive"
+                  className="shrink-0 font-semibold shadow-sm"
+                  onClick={() => setIsConflictModalOpen(true)}
+                >
+                  <AlertCircle className="w-4 h-4 mr-2" />
+                  Resolve Enrolment Conflict
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="bg-background/80 dark:bg-background/40 backdrop-blur rounded-lg p-3 border border-amber-500/20 divide-y divide-border">
+                {conflicts.map((conflict) => (
+                  <div key={conflict.enrollmentNumber} className="py-2.5 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono font-semibold bg-muted px-2 py-0.5 rounded text-xs border border-border">
+                        {conflict.enrollmentNumber}
+                      </span>
+                      <span className="text-muted-foreground text-xs">shared by:</span>
+                      <span className="font-medium text-foreground text-xs">
+                        {conflict.students.map(s => `${s.firstName} ${s.lastName} (${s.projectTeamId ? `Team ${s.projectTeamId}` : (s.groupName || 'No Team')})`).join(" & ")}
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-7 self-start sm:self-auto border-amber-500/40 hover:bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                      onClick={() => setIsConflictModalOpen(true)}
+                    >
+                      Change Enrolment
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -483,6 +584,91 @@ export default function Dashboard() {
           </div>
         </Modal>
       )}
+
+      {/* Enrollment Conflict Resolution Dialog */}
+      <Dialog open={isConflictModalOpen} onOpenChange={setIsConflictModalOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="h-5 w-5" />
+              <DialogTitle>Resolve Enrolment Conflict</DialogTitle>
+            </div>
+            <DialogDescription>
+              Multiple students are currently assigned the same enrolment number. Update the enrolment number for the student(s) to resolve the conflict. Their username and login credentials will automatically update.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 my-2">
+            {conflicts.map((conflict, idx) => (
+              <Card key={conflict.enrollmentNumber} className="border border-border shadow-none">
+                <CardHeader className="bg-muted/40 py-2.5 px-4 border-b border-border">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Conflict #{idx + 1}
+                    </span>
+                    <span className="font-mono text-xs font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 px-2 py-0.5 rounded">
+                      Enrolment: {conflict.enrollmentNumber} ({conflict.count} Students)
+                    </span>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-3 space-y-3">
+                  {conflict.students.map((student) => (
+                    <div key={student.id} className="p-3 rounded-lg border border-border/70 bg-card/60 space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-sm">
+                        <div>
+                          <span className="font-semibold text-foreground">{student.firstName} {student.lastName}</span>
+                          <span className="text-xs text-muted-foreground ml-2">({student.course || "BCA"})</span>
+                          <p className="text-xs text-muted-foreground font-mono">{student.email}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className="inline-block text-xs font-medium px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                            {student.projectTeamId ? `Team ${student.projectTeamId}` : (student.groupName || "No Team Assigned")}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <Input
+                          placeholder={`Enter new enrolment for ${student.firstName}`}
+                          value={newEnrollmentInputs[student.id] ?? ""}
+                          onChange={(e) => setNewEnrollmentInputs(prev => ({ ...prev, [student.id]: e.target.value }))}
+                          className="font-mono text-sm h-8"
+                        />
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs shrink-0"
+                          disabled={
+                            (resolveConflictMutation.isPending && resolvingStudentId === student.id) ||
+                            !newEnrollmentInputs[student.id]?.trim() ||
+                            newEnrollmentInputs[student.id]?.trim() === student.enrollmentNumber
+                          }
+                          onClick={() => {
+                            const val = newEnrollmentInputs[student.id]?.trim();
+                            if (!val) return;
+                            setResolvingStudentId(student.id);
+                            resolveConflictMutation.mutate({
+                              userId: student.id,
+                              newEnrollmentNumber: val
+                            });
+                          }}
+                        >
+                          {resolveConflictMutation.isPending && resolvingStudentId === student.id ? "Updating..." : "Update Enrolment"}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button variant="outline" onClick={() => setIsConflictModalOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }

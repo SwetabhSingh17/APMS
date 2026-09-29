@@ -85,9 +85,16 @@ export function registerUserRoutes(router: Router, storage: DBStorage) {
                 students = students.filter(s => s.course === course);
             }
 
-            // Return stripped down data for safety
-            const safeStudents = students.map(({ id, firstName, lastName, enrollmentNumber, course, groupId }) => ({
-                id, firstName, lastName, enrollmentNumber, course, groupId
+            // Return data with contact information for privileged roles (Admin, Coordinator, Supervisor)
+            const isPrivileged = [UserRole.ADMIN, UserRole.COORDINATOR, UserRole.SUPERVISOR].includes(req.user.role as UserRole);
+            const safeStudents = students.map(({ id, firstName, lastName, enrollmentNumber, course, groupId, mobile }) => ({
+                id,
+                firstName,
+                lastName,
+                enrollmentNumber,
+                course,
+                groupId,
+                mobile: isPrivileged ? mobile : undefined,
             }));
 
             res.json(safeStudents);

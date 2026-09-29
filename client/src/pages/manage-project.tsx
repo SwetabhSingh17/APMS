@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User, UserRole } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Users, Search, ArrowRightLeft, UserPlus, FolderGit2, Clock, CheckCircle2, Check, Trash2, AlertTriangle } from "lucide-react";
+import { Loader2, Users, Search, ArrowRightLeft, UserPlus, FolderGit2, Clock, CheckCircle2, Check, Trash2, AlertTriangle, BookOpen, Phone } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useCourseFilter } from "@/hooks/course-filter-context";
 import { CreateTeamDialog } from "@/components/create-team-dialog";
 import { ManageMembersDialog } from "@/components/manage-members-dialog";
@@ -25,6 +26,10 @@ export default function ManageProject() {
   const [deleteConfirmGroup, setDeleteConfirmGroup] = useState<any>(null);
   const [selectedSupervisorId, setSelectedSupervisorId] = useState<string>("");
   const [supervisorSearchQuery, setSupervisorSearchQuery] = useState<string>("");
+  const [changeTopicGroup, setChangeTopicGroup] = useState<any | null>(null);
+  const [selectedTopicId, setSelectedTopicId] = useState<string>("");
+  const [topicSearchQuery, setTopicSearchQuery] = useState<string>("");
+  const [updateSupervisorWithTopic, setUpdateSupervisorWithTopic] = useState<boolean>(true);
   const { courseFilter, getCourseQuery } = useCourseFilter();
 
   // Fetch all supervisors
@@ -38,6 +43,20 @@ export default function ManageProject() {
     enabled: !!user,
   });
 
+  // Fetch all approved topics
+  const { data: approvedTopicsData } = useQuery<{ data: any[] } | any[]>({
+    queryKey: [`/api/topics/approved?limit=all${getCourseQuery() ? `&${getCourseQuery()}` : ''}`],
+    queryFn: async () => {
+      const res = await fetch(`/api/topics/approved?limit=all${getCourseQuery() ? `&${getCourseQuery()}` : ''}`);
+      if (!res.ok) throw new Error("Failed to fetch approved topics");
+      return res.json();
+    },
+    enabled: !!user,
+  });
+  const approvedTopics: any[] = Array.isArray(approvedTopicsData)
+    ? approvedTopicsData
+    : (approvedTopicsData?.data || []);
+
   // Fetch all student groups
   const { data: allGroups = [], isLoading: isLoadingAllGroups } = useQuery({
     queryKey: [`/api/student-groups/all${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
@@ -47,6 +66,40 @@ export default function ManageProject() {
       return res.json();
     },
     enabled: !!user,
+  });
+
+  // Change topic mutation
+  const changeTopicMutation = useMutation({
+    mutationFn: async ({ groupId, topicId, updateSupervisor }: { groupId: number; topicId: number; updateSupervisor: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/student-groups/${groupId}/topic`, { topicId, updateSupervisor });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Topic Updated",
+        description: data.message || "The project topic has been changed successfully.",
+      });
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === "string" && (
+            key.startsWith("/api/student-groups") ||
+            key.startsWith("/api/projects") ||
+            key.startsWith("/api/topics")
+          );
+        },
+      });
+      setChangeTopicGroup(null);
+      setSelectedTopicId("");
+      setTopicSearchQuery("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update project topic",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   // Change supervisor mutation
@@ -194,7 +247,7 @@ export default function ManageProject() {
               </span>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Current Supervisor</p>
+              <p className="text-xs text-muted-foreground font-medium">Tentative Supervisor</p>
               <p className="font-medium">
                 {group.supervisor ? `${group.supervisor.prefix ? `${group.supervisor.prefix} ` : ""}${group.supervisor.firstName} ${group.supervisor.lastName}` : "Not Assigned"}
               </p>
@@ -217,7 +270,23 @@ export default function ManageProject() {
 
         {/* Selected Project Info */}
         <div>
-          <p className="text-xs font-medium text-muted-foreground mb-1.5">Selected Project</p>
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-xs font-medium text-muted-foreground">Selected Project</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1.5"
+              onClick={() => {
+                setChangeTopicGroup(group);
+                setSelectedTopicId(group.project?.topicId?.toString() || "");
+                setTopicSearchQuery("");
+                setUpdateSupervisorWithTopic(true);
+              }}
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              {group.project ? "Change Topic" : "Assign Topic"}
+            </Button>
+          </div>
           {group.project ? (
             <div className="flex items-center gap-2.5 p-2.5 rounded-lg border bg-blue-50/50 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-900/40">
               <div className="w-8 h-8 rounded-md bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center shrink-0">
@@ -238,7 +307,7 @@ export default function ManageProject() {
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-2 p-2 rounded-lg border border-dashed text-xs text-muted-foreground bg-muted/20">
+            <div className="flex items-center justify-between p-2.5 rounded-lg border border-dashed text-xs text-muted-foreground bg-muted/20">
               <span className="italic">No topic selected by this team yet</span>
             </div>
           )}
@@ -259,13 +328,21 @@ export default function ManageProject() {
           />
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {group.members?.map((member: any) => (
-              <div key={member.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50 text-sm">
-                <div className="w-7 h-7 rounded-full bg-background border flex items-center justify-center text-xs font-semibold shrink-0">
+              <div key={member.id} className="flex items-center gap-2.5 p-2 rounded-md bg-muted/50 text-sm">
+                <div className="w-8 h-8 rounded-full bg-background border flex items-center justify-center text-xs font-semibold shrink-0">
                   {member.firstName[0]}{member.lastName[0]}
                 </div>
-                <div className="min-w-0">
-                  <p className="font-medium truncate">{member.firstName} {member.lastName}</p>
-                  <p className="text-xs text-muted-foreground truncate">{member.enrollmentNumber}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium truncate text-xs sm:text-sm">{member.firstName} {member.lastName}</p>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                    <span className="font-mono text-[11px]">{member.enrollmentNumber}</span>
+                    {member.mobile && (
+                      <span className="font-mono flex items-center gap-1 text-[11px] text-foreground/80 font-medium">
+                        <Phone className="h-3 w-3 text-muted-foreground shrink-0" />
+                        {member.mobile}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -512,6 +589,232 @@ export default function ManageProject() {
                   disabled={!selectedSupervisorId || changeSupervisorMutation.isPending || (targetGroup?.supervisor?.id?.toString() === selectedSupervisorId)}
                 >
                   {changeSupervisorMutation.isPending ? (
+                    <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...</>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Change Project Topic Dialog */}
+        <Dialog
+          open={changeTopicGroup !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setChangeTopicGroup(null);
+              setSelectedTopicId("");
+              setTopicSearchQuery("");
+            }
+          }}
+        >
+          <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-primary" />
+                {changeTopicGroup?.project ? "Change Project Topic" : "Assign Project Topic"}
+              </DialogTitle>
+              <DialogDescription>
+                Select an approved project topic for <strong>{changeTopicGroup?.name}</strong>.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 pt-2 flex-1 overflow-hidden flex flex-col">
+              {/* Current Status Info */}
+              <div className="bg-muted/40 rounded-lg p-3 border text-xs space-y-1.5 shrink-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Team Course:</span>
+                  <Badge variant="outline" className="font-semibold">
+                    {changeTopicGroup?.course || changeTopicGroup?.members?.[0]?.course || "N/A"}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Current Topic:</span>
+                  <span className="font-medium text-foreground text-right truncate max-w-[320px]">
+                    {changeTopicGroup?.project?.topicTitle ? (
+                      <>
+                        <span className="font-mono text-primary font-semibold mr-1.5">
+                          {changeTopicGroup.project.topicCode || `PRJ-${changeTopicGroup.project.id}`}
+                        </span>
+                        {changeTopicGroup.project.topicTitle}
+                      </>
+                    ) : (
+                      <span className="italic text-muted-foreground">None assigned</span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Tentative Supervisor:</span>
+                  <span className="font-medium text-foreground">
+                    {changeTopicGroup?.supervisor
+                      ? `${changeTopicGroup.supervisor.prefix ? `${changeTopicGroup.supervisor.prefix} ` : ""}${changeTopicGroup.supervisor.firstName} ${changeTopicGroup.supervisor.lastName}`
+                      : <span className="italic text-muted-foreground">Unassigned</span>}
+                  </span>
+                </div>
+              </div>
+
+              {/* Topic Search Input */}
+              <div className="relative shrink-0">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Search topics by code, title, domain, tech, or proposer..."
+                  className="pl-9 h-9 text-sm"
+                  value={topicSearchQuery}
+                  onChange={(e) => setTopicSearchQuery(e.target.value)}
+                />
+              </div>
+
+              {/* Scrollable Topics List */}
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[220px] max-h-[340px]">
+                {(() => {
+                  const groupCourse = (changeTopicGroup?.course || changeTopicGroup?.members?.[0]?.course || "").trim().toUpperCase();
+                  
+                  const filteredTopics = approvedTopics.filter((t: any) => {
+                    // Match course if present
+                    if (groupCourse && t.course) {
+                      if (t.course.trim().toUpperCase() !== groupCourse) return false;
+                    }
+                    if (!topicSearchQuery.trim()) return true;
+                    const query = topicSearchQuery.toLowerCase();
+                    const title = (t.title || "").toLowerCase();
+                    const code = (t.code || "").toLowerCase();
+                    const domain = (t.domain || "").toLowerCase();
+                    const tech = (t.technology || "").toLowerCase();
+                    const submitter = `${t.submittedBy?.firstName || ""} ${t.submittedBy?.lastName || ""}`.toLowerCase();
+                    return title.includes(query) || code.includes(query) || domain.includes(query) || tech.includes(query) || submitter.includes(query);
+                  });
+
+                  if (filteredTopics.length === 0) {
+                    return (
+                      <div className="text-center py-8 text-sm text-muted-foreground">
+                        {topicSearchQuery ? "No approved topics match your search." : "No approved topics available for this course."}
+                      </div>
+                    );
+                  }
+
+                  return filteredTopics.map((topic: any) => {
+                    const isSelected = selectedTopicId === topic.id.toString();
+                    const isCurrentTopic = changeTopicGroup?.project?.topicId === topic.id;
+                    const isTakenByOther = topic.isAllotted && !isCurrentTopic;
+
+                    return (
+                      <div
+                        key={topic.id}
+                        onClick={() => {
+                          if (!isTakenByOther) {
+                            setSelectedTopicId(topic.id.toString());
+                          }
+                        }}
+                        className={`p-3 rounded-lg border transition-all text-left flex items-start justify-between gap-3 ${
+                          isTakenByOther
+                            ? "opacity-50 cursor-not-allowed bg-muted/20 border-dashed"
+                            : isSelected
+                            ? "bg-primary/10 border-primary shadow-xs cursor-pointer"
+                            : "hover:bg-muted/70 hover:border-muted-foreground/30 cursor-pointer"
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-xs font-bold px-1.5 py-0.5 rounded bg-primary/15 text-primary">
+                              {topic.code || `PRJ-${topic.id}`}
+                            </span>
+                            {isCurrentTopic && (
+                              <Badge variant="outline" className="text-[10px] py-0 h-4 border-amber-500 text-amber-600 dark:text-amber-400">
+                                Current Topic
+                              </Badge>
+                            )}
+                            {isTakenByOther && (
+                              <Badge variant="secondary" className="text-[10px] py-0 h-4 text-muted-foreground">
+                                Allotted to another team
+                              </Badge>
+                            )}
+                            {topic.course && (
+                              <Badge variant="outline" className="text-[10px] py-0 h-4">
+                                {topic.course}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm font-semibold text-foreground line-clamp-1 leading-snug">
+                            {topic.title}
+                          </p>
+                          {(topic.domain || topic.technology) && (
+                            <p className="text-xs text-muted-foreground line-clamp-1">
+                              {[topic.domain, topic.technology].filter(Boolean).join(" • ")}
+                            </p>
+                          )}
+                          {topic.submittedBy && (
+                            <p className="text-[11px] text-muted-foreground flex items-center gap-1 pt-0.5">
+                              <span>Proposed by:</span>
+                              <span className="font-medium text-foreground">
+                                {topic.submittedBy.prefix ? `${topic.submittedBy.prefix} ` : ""}{topic.submittedBy.firstName} {topic.submittedBy.lastName}
+                              </span>
+                            </p>
+                          )}
+                        </div>
+
+                        {isSelected && (
+                          <div className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center shrink-0 mt-0.5">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
+              {/* Option to also update supervisor to the topic proposer */}
+              {(() => {
+                const selectedTopic = approvedTopics.find((t: any) => t.id.toString() === selectedTopicId);
+                if (!selectedTopic?.submittedBy) return null;
+                const proposerName = `${selectedTopic.submittedBy.prefix ? `${selectedTopic.submittedBy.prefix} ` : ""}${selectedTopic.submittedBy.firstName} ${selectedTopic.submittedBy.lastName}`;
+                return (
+                  <div className="flex items-center space-x-2 pt-2 border-t text-sm shrink-0">
+                    <Checkbox
+                      id="updateSupervisorWithTopic"
+                      checked={updateSupervisorWithTopic}
+                      onCheckedChange={(checked) => setUpdateSupervisorWithTopic(Boolean(checked))}
+                    />
+                    <label
+                      htmlFor="updateSupervisorWithTopic"
+                      className="text-xs text-muted-foreground cursor-pointer select-none"
+                    >
+                      Also update Tentative Supervisor to <strong className="text-foreground">{proposerName}</strong> (Topic Proposer)
+                    </label>
+                  </div>
+                );
+              })()}
+
+              <div className="flex justify-end gap-3 pt-3 border-t shrink-0">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setChangeTopicGroup(null);
+                    setSelectedTopicId("");
+                    setTopicSearchQuery("");
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (selectedTopicId && changeTopicGroup) {
+                      changeTopicMutation.mutate({
+                        groupId: changeTopicGroup.id,
+                        topicId: parseInt(selectedTopicId),
+                        updateSupervisor: updateSupervisorWithTopic,
+                      });
+                    }
+                  }}
+                  disabled={
+                    !selectedTopicId ||
+                    changeTopicMutation.isPending ||
+                    (changeTopicGroup?.project?.topicId?.toString() === selectedTopicId)
+                  }
+                >
+                  {changeTopicMutation.isPending ? (
                     <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...</>
                   ) : (
                     "Save Changes"
