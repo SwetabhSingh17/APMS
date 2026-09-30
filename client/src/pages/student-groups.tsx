@@ -17,9 +17,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { User, StudentGroup } from "@shared/schema";
+import { User, StudentGroup, UserRole } from "@shared/schema";
+import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, UserPlus, Users, Info, Check, X } from "lucide-react";
+import { Loader2, UserPlus, Users, Info, Check, X, FileText } from "lucide-react";
 
 // Create group form schema
 const createGroupSchema = z.object({
@@ -68,7 +69,23 @@ export default function StudentGroups() {
       return res.json();
     },
     enabled: !!user,
+    refetchOnWindowFocus: true,
+    staleTime: 2000,
   });
+
+  // Fetch current student's project topic
+  const { data: myProjects = [] } = useQuery<any[]>({
+    queryKey: ["/api/projects/my"],
+    queryFn: async () => {
+      const res = await fetch("/api/projects/my");
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!user && user.role === UserRole.STUDENT,
+    refetchOnWindowFocus: true,
+    staleTime: 2000,
+  });
+  const currentProject = myProjects[0];
 
   // Fetch all available groups
   const { data: availableGroups, isLoading: isLoadingGroups } = useQuery({
@@ -429,6 +446,83 @@ export default function StudentGroups() {
                         </div>
                       ))}
                     </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Assigned Project Topic Section */}
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-primary" />
+                        Assigned Project Topic
+                      </h3>
+                      {currentProject?.topic && (
+                        <Link href="/projects">
+                          <Button variant="outline" size="sm" className="text-xs gap-1.5">
+                            View Full Project
+                          </Button>
+                        </Link>
+                      )}
+                    </div>
+                    {currentProject?.topic ? (
+                      <div className="border rounded-lg p-5 bg-card/60 border-primary/20 space-y-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {currentProject.topic.topicCode && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                              {currentProject.topic.topicCode}
+                            </span>
+                          )}
+                          {currentProject.topic.course && (
+                            <Badge variant="outline" className="text-xs font-semibold border-primary/30 text-primary bg-primary/5">
+                              {currentProject.topic.course}
+                            </Badge>
+                          )}
+                          {currentProject.topic.projectType && (
+                            <Badge variant="secondary" className="text-xs">
+                              {currentProject.topic.projectType}
+                            </Badge>
+                          )}
+                          <Badge className={currentProject.progress === 100 ? "bg-green-600 text-white" : "bg-primary text-primary-foreground"}>
+                            {currentProject.progress === 100 ? "Completed" : "In Progress"}
+                          </Badge>
+                        </div>
+                        <h4 className="font-bold text-lg text-foreground leading-snug">
+                          {currentProject.topic.title}
+                        </h4>
+                        <p className="text-sm text-muted-foreground line-clamp-3">
+                          {currentProject.topic.description}
+                        </p>
+                        {currentProject.topic.technology && (
+                          <div className="pt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="font-semibold text-foreground">Technology:</span>
+                            <span>{currentProject.topic.technology}</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="border border-dashed rounded-lg p-5 bg-muted/30">
+                        <div className="flex items-start gap-3">
+                          <Info className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">Project Topic</span>
+                              <Badge variant="outline" className="border-amber-500/30 text-amber-600 bg-amber-500/10 text-xs">
+                                Not Selected
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              No project topic has been selected or assigned to your team yet. Your team can browse and select an approved topic from the Topics section.
+                            </p>
+                            <div className="pt-2">
+                              <Link href="/student-topics">
+                                <Button size="sm" variant="outline">Browse Available Topics</Button>
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <Separator />

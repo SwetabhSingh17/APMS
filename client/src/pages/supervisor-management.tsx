@@ -309,7 +309,8 @@ export default function SupervisorManagement() {
           key.startsWith("/api/student-groups") ||
           key.startsWith("/api/projects") ||
           key.startsWith("/api/topics") ||
-          key.startsWith("/api/users")
+          key.startsWith("/api/users") ||
+          key.startsWith("/api/stats")
         );
       },
     });

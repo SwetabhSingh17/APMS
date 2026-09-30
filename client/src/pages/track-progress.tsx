@@ -187,7 +187,7 @@ export default function TrackProgress() {
             {list && list.length > 0 ? (
               list.map((project) => {
                 const supervisor = project.supervisor || (project.topic as any)?.submittedBy;
-                const supervisorName = supervisor 
+                const supervisorName = supervisor
                   ? `${supervisor.prefix ? `${supervisor.prefix} ` : ""}${supervisor.firstName} ${supervisor.lastName}`.trim()
                   : null;
 
@@ -439,7 +439,7 @@ export default function TrackProgress() {
               </div>
 
               <div className="p-3 rounded-lg border bg-muted/20 space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground uppercase">Assigned Supervisor</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase">Tentative Supervisor</p>
                 {(() => {
                   const supervisor = selectedProject.supervisor || (selectedProject.topic as any)?.submittedBy;
                   if (!supervisor) return <p className="text-sm text-muted-foreground">Not Assigned</p>;

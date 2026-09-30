@@ -85,7 +85,9 @@ export default function ManageProject() {
           return typeof key === "string" && (
             key.startsWith("/api/student-groups") ||
             key.startsWith("/api/projects") ||
-            key.startsWith("/api/topics")
+            key.startsWith("/api/topics") ||
+            key.startsWith("/api/stats") ||
+            key.startsWith("/api/admin/supervisors-summary")
           );
         },
       });
@@ -118,7 +120,10 @@ export default function ManageProject() {
           const key = query.queryKey[0];
           return typeof key === "string" && (
             key.startsWith("/api/student-groups") ||
-            key.startsWith("/api/projects")
+            key.startsWith("/api/projects") ||
+            key.startsWith("/api/topics") ||
+            key.startsWith("/api/stats") ||
+            key.startsWith("/api/admin/supervisors-summary")
           );
         },
       });

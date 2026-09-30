@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ============================================================================
-# APMS (Academic Project Management System v2.0.0) - Automatic Installation Script
+# APMS (Academic Project Management System v2.0.1) - Automatic Installation Script
 # Created by: Swetabh Singh
 # For macOS and Linux Systems
 # ============================================================================

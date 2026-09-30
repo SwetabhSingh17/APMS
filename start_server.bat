@@ -3,7 +3,7 @@ title APMS Server
 setlocal
 
 echo ==========================================================
-echo    APMS - Academic Project Management System (v2.0.0)
+echo    APMS - Academic Project Management System (v2.0.1)
 echo    One-Click Production Server - By Swetabh Singh
 echo ==========================================================
 echo.

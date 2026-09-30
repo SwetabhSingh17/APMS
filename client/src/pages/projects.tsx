@@ -23,19 +23,19 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertProjectTopicSchema } from "@shared/schema";
 import { z } from "zod";
-import { 
-  Search, 
-  CheckCircle2, 
-  Clock, 
-  Calendar, 
-  Users, 
-  Award, 
-  BookOpen, 
-  AlertCircle, 
-  Sparkles, 
-  ShieldCheck, 
-  Mail, 
-  Building, 
+import {
+  Search,
+  CheckCircle2,
+  Clock,
+  Calendar,
+  Users,
+  Award,
+  BookOpen,
+  AlertCircle,
+  Sparkles,
+  ShieldCheck,
+  Mail,
+  Building,
   ArrowRight,
   FileText,
   GraduationCap,
@@ -93,7 +93,9 @@ export default function Projects() {
       const response = await apiRequest("GET", "/api/projects/supervisor/my-topics");
       return await response.json();
     },
-    enabled: !!user && user.role === UserRole.SUPERVISOR
+    enabled: !!user && user.role === UserRole.SUPERVISOR,
+    refetchOnWindowFocus: true,
+    staleTime: 2000,
   });
 
   // Query student's selected project
@@ -104,7 +106,9 @@ export default function Projects() {
       const data = await response.json();
       return data;
     },
-    enabled: !!user && user.role === UserRole.STUDENT
+    enabled: !!user && user.role === UserRole.STUDENT,
+    refetchOnWindowFocus: true,
+    staleTime: 2000,
   });
 
   // Query student's group details to display team members & assigned supervisor
@@ -125,9 +129,11 @@ export default function Projects() {
       }
       return res.json();
     },
-    enabled: !!user && user.role === UserRole.STUDENT
+    enabled: !!user && user.role === UserRole.STUDENT,
+    refetchOnWindowFocus: true,
+    staleTime: 2000,
   });
- 
+
   // Add query for coordinator/admin to fetch all student projects
   // Supervisors now use the dedicated /api/projects/supervisor/my-topics endpoint instead
   const { data: allProjects = [], isLoading: isLoadingAllProjects } = useQuery<IStudentProjectWithTopic[]>({
@@ -377,9 +383,8 @@ export default function Projects() {
         ) : (
           <div className="space-y-4">
             {filteredItems.map(item => (
-              <Card key={item.id} className={`shadow-sm transition-all ${
-                item.isPicked ? "border-green-500/30 bg-green-500/[0.02]" : "border-border"
-              }`}>
+              <Card key={item.id} className={`shadow-sm transition-all ${item.isPicked ? "border-green-500/30 bg-green-500/[0.02]" : "border-border"
+                }`}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -588,8 +593,8 @@ export default function Projects() {
       );
     }
 
-    // Resolve supervisor defensively from topic submitter or group assignment
-    const supervisor = project.topic.submittedBy || userGroup?.supervisor;
+    // Resolve supervisor defensively from assigned group supervisor or topic submitter
+    const supervisor = (project as any).supervisor || userGroup?.supervisor || project.topic.submittedBy;
     const supervisorName = supervisor
       ? `${supervisor.prefix ? `${supervisor.prefix} ` : ""}${supervisor.firstName} ${supervisor.lastName || ""}`.trim()
       : null;
@@ -666,7 +671,28 @@ export default function Projects() {
                   <Sparkles className="w-3.5 h-3.5 text-primary" />
                   Technology Stack
                 </p>
-                <p className="font-semibold text-sm line-clamp-1">{project.topic.technology || "General"}</p>
+                <div className="font-medium text-xs break-words flex flex-wrap gap-1 mt-0.5">
+                  {project.topic.technology ? (
+                    project.topic.technology.includes(',') || project.topic.technology.includes('/') || project.topic.technology.includes(';') ? (
+                      project.topic.technology
+                        .split(/[,/|;]+/)
+                        .map((t) => t.trim())
+                        .filter(Boolean)
+                        .map((tech, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-primary/10 text-primary border border-primary/20"
+                          >
+                            {tech}
+                          </span>
+                        ))
+                    ) : (
+                      <span className="font-semibold text-sm">{project.topic.technology}</span>
+                    )
+                  ) : (
+                    <span className="text-muted-foreground text-sm">General</span>
+                  )}
+                </div>
               </div>
 
               <div className="p-3.5 rounded-lg bg-background border shadow-xs">
@@ -724,11 +750,10 @@ export default function Projects() {
               {milestones.map((m) => (
                 <div
                   key={m.id}
-                  className={`p-3 rounded-lg border text-left transition-all ${
-                    m.completed
+                  className={`p-3 rounded-lg border text-left transition-all ${m.completed
                       ? "bg-primary/5 border-primary/30 shadow-2xs"
                       : "bg-muted/20 border-border opacity-75"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-xs font-mono font-bold text-muted-foreground">Phase {m.id}</span>
@@ -753,7 +778,7 @@ export default function Projects() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-bold flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-primary" />
-                Assigned Supervisor
+                Tentative Supervisor
               </CardTitle>
               <CardDescription>Academic mentor guiding this project</CardDescription>
             </CardHeader>

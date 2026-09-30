@@ -46,6 +46,8 @@ APMS is a comprehensive web-based project management system for educational inst
     - **Direct Specific Group Topic Allotment**: Displays all submitted project topics directly under each supervisor with associated student group details (team name, ID, member count, member list with enrollment numbers). Provides modal dialog to assign specific student teams directly to supervisor topics (`PATCH /api/student-groups/:groupId/topic`), along with change and unassign operations that preserve student group and account records.
     - **Fully Reactive Multi-Mode Layout**: Default responsive **Cards View** reflows smoothly on all screen widths with View, Edit, and Manage Topics actions permanently accessible in the supervisor header (no horizontal scrollbar or boundary clipping). Includes a **Table View Toggle** with pinned sticky right actions for users preferring tabular format.
     - **Workload Governance**: Tracks 5-team mentorship caps, visual capacity progress bars, student counts, and status indicators (`available`, `optimal`, `high`, `maxed`).
+16. **Synchronized Project Topic & Supervisor Reflection**: Ensures project topic assignments or changes made by Administrators or Coordinators reflect immediately everywhere across Student accounts (Dashboard, Projects page, Team page) and Supervisor accounts (Evaluations, "My Topics & Teams"). Dynamic supervisor attribution prioritizes assigned team mentors over topic submitters.
+17. **Full Project Technology Stack Visibility**: Topic selection cards and project detail dashboards display full technology stacks as flexible badges with word-break wrapping, eliminating single-line ellipsis truncations (`line-clamp-1`) so students can thoroughly evaluate project tech requirements before selection.
 
 ---
 

@@ -164,6 +164,9 @@ export function registerProjectRoutes(router: Router, storage: DBStorage) {
             console.log('All projects:', allProjects);
 
             const supervisorProjects = allProjects.filter(project => {
+                if (project.supervisor?.id) {
+                    return project.supervisor.id === req.user.id;
+                }
                 return project.topic?.submittedById === req.user.id;
             });
 

@@ -841,7 +841,7 @@ export default function TeamManagement() {
               {/* Supervisor Info */}
               <div>
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                  Assigned Supervisor
+                  Tentative Supervisor
                 </h4>
                 {viewGroup?.supervisor ? (
                   <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
@@ -975,11 +975,10 @@ export default function TeamManagement() {
               <div className="max-h-60 overflow-y-auto space-y-1.5 border rounded-lg p-2">
                 {/* Option to unassign supervisor */}
                 <div
-                  className={`p-2.5 rounded-md cursor-pointer flex items-center justify-between text-sm transition-colors ${
-                    selectedSupervisorId === "none"
-                      ? "bg-primary/10 border border-primary text-primary font-medium"
-                      : "hover:bg-muted"
-                  }`}
+                  className={`p-2.5 rounded-md cursor-pointer flex items-center justify-between text-sm transition-colors ${selectedSupervisorId === "none"
+                    ? "bg-primary/10 border border-primary text-primary font-medium"
+                    : "hover:bg-muted"
+                    }`}
                   onClick={() => setSelectedSupervisorId("none")}
                 >
                   <div>
@@ -994,11 +993,10 @@ export default function TeamManagement() {
                   return (
                     <div
                       key={s.id}
-                      className={`p-2.5 rounded-md cursor-pointer flex items-center justify-between text-sm transition-colors ${
-                        isSelected
-                          ? "bg-primary/10 border border-primary text-primary font-medium"
-                          : "hover:bg-muted"
-                      }`}
+                      className={`p-2.5 rounded-md cursor-pointer flex items-center justify-between text-sm transition-colors ${isSelected
+                        ? "bg-primary/10 border border-primary text-primary font-medium"
+                        : "hover:bg-muted"
+                        }`}
                       onClick={() => setSelectedSupervisorId(s.id.toString())}
                     >
                       <div>

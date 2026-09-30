@@ -7,7 +7,7 @@ REM ============================================================================
 
 echo.
 echo ========================================
-echo   APMS Setup (v2.0.0)
+echo   APMS Setup (v2.0.1)
 echo   Academic Project Management System
 echo   By - Swetabh Singh
 echo ========================================

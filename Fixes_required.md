@@ -6,6 +6,16 @@ This document outlines suggested architectural, security, and maintenance improv
 
 ## 🚨 Priority Bugs to be Resolved
 
+### 🟢 ACTIVE ISSUES RESOLVED (v2.0.1 - Completed & Verified)
+
+- [x] **Project Technologies Full Visibility During Student Topic Selection (`/student-topics`, `/projects`)** — **COMPLETED**
+  - **Affected Files:** `client/src/pages/student-topics.tsx`, `client/src/components/projects/topic-card.tsx`, `client/src/pages/projects.tsx`
+  - **Resolution:** Removed single-line ellipsis truncation (`line-clamp-1`) which caused long technology stacks to be truncated with `...`. Rendered technologies as flexible, responsive badges/chips with word-break wrapping, ensuring students can clearly inspect all technologies involved in a project topic before selection.
+
+- [x] **Universal Project Topic & Supervisor Reflection Across Dashboards & Accounts** — **COMPLETED**
+  - **Affected Files:** `server/db-storage.ts`, `server/routes/projects.ts`, `client/src/pages/dashboard.tsx`, `client/src/pages/projects.tsx`, `client/src/pages/student-groups.tsx`, `client/src/pages/manage-project.tsx`, `client/src/pages/supervisor-management.tsx`
+  - **Resolution:** Fixed issue where Admin or Coordinator changes to project topics and supervisor assignments only reflected in the "Project Team" section. Resolved assigned group supervisor dynamically in `getStudentProjects`, prioritized assigned group supervisor in supervisor evaluations (`GET /api/projects/supervisor`), added "Assigned Project Topic" section in student groups, and added automated team project self-healing with real-time React Query cache invalidation across the app.
+
 ### 🟢 ACTIVE ISSUES RESOLVED (v2.0.0 / v2 - Completed & Verified)
 
 - [x] **Supervisor Management Portal for Admins & Coordinators (`/supervisor-management`)** — **COMPLETED**

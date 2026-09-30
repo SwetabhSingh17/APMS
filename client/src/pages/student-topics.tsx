@@ -904,14 +904,38 @@ function TopicCard({
           </div>
 
           {/* Technology & Metadata */}
-          <div className="grid grid-cols-2 gap-2 pt-2 border-t text-xs">
+          <div className="pt-2.5 border-t text-xs space-y-2">
             <div>
-              <p className="text-muted-foreground">Technology</p>
-              <p className="font-medium line-clamp-1">{topic.technology || "General"}</p>
+              <p className="text-muted-foreground font-semibold text-[11px] uppercase tracking-wider mb-1.5">Technologies</p>
+              <div className="flex flex-wrap gap-1.5">
+                {topic.technology ? (
+                  topic.technology.includes(',') || topic.technology.includes('/') || topic.technology.includes(';') ? (
+                    topic.technology
+                      .split(/[,/|;]+/)
+                      .map((t) => t.trim())
+                      .filter(Boolean)
+                      .map((tech, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground border border-border/60 hover:bg-muted/80 transition-colors"
+                        >
+                          {tech}
+                        </span>
+                      ))
+                  ) : (
+                    <span className="font-medium text-foreground text-xs break-words">
+                      {topic.technology}
+                    </span>
+                  )
+                ) : (
+                  <span className="text-muted-foreground italic text-xs">General</span>
+                )}
+              </div>
             </div>
-            <div>
-              <p className="text-muted-foreground">Complexity</p>
-              <p className="font-medium">{topic.estimatedComplexity || "Medium"}</p>
+
+            <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t border-border/40">
+              <span>Complexity: <strong className="font-semibold text-foreground">{topic.estimatedComplexity || "Medium"}</strong></span>
+              {topic.projectType && <span>Type: <strong className="font-semibold text-foreground">{topic.projectType}</strong></span>}
             </div>
           </div>
         </div>

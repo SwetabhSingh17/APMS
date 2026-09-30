@@ -447,8 +447,8 @@ export class DBStorage {
     return project as StudentProject | undefined;
   }
 
-  async getStudentProjects(studentId: number): Promise<(StudentProject & { topic: ProjectTopic | null })[]> {
-    const rows = await db.select({
+  async getStudentProjects(studentId: number): Promise<(StudentProject & { topic: ProjectTopic | null; supervisor?: User })[]> {
+    let rows = await db.select({
       project: studentProjects,
       topic: projectTopics,
       submitter: users
@@ -456,7 +456,52 @@ export class DBStorage {
     .from(studentProjects)
     .leftJoin(projectTopics, eq(studentProjects.topicId, projectTopics.id))
     .leftJoin(users, eq(projectTopics.submittedById, users.id))
-    .where(eq(studentProjects.studentId, studentId));
+    .where(eq(studentProjects.studentId, studentId))
+    .orderBy(desc(studentProjects.updatedAt), desc(studentProjects.id));
+
+    // Fallback self-healing: If no student_project exists, check if student belongs to a group with an allotted project
+    if (rows.length === 0) {
+      const membership = await this.getUserGroupMembership(studentId);
+      if (membership && membership.group) {
+        const groupMembers = await this.getStudentGroupMembers(membership.group.id);
+        const siblingIds = groupMembers.map(m => m.id).filter(id => id !== studentId);
+        if (siblingIds.length > 0) {
+          const [siblingProject] = await db.select()
+            .from(studentProjects)
+            .where(inArray(studentProjects.studentId, siblingIds))
+            .orderBy(desc(studentProjects.updatedAt), desc(studentProjects.id))
+            .limit(1);
+
+          if (siblingProject && siblingProject.topicId) {
+            await db.insert(studentProjects).values({
+              studentId,
+              topicId: siblingProject.topicId,
+              progress: siblingProject.progress || 0,
+              status: siblingProject.status || "in_progress",
+            });
+
+            rows = await db.select({
+              project: studentProjects,
+              topic: projectTopics,
+              submitter: users
+            })
+            .from(studentProjects)
+            .leftJoin(projectTopics, eq(studentProjects.topicId, projectTopics.id))
+            .leftJoin(users, eq(projectTopics.submittedById, users.id))
+            .where(eq(studentProjects.studentId, studentId))
+            .orderBy(desc(studentProjects.updatedAt), desc(studentProjects.id));
+          }
+        }
+      }
+    }
+
+    // Resolve assigned group supervisor
+    let groupSupervisor: User | undefined = undefined;
+    const membership = await this.getUserGroupMembership(studentId);
+    if (membership?.group?.supervisorId) {
+      const sup = await this.getUser(membership.group.supervisorId);
+      if (sup) groupSupervisor = sup;
+    }
 
     return rows.map(r => {
       let topic = null;
@@ -468,8 +513,9 @@ export class DBStorage {
       }
       return {
         ...r.project,
-        topic
-      } as StudentProject & { topic: ProjectTopic | null };
+        topic,
+        supervisor: groupSupervisor || (r.submitter as User | undefined)
+      } as StudentProject & { topic: ProjectTopic | null; supervisor?: User };
     });
   }
 
@@ -557,7 +603,7 @@ export class DBStorage {
       groupName: string;
       projectTeamId: string | null;
       course: string | null;
-      members: { id: number; firstName: string; lastName: string; enrollmentNumber: string | null; email: string }[];
+      members: { id: number; firstName: string; lastName: string; enrollmentNumber: string | null; email: string; mobile?: string | null }[];
       progress: number;
     };
   }[]> {
@@ -569,6 +615,46 @@ export class DBStorage {
         eq(projectTopics.isDeleted, false)
       ))
       .orderBy(desc(projectTopics.createdAt));
+
+    // Step 1b: Also find any student groups where this supervisor is assigned as the mentor
+    const supervisedGroups = await db.select()
+      .from(studentGroups)
+      .where(eq(studentGroups.supervisorId, supervisorId));
+
+    if (supervisedGroups.length > 0) {
+      const supervisedGroupIds = supervisedGroups.map(g => g.id);
+      const supervisedMembers = await db.select({
+        userId: studentGroupMembers.userId,
+        groupId: studentGroupMembers.groupId
+      })
+      .from(studentGroupMembers)
+      .where(and(
+        inArray(studentGroupMembers.groupId, supervisedGroupIds),
+        eq(studentGroupMembers.status, "accepted")
+      ));
+
+      const supervisedUserIds = supervisedMembers.map(m => m.userId);
+      if (supervisedUserIds.length > 0) {
+        const supProjects = await db.select({ topicId: studentProjects.topicId })
+          .from(studentProjects)
+          .where(inArray(studentProjects.studentId, supervisedUserIds));
+
+        const existingTopicIds = new Set(supervisorTopics.map(t => t.id));
+        const additionalTopicIds = Array.from(new Set(
+          supProjects.map(p => p.topicId).filter(id => !existingTopicIds.has(id))
+        ));
+
+        if (additionalTopicIds.length > 0) {
+          const extraTopics = await db.select()
+            .from(projectTopics)
+            .where(and(
+              inArray(projectTopics.id, additionalTopicIds),
+              eq(projectTopics.isDeleted, false)
+            ));
+          supervisorTopics.push(...extraTopics);
+        }
+      }
+    }
 
     if (supervisorTopics.length === 0) return [];
 
@@ -652,10 +738,23 @@ export class DBStorage {
         return { id: topic.id, topic: topic as ProjectTopic, isPicked: false };
       }
 
-      // Find the group for this topic's students
-      const firstStudentId = projectData.studentIds[0];
-      const groupId = studentGroupMap.get(firstStudentId);
-      const groupData = groupId ? groupMap.get(groupId) : undefined;
+      // Find the group for this topic's students (prioritizing groups supervised by this supervisor)
+      let matchedGroupId: number | undefined = undefined;
+      for (const sid of projectData.studentIds) {
+        const gid = studentGroupMap.get(sid);
+        if (gid) {
+          const gInfo = groupMap.get(gid);
+          if (gInfo?.group.supervisorId === supervisorId) {
+            matchedGroupId = gid;
+            break;
+          }
+        }
+      }
+      if (!matchedGroupId && projectData.studentIds.length > 0) {
+        matchedGroupId = studentGroupMap.get(projectData.studentIds[0]);
+      }
+
+      const groupData = matchedGroupId ? groupMap.get(matchedGroupId) : undefined;
 
       return {
         id: topic.id,
@@ -844,6 +943,25 @@ export class DBStorage {
       status: 'accepted'
     });
     await db.update(users).set({ groupId }).where(eq(users.id, userId));
+
+    // If group already has an active project, automatically link this student to that project
+    const groupMembers = await this.getStudentGroupMembers(groupId);
+    const otherMemberIds = groupMembers.map(m => m.id).filter(id => id !== userId);
+    if (otherMemberIds.length > 0) {
+      const [existingProj] = await db.select().from(studentProjects).where(inArray(studentProjects.studentId, otherMemberIds)).limit(1);
+      if (existingProj && existingProj.topicId) {
+        const [hasProj] = await db.select().from(studentProjects).where(eq(studentProjects.studentId, userId));
+        if (!hasProj) {
+          await db.insert(studentProjects).values({
+            studentId: userId,
+            topicId: existingProj.topicId,
+            progress: existingProj.progress || 0,
+            status: existingProj.status || "in_progress",
+          });
+        }
+      }
+    }
+
     return true;
   }
 
@@ -922,6 +1040,26 @@ export class DBStorage {
     await db.update(studentGroupMembers)
       .set({ status: 'accepted' })
       .where(and(eq(studentGroupMembers.userId, userId), eq(studentGroupMembers.groupId, groupId)));
+    await db.update(users).set({ groupId }).where(eq(users.id, userId));
+
+    // If group already has an active project, automatically link this student to that project
+    const groupMembers = await this.getStudentGroupMembers(groupId);
+    const otherMemberIds = groupMembers.map(m => m.id).filter(id => id !== userId);
+    if (otherMemberIds.length > 0) {
+      const [existingProj] = await db.select().from(studentProjects).where(inArray(studentProjects.studentId, otherMemberIds)).limit(1);
+      if (existingProj && existingProj.topicId) {
+        const [hasProj] = await db.select().from(studentProjects).where(eq(studentProjects.studentId, userId));
+        if (!hasProj) {
+          await db.insert(studentProjects).values({
+            studentId: userId,
+            topicId: existingProj.topicId,
+            progress: existingProj.progress || 0,
+            status: existingProj.status || "in_progress",
+          });
+        }
+      }
+    }
+
     return true;
   }
 
@@ -1048,14 +1186,19 @@ export class DBStorage {
 
     // Update or insert student_projects for all team members
     for (const member of members) {
-      const [existingProject] = await db.select()
+      const existingProjects = await db.select()
         .from(studentProjects)
         .where(eq(studentProjects.studentId, member.id));
 
-      if (existingProject) {
+      if (existingProjects.length > 0) {
         await db.update(studentProjects)
           .set({ topicId, updatedAt: new Date() })
-          .where(eq(studentProjects.id, existingProject.id));
+          .where(eq(studentProjects.id, existingProjects[0].id));
+
+        // Clean up any stale duplicate project rows for this student
+        for (let i = 1; i < existingProjects.length; i++) {
+          await db.delete(studentProjects).where(eq(studentProjects.id, existingProjects[i].id));
+        }
       } else {
         await db.insert(studentProjects).values({
           studentId: member.id,
@@ -1072,6 +1215,12 @@ export class DBStorage {
     if (shouldUpdateSupervisor && topic.submittedById) {
       const [ug] = await db.update(studentGroups)
         .set({ supervisorId: topic.submittedById, updatedAt: new Date() })
+        .where(eq(studentGroups.id, groupId))
+        .returning();
+      if (ug) updatedGroup = ug as StudentGroup;
+    } else {
+      const [ug] = await db.update(studentGroups)
+        .set({ updatedAt: new Date() })
         .where(eq(studentGroups.id, groupId))
         .returning();
       if (ug) updatedGroup = ug as StudentGroup;

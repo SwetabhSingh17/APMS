@@ -50,6 +50,8 @@
 - **Error Resilient** — Global React Error Boundaries with graceful fallback UI and standardized machine-readable API error codes
 - **Cybertruck Spatial UI** — Glassmorphism, dynamic context pill (iOS-style), holographic data grids, physics-based micro-interactions, and animated cinematic splash screens
 - **Dark/Light Theme** — System-aware with manual toggle  
+- **Synchronized Project Topic & Supervisor Reflection** — Ensures topic updates and supervisor reassignments made by Admins and Coordinators reflect synchronously across student dashboards, project views, and supervisor evaluation portals.
+- **Complete Technology Stack Visibility** — Responsive badges and word-wrap chip formatting for project technologies, eliminating single-line ellipsis clipping (`...`) during student topic selection and on project dashboards.
 - **Responsive Design** — Mobile-friendly layouts with collapsible sidebar  
 
 ---

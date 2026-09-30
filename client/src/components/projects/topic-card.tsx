@@ -102,11 +102,35 @@ export default function TopicCard({
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-2 text-sm pt-1 border-t">
+        <div className="pt-2 border-t text-xs space-y-2">
           <div>
-            <p className="text-xs text-muted-foreground">Technology</p>
-            <p className="font-medium text-xs line-clamp-1">{topic.technology || "General"}</p>
+            <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">Technologies</p>
+            <div className="flex flex-wrap gap-1">
+              {topic.technology ? (
+                topic.technology.includes(',') || topic.technology.includes('/') || topic.technology.includes(';') ? (
+                  topic.technology
+                    .split(/[,/|;]+/)
+                    .map((t) => t.trim())
+                    .filter(Boolean)
+                    .map((tech, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground border border-border/60"
+                      >
+                        {tech}
+                      </span>
+                    ))
+                ) : (
+                  <span className="font-medium text-xs text-foreground break-words">{topic.technology}</span>
+                )
+              ) : (
+                <span className="text-muted-foreground italic text-xs">General</span>
+              )}
+            </div>
           </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-sm pt-1 border-t">
           {!hideSupervisor && (
             <div>
               <p className="text-xs text-muted-foreground">Supervisor</p>

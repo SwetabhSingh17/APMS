@@ -1,6 +1,22 @@
 # Version History
 
-## Version 2.0.0 (Current) [v2]
+## Version 2.0.1 (Current)
+### Topic Technologies Full Visibility & Universal Project Topic & Supervisor Reflection Across Dashboards
+1. **Full Technology Stack Visibility in Topic Selection (`/student-topics`, `/projects`)** —
+   - **Eliminated Single-Line Ellipsis Truncation**: Removed `line-clamp-1` and rigid grid width limits that previously truncated project technology stacks with ellipsis (`...`).
+   - **Responsive Technology Badges**: Formatted technologies into clean, responsive badges/chips with word-break wrapping, ensuring students can clearly inspect all technologies involved before topic selection.
+   - **Consistent Technology Display Across Views**: Updated topic cards and the student project details view (`/projects`) so comprehensive technology stacks remain fully readable.
+2. **Synchronized Project Topic & Supervisor Reflection Across Dashboards & Accounts** —
+   - **Cross-Account Synchronization**: Fixed issue where Admin or Coordinator changes to project topics only reflected in the "Project Team" view and not on the Student Dashboard (`/`) or Projects page (`/projects`).
+   - **Dynamic Supervisor Attribution**: Updated `getStudentProjects` in `server/db-storage.ts` and frontend dashboards to prioritize the assigned group supervisor (`studentGroups.supervisorId`) over the original topic submitter, displaying the supervisor's prefix, name, department, and email.
+   - **Supervisor Portal & Evaluations Alignment**: Updated `getSupervisorTopicsWithTeams` and `GET /api/projects/supervisor` so supervisors can view and evaluate all teams assigned to them, even for topics submitted by another faculty member.
+   - **Assigned Topic Section in Team View**: Added an "Assigned Project Topic" section to the student groups portal (`/student-groups`), showing topic code, course, status, description, tech stack, and direct navigation to `/projects`.
+   - **Automated Self-Healing & Instant Query Cache Invalidation**: Automatic project row linking for newly joined group members, combined with reactive query invalidations on topic and supervisor reassignments.
+3. **Production Safety & Zero Data Loss Guarantee** —
+   - Built with 100% backward-compatible database queries and storage functions.
+   - Zero database migrations or schema alterations required, preserving ongoing live production system state.
+
+## Version 2.0.0 [v2]
 ### Major Release (v2.0): Supervisor Management Portal, Reactive Roster, Specific Group Topic Allotment & Workload Governance
 1. **Dedicated Supervisor Management Portal (`/supervisor-management`)** —
    - **Centralized Faculty Governance Console**: Added a full-featured administrative portal accessible by Administrators and Coordinators from the sidebar navigation (`GraduationCap` icon) and header sync.

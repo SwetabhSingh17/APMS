@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link, useLocation } from "wouter";
 import { UserRole, ProjectTopic, User, IEnrollmentConflict } from "@shared/schema";
+import { Badge } from "@/components/ui/badge";
 import { useCourseFilter } from "@/hooks/course-filter-context";
 import { useState } from "react";
 import Modal from "@/components/ui/modal";
@@ -150,7 +151,16 @@ export default function Dashboard() {
 
   const { data: myProjects = [], isLoading: isLoadingMyProjects } = useQuery<any[]>({
     queryKey: ["/api/projects/my"],
-    enabled: !!user && user.role === UserRole.STUDENT
+    enabled: !!user && user.role === UserRole.STUDENT,
+    refetchOnWindowFocus: true,
+    staleTime: 2000,
+  });
+
+  const { data: userGroup } = useQuery<any>({
+    queryKey: ["/api/student-groups/my-group"],
+    enabled: !!user && user.role === UserRole.STUDENT,
+    refetchOnWindowFocus: true,
+    staleTime: 2000,
   });
 
   const renderContent = () => {
@@ -158,6 +168,7 @@ export default function Dashboard() {
 
     if (user.role === UserRole.STUDENT) {
       const project = myProjects[0];
+      const supervisor = project?.supervisor || userGroup?.supervisor || project?.topic?.submittedBy;
 
       return (
         <>
@@ -179,19 +190,33 @@ export default function Dashboard() {
               <>
                 <Card className="col-span-1 md:col-span-2 bg-gradient-to-br from-primary/5 to-transparent border-primary/20">
                   <CardHeader>
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      {project.topic?.topicCode && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                          {project.topic.topicCode}
+                        </span>
+                      )}
+                      {project.topic?.course && (
+                        <Badge variant="outline" className="text-xs font-semibold border-primary/30 text-primary bg-primary/5">
+                          {project.topic.course}
+                        </Badge>
+                      )}
+                    </div>
                     <CardTitle className="text-xl text-primary">{project.topic?.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-muted-foreground mb-4">{project.topic?.description}</p>
-                    <div className="flex gap-4 text-sm">
+                    <p className="text-muted-foreground mb-4 line-clamp-3">{project.topic?.description}</p>
+                    <div className="flex flex-wrap gap-4 text-sm">
                       <div className="flex items-center gap-2">
                         <Clock className="w-4 h-4" />
-                        <span>Status: {project.status}</span>
+                        <span>Status: <span className="capitalize">{project.status?.replace('_', ' ')}</span></span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4" />
-                        <span>{project.topic?.technology}</span>
-                      </div>
+                      {project.topic?.technology && (
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4" />
+                          <span>{project.topic.technology}</span>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -201,13 +226,26 @@ export default function Dashboard() {
                     <CardTitle className="text-lg">Supervisor</CardTitle>
                   </CardHeader>
                   <CardContent className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">
-                      {project.topic?.submittedBy?.firstName?.[0]}{project.topic?.submittedBy?.lastName?.[0]}
-                    </div>
-                    <div>
-                      <p className="font-semibold">{project.topic?.submittedBy?.firstName} {project.topic?.submittedBy?.lastName}</p>
-                      {/* <p className="text-sm text-muted-foreground">{project.topic?.submittedBy?.department}</p> */}
-                    </div>
+                    {supervisor ? (
+                      <>
+                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg shrink-0">
+                          {supervisor.firstName?.[0]}{supervisor.lastName?.[0]}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-foreground truncate">
+                            {supervisor.prefix ? `${supervisor.prefix} ` : ""}{supervisor.firstName} {supervisor.lastName}
+                          </p>
+                          {supervisor.department && (
+                            <p className="text-xs text-muted-foreground truncate">{supervisor.department}</p>
+                          )}
+                          {supervisor.email && (
+                            <p className="text-xs text-muted-foreground truncate">{supervisor.email}</p>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">No supervisor assigned</p>
+                    )}
                   </CardContent>
                 </Card>
               </>
