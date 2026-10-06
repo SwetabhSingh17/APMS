@@ -18,23 +18,44 @@
 
 ---
 
+## 📋 Table of Contents
+
+- [✨ Key Features](#-key-features)
+- [📊 System Architecture & Workflow](#-system-architecture--workflow)
+- [🏗️ Tech Stack](#️-tech-stack)
+- [📁 Project Structure](#-project-structure)
+- [🚀 Getting Started](#-getting-started)
+  - [Quick Start (Recommended)](#quick-start-recommended)
+  - [Manual Installation](#manual-installation)
+  - [Gracefully Updating an Existing Application](#gracefully-updating-an-existing-application)
+- [⚙️ Configuration](#️-configuration)
+- [📜 Available Scripts](#-available-scripts)
+- [👥 User Roles](#-user-roles)
+- [🤝 Contributing](#-contributing)
+- [📄 License](#-license)
+- [🤖 AI Context & Future Fixes](#-ai-context--future-fixes)
+
+---
+
 ## ✨ Key Features
 
-- **Role-Based Access Control** — Four distinct roles: Admin, Coordinator, Supervisor, Student  
+- **Role-Based Access Control** — Four distinct roles: Admin, Coordinator, Supervisor, Student.
 - **Project Topic Workflows** — Dynamic selection paths based on student course:
   - **BCA**: Supervisors submit topics → Coordinators approve → Students select.
   - **MCA**: Coordinators assign Supervisors → Students suggest topics → Supervisors endorse → Coordinators approve.
+- **Admin & Coordinator Direct Topic Creation with Faculty Assignment** — Administrators and Coordinators can author approved project topics directly from `/approve-topics`, select any registered faculty supervisor, and assign the topic with instant auto-approval and sequential PUGID generation.
+- **Multi-Word Search Engine & In-Memory Indexing** — Fast, tokenized multi-attribute search across all catalogs, data tables, and modals (`client/src/lib/search-index.ts`). Handles multiple words separated by whitespace, ignores typing spaces gracefully, and executes sub-millisecond lookups.
 - **Course Segregation (BCA / MCA)** — Strict isolation of student accounts, project topics, and project teams based on their registered course.
 - **Project Team Management** — Create project teams, invite members, assign supervisor mentors. Constraints strictly enforced (BCA: 2-5 members, MCA: 1-2 members). Admins & Coordinators have exclusive ability to manage team members directly and form single-member BCA teams. Students and supervisors do not have permission to modify rosters or leave teams.
 - **Dedicated Team Management Portal (`/team-management`)** — Centralized administrative console for Admins and Coordinators to oversee all student project teams with five distinct status tabs (`All Teams`, `Pending Topics`, `Assigned Topics`, `With Supervisor`, `Without Supervisor`), global course filtering (BCA/MCA), live search across names, enrollments, topics, and supervisors, inline team detail editing, member addition/removal with course and capacity validation, and safe team dissolution preserving student user accounts intact.
 - **Dedicated Supervisor Management Portal (`/supervisor-management`)** — Comprehensive governance portal for Admins and Coordinators to monitor faculty workloads, topic proposals, and group assignments. Features real-time metric tiles (Supervisors, Active Mentors, Available, Topics, Allotments), global course filtering, direct team-to-topic allotment under supervisor submitted topics, safe topic unassignment with student account preservation, supervisor profile editing, and topic review/approval. Includes a fully reactive layout with a default **Cards View** (zero horizontal boundary overflow, with View, Edit, and Manage actions always accessible) and a **Table View Toggle** with pinned sticky actions.
 - **Decoupled & Optional Supervisor Allotment** — Reflecting institutional workflows where faculty supervisors are assigned upon project topic selection, supervisor assignment during team creation is fully optional. If unselected, teams are provisioned cleanly without a supervisor and seamlessly assigned once a project topic is chosen.
-- **Manage Project (Pending & Assigned Tabs + Supervisor Search)** — Admins & Coordinators can view all project teams segmented into "Pending" (unallotted) and "Assigned" tabs with live count badges. Includes a unified modal featuring real-time faculty directory search across 60+ supervisors by name, prefix, department, designation, and email.
+- **Manage Project (Pending & Assigned Tabs + Supervisor Search)** — Admins & Coordinators can view all project teams segmented into "Pending" (unallotted) and "Assigned" tabs with live count badges under the reorganized "Management" section. Includes a unified modal featuring real-time faculty directory search across 60+ supervisors by name, prefix, department, designation, and email.
 - **Dedicated Supervisor Portal ("My Topics & Teams")** — Supervisors enjoy an exclusive dashboard displaying only their proposed topics, real-time allotment status (`Picked` vs `Available`), PUGID codes, and full team roster details.
 - **Student Topic Confirmation Dialog** — Non-reversible confirmation alert dialog ensuring students review topic details, confirm team allotment, and prevent accidental selections.
-- **Progress Tracking** — Real-time dashboards with charts and department statistics  
-- **Project Assessments** — Supervisor grading with score and feedback  
-- **Real-Time Notifications** — WebSocket-powered instant notifications with role-based routing, plus a persistent per-user inbox (bell dropdown + notifications page with read/unread state)  
+- **Progress Tracking** — Real-time dashboards with charts and department statistics.
+- **Project Assessments** — Supervisor grading with score and feedback.
+- **Real-Time Notifications** — WebSocket-powered instant notifications with role-based routing, plus a persistent per-user inbox (bell dropdown + notifications page with read/unread state).
 - **Enrollment Number Conflict Detection & Resolution UI** — Intelligent conflict detection across cohorts that highlights students sharing duplicate enrollment numbers. Administrators and Coordinators are alerted on the Dashboard and User Management with live conflict cards, amber row highlighting, a dedicated "Conflicts" directory tab, and an interactive modal to reassign unique enrollment numbers and synchronize credentials without data loss.
 - **Admin & Coordinator Project Topic Reassignment** — Dynamic topic modification in `/manage-project` allowing Admins and Coordinators to change or assign project topics for groups, complete with live search, course filters, and real-time student team notification dispatch.
 - **Student Contact Access & Mobile Directory** — Comprehensive student mobile phone numbers backfilled and accessible to Administrators, Coordinators, and Supervisors across project views, evaluation sheets, and user management.
@@ -45,14 +66,14 @@
 - **First-Login Security Enforcement** — Students and faculty supervisors onboarded via Excel or default password reset receive temporary initial passwords matching their identifier; upon first login, a non-dismissible modal and backend security interceptor enforce a mandatory password change before granting system access.
 - **Institutional Branding & Registration Gate** — Features the official Department logo, university typography headers, creator attributions, and a registration closed overlay on the authentication page (`IS_REGISTRATION_OPEN = false`).
 - **Academic Profile Management & Designation RBAC** — Profile settings displays the supervisor's designation directly beneath their name. Faculty can update personal prefixes, name details, email, and mobile, while academic designation remains protected and immutable except by authorized administrators.
-- **System Management** — Database export/import, Excel reports, full reset capabilities  
-- **Security Hardened** — Helmet HTTP headers, rate-limited auth endpoints, soft-delete data retention, session-authenticated WebSockets, automatic scrypt password migration, per-resource ownership checks, and password-verified destructive operations  
-- **Error Resilient** — Global React Error Boundaries with graceful fallback UI and standardized machine-readable API error codes
-- **Cybertruck Spatial UI** — Glassmorphism, dynamic context pill (iOS-style), holographic data grids, physics-based micro-interactions, and animated cinematic splash screens
-- **Dark/Light Theme** — System-aware with manual toggle  
+- **System Management** — Database export/import, Excel reports, full reset capabilities.
+- **Security Hardened** — Helmet HTTP headers, rate-limited auth endpoints, soft-delete data retention, session-authenticated WebSockets, automatic scrypt password migration, per-resource ownership checks, and password-verified destructive operations.
+- **Error Resilient** — Global React Error Boundaries with graceful fallback UI and standardized machine-readable API error codes.
+- **Cybertruck Spatial UI** — Glassmorphism, dynamic context pill (iOS-style), holographic data grids, physics-based micro-interactions, and animated cinematic splash screens.
+- **Dark/Light Theme** — System-aware with manual toggle.
 - **Synchronized Project Topic & Supervisor Reflection** — Ensures topic updates and supervisor reassignments made by Admins and Coordinators reflect synchronously across student dashboards, project views, and supervisor evaluation portals.
 - **Complete Technology Stack Visibility** — Responsive badges and word-wrap chip formatting for project technologies, eliminating single-line ellipsis clipping (`...`) during student topic selection and on project dashboards.
-- **Responsive Design** — Mobile-friendly layouts with collapsible sidebar  
+- **Responsive Design** — Mobile-friendly layouts with collapsible sidebar.
 
 ---
 
@@ -94,11 +115,11 @@ graph TD
 ## 🏗️ Tech Stack
 
 | Layer | Technology |
-|-------|-----------|
+|---|---|
 | **Frontend** | React 18, Vite, wouter (routing), TanStack Query, Framer Motion |
 | **UI Components** | shadcn/ui (Radix UI primitives), TailwindCSS, Recharts |
 | **Backend** | Express.js, Node.js |
-| **Authentication** | Passport.js (Local Strategy), express-session |
+| **Authentication** | Passport.js (Local Strategy), express-session, connect-pg-simple |
 | **Database** | PostgreSQL, Drizzle ORM |
 | **Validation** | Zod, drizzle-zod |
 | **Language** | TypeScript (end-to-end) |
@@ -117,7 +138,7 @@ APMS/
 │   │   │   ├── layout/     # MainLayout, Sidebar, Header
 │   │   │   └── dashboard/  # Dashboard-specific components
 │   │   ├── hooks/          # useAuth, useToast, useNotifications, useMobile
-│   │   └── lib/            # QueryClient, utils, ProtectedRoute
+│   │   └── lib/            # QueryClient, search-index.ts, utils, ProtectedRoute
 │   └── index.html
 ├── server/                 # Backend API
 │   ├── index.ts            # Express app entry point & route aggregation
@@ -128,11 +149,21 @@ APMS/
 │   └── routes/             # Modular API routes (auth, users, projects, topics, groups, notifications, etc.)
 ├── shared/                 # Shared code
 │   └── schema.ts           # Drizzle table definitions + Zod schemas + TypeScript types
-├── scripts/                # Database utilities
+├── scripts/                # Database utilities & verification suites
 │   ├── ensure_db.ts        # Production-safe bootstrap (schema check + non-destructive setup)
 │   ├── setup_db.ts         # Full database reset (destructive)
 │   ├── backup_schema.ts    # Schema backup
-│   └── restore_schema.ts   # Schema restore
+│   ├── restore_schema.ts   # Schema restore
+│   ├── verify_search_indexing.ts          # Search engine tokenization & benchmark suite
+│   ├── verify_phase_6_enhancements.ts    # Direct topic creation & UI suite
+│   ├── verify_password_reset_and_login.ts # Password reset, scrypt hashing & RBAC suite
+│   ├── verify_priority_bug_fixes.ts       # Priority bug fixes verification suite
+│   ├── verify_team_management_and_supervisor_fix.ts # Team management suite
+│   ├── verify_topic_selection_and_routing.ts        # Student topic confirmation & routing suite
+│   ├── verify_onboarding_and_access_control.ts      # Student bulk onboarding suite
+│   ├── verify_supervisor_onboarding_and_rbac.ts     # Supervisor onboarding suite
+│   ├── verify_bulk_topic_onboarding.ts              # Topic bulk upload & PUGID suite
+│   └── e2e_verify.ts                                # End-to-end integration test suite
 └── Setup_Assistant/        # Cross-platform installation scripts
 ```
 
@@ -164,6 +195,8 @@ chmod +x install_mac_linux.sh
 ./install_mac_linux.sh
 ```
 
+---
+
 ### Manual Installation
 
 If you prefer to run the steps manually:
@@ -186,7 +219,7 @@ If you prefer to run the steps manually:
    cp .env.example .env
    ```
    
-   Edit `.env` with your PostgreSQL connection string and a secure session secret. See [Configuration](#-configuration) for details.
+   Edit `.env` with your PostgreSQL connection string and a secure session secret. See [Configuration](#️-configuration) for details.
 
 4. **Set up the database**
    
@@ -203,15 +236,17 @@ If you prefer to run the steps manually:
    
    The app will be available at `http://localhost:3000`.
 
+---
+
 ### Gracefully Updating an Existing Application
 
 If you already have a running instance and want to pull the latest code without losing your database state:
 
-**Windows Server (one click):** just double-click `start_server.bat` — it installs dependencies, safely syncs the database schema (`db:ensure` never wipes data), rebuilds, and restarts.
+**Windows Server (one click):** Just double-click `start_server.bat` — it installs dependencies, safely syncs the database schema (`db:ensure` never wipes data), rebuilds, and restarts.
 
 **Manual:**
 1. **Stop the server** (`Ctrl + C`).
-2. **Get the latest code** using `git pull origin main` (or extract a new ZIP, but remember to copy over your `.env` file from the old folder).
+2. **Get the latest code** using `git pull origin main` (or extract a new ZIP, remembering to copy over your `.env` file from the old folder).
 3. **Install new dependencies**:
    ```bash
    npm install
@@ -229,26 +264,29 @@ If you already have a running instance and want to pull the latest code without 
 All configuration is managed through a `.env` file at the project root.
 
 | Variable | Required | Description | Example |
-|----------|----------|-------------|---------|
+|---|:---:|---|---|
 | `DATABASE_URL` | ✅ | PostgreSQL connection string — the canonical config used by both the server and database tooling | `postgres://user:pass@localhost:5432/integral_project_hub` |
 | `SESSION_SECRET` | ✅ | Secret key for session encryption | A long random string |
 | `PORT` | ❌ | Server port (default: `3000`) | `3000` |
 | `NODE_ENV` | ❌ | Environment mode | `development` / `production` |
 | `DB_HOST` `DB_PORT` `DB_NAME` `DB_USER` `DB_PASSWORD` | ❌ | Alternative individual database settings. If `DATABASE_URL` is set it takes precedence | `localhost`, `5432`, `integral_project_hub`... |
 
-> **Note:** See `.env.example` for a ready-to-use template. On first run, `start_server.bat` creates `.env` from this template automatically.
+> [!NOTE]
+> See `.env.example` for a ready-to-use template. On first run, `start_server.bat` creates `.env` from this template automatically.
 
 ---
 
 ## 📜 Available Scripts
 
 | Command | Description |
-|---------|-------------|
+|---|---|
 | `npm run dev` | Start development server (Vite HMR + Express) |
 | `npm run build` | Build for production (client + server) |
 | `npm start` | Start production server |
-| `npm run check` | Run TypeScript type checking |
-| `npm test` | Run TypeScript check and complete automated test suite (175+ test assertions across 7 test suites) |
+| `npm run check` | Run TypeScript type checking (`tsc`) |
+| `npm test` | Run TypeScript check and complete automated test suite across all 9 test suites |
+| `npm run test:search` | Run multi-word search engine tokenization & sub-millisecond benchmark suite |
+| `npm run test:admin-topics` | Run direct topic creation with faculty assignment verification suite |
 | `npm run test:teams` | Run team management CRUD, safe dissolution & supervisor optional verification suite |
 | `npm run test:password` | Run password reset, default credentials, RBAC & login verification suite |
 | `npm run test:fixes` | Run priority bug fixes verification suite |
@@ -269,9 +307,9 @@ All configuration is managed through a `.env` file at the project root.
 ## 👥 User Roles
 
 | Role | Capabilities |
-|------|-------------|
-| **Admin** | Full system access, user management, team management, supervisor management, safe team dissolution, database operations, Excel reports, supervisor reassignment |
-| **Coordinator** | Approve/reject topics, track progress, manage users, team management, supervisor management, roster modification, safe team dissolution, view statistics, reassign supervisors, filter by course context |
+|---|---|
+| **Admin** | Full system access, user management, direct topic creation & assignment, team management, supervisor management, safe team dissolution, database operations, Excel reports, supervisor reassignment |
+| **Coordinator** | Approve/reject topics, direct topic creation & assignment, track progress, manage users, team management, supervisor management, roster modification, safe team dissolution, view statistics, reassign supervisors, filter by course context |
 | **Supervisor** | Submit project topics (tied to specific course), evaluate assigned projects, view student progress |
 | **Student** | Browse & select topics specific to their course, form project teams within their course, invite members, track own progress |
 

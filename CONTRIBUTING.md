@@ -1,10 +1,23 @@
 # Contributing to APMS (Academic Project Management System)
 
-Thank you for considering contributing! Here's how to get started.
+Thank you for considering contributing to the Academic Project Management System (APMS)! Contributions help make APMS more reliable, scalable, and useful for departmental project governance.
+
+---
+
+## 📋 Table of Contents
+
+- [Getting Started](#getting-started)
+- [Development Workflow](#development-workflow)
+- [Code Style Guidelines](#code-style-guidelines)
+- [Reporting Issues](#reporting-issues)
+- [License](#license)
+
+---
 
 ## Getting Started
 
-> **Tip:** You can use the automated scripts in the `Setup_Assistant` folder to instantly set up your environment, database, and dependencies.
+> [!TIP]
+> You can use the automated scripts in the `Setup_Assistant` folder to instantly set up your environment, database, and dependencies.
 
 If you prefer to set up manually:
 
@@ -35,31 +48,35 @@ If you prefer to set up manually:
    npm run dev
    ```
 
+---
+
 ## Development Workflow
 
-1. Create a feature branch from `main`:
+1. **Create a feature branch from `main`:**
    ```bash
    git checkout -b feature/your-feature-name
    ```
 
-2. Make your changes. Follow the existing code style:
+2. **Make your changes. Follow the existing code style:**
    - TypeScript strict mode
    - Functional React components with hooks
    - Drizzle ORM for database queries
    - Zod for validation schemas
 
-3. Run type checking and automated tests before committing:
+3. **Run type checking and automated tests before committing:**
    ```bash
    npm run check
    npm test
    ```
 
-4. Commit with clear, descriptive messages:
+4. **Commit with clear, descriptive messages:**
    ```bash
    git commit -m "feat: add student notification preferences"
    ```
 
-5. Push and open a Pull Request against `main`.
+5. **Push and open a Pull Request against `main`.**
+
+---
 
 ## Code Style Guidelines
 
@@ -69,6 +86,8 @@ If you prefer to set up manually:
 - **Schema Changes** — Modify `shared/schema.ts` and run `npm run db:ensure`.
 - **Naming** — camelCase for variables/functions, PascalCase for components/types.
 
+---
+
 ## Reporting Issues
 
 Open an issue with:
@@ -76,6 +95,8 @@ Open an issue with:
 - Steps to reproduce (if applicable)
 - Expected vs. actual behavior
 - Screenshots for UI issues
+
+---
 
 ## License
 

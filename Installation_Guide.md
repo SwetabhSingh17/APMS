@@ -1,8 +1,23 @@
-# 🚀 How to Build Your Very Own Website! (A Guide for Smart Kids)
+# 🚀 Installation Guide: How to Build Your Very Own Website! (A Guide for Smart Kids)
 
 Hi there! 👋 Do you like building things with blocks? Today, we are going to build a **real website** on your computer. It is super fun and very easy. 
 
 Just ask an adult to help you read these instructions, and let's get building! 🧱
+
+---
+
+## 📋 Table of Contents
+
+- [📥 Step 0: Getting the Code!](#-step-0-getting-the-code)
+- [🎒 Step 1: Getting Our Tools Ready! (Installation)](#-step-1-getting-our-tools-ready-installation)
+  - [🪟 Windows Installation](#-windows-installation)
+  - [🍎 Mac Installation](#-mac-installation)
+  - [🐧 Linux Installation](#-linux-installation)
+- [💾 Step 2: Loading a Saved Game! (Optional)](#-step-2-loading-a-saved-game-optional)
+- [🎉 Step 3: Turning on the Power! It's Alive!](#-step-3-turning-on-the-power-its-alive)
+  - [🏎️ Bonus: Want to make it super fast? (Production)](#️-bonus-want-to-make-it-super-fast-production)
+- [🔄 Step 4: Updating an Existing Application](#-step-4-updating-an-existing-application)
+- [🧪 Step 5: Running System & Verification Tests](#-step-5-running-system--verification-tests)
 
 ---
 
@@ -24,17 +39,19 @@ We have a special "Setup Assistant" that will do almost all the hard work for yo
 
 ### 🪟 Windows Installation
 
-**Option A: The Automated Setup Assistant (Easiest!)**
+#### Option A: The Automated Setup Assistant (Easiest!)
 1. Open the folder where you saved this project.
 2. Open the **`Setup_Assistant`** folder.
 3. Double-click the **`INSTALL_WINDOWS.bat`** file.
 4. Click "YES" when Windows asks for permission, and wait for the magic to happen!
 *(A blue box will open and start downloading everything you need. When it says "Installation Complete!", you can close it.)*
 
-**Option B: Manual Step-by-Step (For Windows Server, or if the .bat file gets blocked)**
+#### Option B: Manual Step-by-Step (For Windows Server, or if the .bat file gets blocked)
 If you are on a Windows Server (which lacks the Microsoft Store for automated installs), or if your Antivirus blocks the `.bat` file, you can build it manually:
 1. Go to **nodejs.org** and install Node.js.
-2. Go to **postgresql.org** and install PostgreSQL (version 15 or 16). *(⚠️ IMPORTANT: When it asks for a password during setup, set it to `root123`)*.
+2. Go to **postgresql.org** and install PostgreSQL (version 15 or 16).
+   > [!IMPORTANT]
+   > When it asks for a password during setup, set it to `root123`.
 3. Open the **Command Prompt** (type `cmd` in your Windows search bar, right-click and "Run as Administrator").
 4. Navigate to your project folder (e.g. your Downloads folder):
    ```cmd
@@ -56,14 +73,15 @@ If you are on a Windows Server (which lacks the Microsoft Store for automated in
    ```cmd
    npm run db:ensure
    ```
-   *(⚠️ If this step shows an error in red, open the `.env` file and make sure the `DATABASE_URL` or `DB_PASSWORD` matches what you set in step 2! This command is safe to run again — it only creates what is missing.)*
+   > [!NOTE]
+   > If this step shows an error in red, open the `.env` file and make sure the `DATABASE_URL` or `DB_PASSWORD` matches what you set in step 2! This command is safe to run again — it only creates what is missing.
 9. Skip to **Step 2**!
 
 ---
 
 ### 🍎 Mac Installation
 
-**Option A: The Automated Setup Assistant**
+#### Option A: The Automated Setup Assistant
 1. Press `Command` + `Space`, type "Terminal", and press Enter.
 2. Open Finder, find the **`Setup_Assistant`** folder, and drag it into the Terminal window. Press Enter.
 3. Type this magic spell and press Enter:
@@ -73,7 +91,7 @@ If you are on a Windows Server (which lacks the Microsoft Store for automated in
    ```
 4. It might ask for your computer password. Type it in (you won't see the letters) and press Enter!
 
-**Option B: Manual Step-by-Step (If the .sh file doesn't run)**
+#### Option B: Manual Step-by-Step (If the .sh file doesn't run)
 1. Go to **nodejs.org** and install Node.js.
 2. Download Postgres app from **postgresapp.com** and install it.
 3. Open your Terminal and navigate to the project folder:
@@ -98,7 +116,7 @@ If you are on a Windows Server (which lacks the Microsoft Store for automated in
 
 ### 🐧 Linux Installation
 
-**Option A: The Automated Setup Assistant**
+#### Option A: The Automated Setup Assistant
 1. Press `Ctrl`+`Alt`+`T` to open your Terminal.
 2. Type `cd path/to/APMS/Setup_Assistant` (replace with your actual folder path) and press Enter.
 3. Type this magic spell and press Enter:
@@ -108,7 +126,7 @@ If you are on a Windows Server (which lacks the Microsoft Store for automated in
    ```
 4. Type your sudo password and press Enter!
 
-**Option B: Manual Step-by-Step**
+#### Option B: Manual Step-by-Step
 1. Install Node.js:
    ```bash
    sudo apt install nodejs npm
@@ -160,7 +178,7 @@ Are you ready to see your creation? Let's turn the power on!
 3. Type this into the very top bar where web addresses go, and hit Enter:
    👉 **`http://localhost:3000`**
 
-**WOW! YOU DID IT!** 🌟 
+**WOW! YOU DID IT!** 🌟  
 You are amazing! You just built a real website all by yourself! Give yourself a high-five! ✋
 
 ---
@@ -169,7 +187,7 @@ You are amazing! You just built a real website all by yourself! Give yourself a 
 
 When you are done playing and want to make the website super fast:
 
-**For Windows Users (one click!):**
+**For Windows Users (one click!):**  
 Just double-click the **`start_server.bat`** file in your APMS folder. It does everything by itself:
 1. Checks that Node.js is installed
 2. Creates your `.env` settings file on the very first run (and tells you what to fill in)
@@ -232,20 +250,26 @@ If you already have the application running and need to update the code to the l
 
 ## 🧪 Step 5: Running System & Verification Tests
 
-To verify that your installation is working properly and all features (Excel bulk onboarding, access control, first-login security enforcement, cohort isolation, default password resets, and topic selection workflows) are functional:
+To verify that your installation is working properly and all features (Excel bulk onboarding, access control, first-login security enforcement, cohort isolation, default password resets, multi-word search, and topic selection workflows) are functional:
 
 1. Check TypeScript compilation:
    ```bash
    npm run check
    ```
 
-2. Run the complete automated test suite (175+ test assertions across 7 suites):
+2. Run the complete automated test suite across all 9 suites:
    ```bash
    npm test
    ```
 
 3. Or run specific individual test suites:
    ```bash
+   # Test multi-word search engine & sub-millisecond in-memory indexing
+   npm run test:search
+
+   # Test admin & coordinator direct topic creation with faculty assignment
+   npm run test:admin-topics
+
    # Test team management, safe dissolution & supervisor optional fix
    npm run test:teams
 

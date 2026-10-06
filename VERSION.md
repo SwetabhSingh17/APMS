@@ -1,6 +1,64 @@
 # Version History
 
-## Version 2.0.1 (Current)
+## 📋 Table of Contents
+- [Version 2.1.0 (Current)](#version-210-current)
+- [Version 2.0.1](#version-201)
+- [Version 2.0.0 [v2]](#version-200-v2)
+- [Version 1.9.7](#version-197)
+- [Version 1.9.6](#version-196)
+- [Version 1.9.5](#version-195)
+- [Version 1.9.4](#version-194)
+- [Version 1.9.3](#version-193)
+- [Version 1.9.2](#version-192)
+- [Version 1.9.1](#version-191)
+- [Version 1.9.0](#version-190)
+- [Version 1.8.1](#version-181)
+- [Version 1.8.0](#version-180)
+- [Version 1.7.2](#version-172)
+- [Version 1.7.1](#version-171)
+- [Version 1.7.0](#version-170)
+- [Version 1.6.0](#version-160)
+- [Version 1.5.0](#version-150)
+- [Version 1.4.1](#version-141)
+- [Version 1.3.0](#version-130)
+- [Version 1.2.0](#version-120)
+- [Version 1.1.2](#version-112)
+- [Version 1.1.1](#version-111)
+- [Version 1.1.0](#version-110)
+- [Version 1.0.1](#version-101)
+- [Planned Features](#planned-features)
+- [Known Issues](#known-issues)
+- [Dependencies](#dependencies)
+
+---
+
+## Version 2.1.0 (Current)
+### Multi-Word Search Engine & In-Memory Indexing, Admin Direct Topic Allotment & UI/UX Enhancements
+1. **Multi-Word Search Engine & In-Memory Indexing (`client/src/lib/search-index.ts`)** —
+   - **Multi-Token Space-Separated Matching**: Overhauled search query parsing logic to tokenize on whitespace, matching each token across all searchable fields (Title, PUGID, Description, Technologies, Supervisor Name, Student Names, and Enrollment Numbers) and resolving the bug where words following spaces were ignored.
+   - **Whitespace & Typing Tolerance**: Normalizes arbitrary spaces and handles trailing whitespace during real-time typing without clearing search results.
+   - **Sub-Millisecond In-Memory Index**: Implemented an in-memory document search index with automatic caching, benchmarked at **0.218ms** across 1,000 records.
+   - **System-Wide Integration**: Integrated across 10 client pages, catalogs, and selection dialogs (`student-topics.tsx`, `projects.tsx`, `approve-topics.tsx`, `track-progress.tsx`, `manage-project.tsx`, `team-management.tsx`, `supervisor-management.tsx`, `user-management.tsx`, `supervisor-evaluations.tsx`, `notifications.tsx`).
+   - **Server-Side Tokenization**: Updated `searchProjects` in `server/db-storage.ts` to tokenize search queries into individual words and match each token across all project fields.
+2. **Admin & Coordinator Direct Topic Creation with Faculty Assignment (`/approve-topics`)** —
+   - **Direct Authoring & Assignment**: Added an "Add & Assign Topic" dialog allowing Administrators and Coordinators to author project topics directly on the Approve Topics page.
+   - **Faculty Supervisor Selector**: Includes a faculty selection dropdown listing all registered faculty members with academic designations and departments.
+   - **Instant Auto-Approval**: Bypasses the supervisor proposal and coordinator review queue, directly saving the topic with status `'approved'` (`POST /api/topics/direct`).
+   - **Sequential PUGID Generation & Notifications**: Automatically assigns the next sequential topic code (`PUGID26xxx`) and dispatches an instant real-time notification to the allotted faculty supervisor.
+3. **Sidebar Navigation Reorganization & Label Renaming (`client/src/components/layout/sidebar.tsx`)** —
+   - Renamed header section **"Main Navigation"** $\rightarrow$ **"Navigation"**.
+   - Renamed **"Manage Project"** $\rightarrow$ **"Project Management"** and moved it under the **"Management"** section (alongside User Management, Team Management, and Supervisor Management).
+   - Renamed **"Setting"** $\rightarrow$ **"Account Setting"**.
+4. **System Management Import Feedback & Notification Preferences Safekeeping** —
+   - Updated `client/src/pages/system-management.tsx` to remove the forced redirect to `/auth` on successful database imports, clarifying that the administrator's active session is preserved.
+   - Updated `server/routes/users.ts` to safely validate and log payload fields for `PATCH /api/user/notifications`.
+5. **Production Safety & Live Database Compatibility** —
+   - 100% backward-compatible database queries and storage functions.
+   - Zero database migrations or schema alterations required, preserving ongoing live production system state.
+
+---
+
+## Version 2.0.1
 ### Topic Technologies Full Visibility & Universal Project Topic & Supervisor Reflection Across Dashboards
 1. **Full Technology Stack Visibility in Topic Selection (`/student-topics`, `/projects`)** —
    - **Eliminated Single-Line Ellipsis Truncation**: Removed `line-clamp-1` and rigid grid width limits that previously truncated project technology stacks with ellipsis (`...`).

@@ -1,34 +1,61 @@
 # Security Policy
 
+This document outlines the security policies, supported versions, protective measures, and vulnerability reporting procedures for the Academic Project Management System (APMS).
+
+---
+
+## 📋 Table of Contents
+
+- [Supported Versions](#supported-versions)
+- [Security Posture (v2.1.0)](#security-posture-v210)
+  - [Authentication & Cryptography](#authentication--cryptography)
+  - [Access Control & Authorization](#access-control--authorization)
+  - [Network & Infrastructure Security](#network--infrastructure-security)
+  - [Data Protection & Account Retention](#data-protection--account-retention)
+- [Reporting a Vulnerability](#reporting-a-vulnerability)
+
+---
+
 ## Supported Versions
 
 Currently, the following versions of this project are actively supported with security updates:
 
-| Version | Supported          |
-| ------- | ------------------ |
-| v2.x    | :white_check_mark: |
-| v1.9.x  | :white_check_mark: |
-| v1.8.x  | :white_check_mark: |
-| < v1.8  | :x:                |
+| Version | Supported | Notes |
+|:---|:---:|:---|
+| **v2.x** | ✅ | Actively supported (Current production release) |
+| **v1.9.x** | ✅ | Critical security maintenance |
+| **v1.8.x** | ✅ | Legacy security maintenance |
+| **< v1.8** | ❌ | Unsupported; please upgrade to v2.x |
 
-## Security Posture (v2.0)
+---
+
+## Security Posture (v2.1.0)
 
 APMS ships with the following protections in place:
 
+### Authentication & Cryptography
 - **Authentication & Cryptography** — Passport.js local strategy with scrypt password hashing; PostgreSQL-backed sessions (`connect-pg-simple`) with a 15-minute rolling inactivity expiry.
 - **Automated Password Migration** — Automatic detection of legacy plaintext records upon login, upgrading them to salted scrypt hashes in-place with zero user friction.
-- **Consolidated Route Authorization & Shadowing Elimination** — User management routes (`POST`, `PATCH`, `DELETE` under `/api/admin/users`) are strictly consolidated into `server/routes/admin.ts` with explicit RBAC checks, eliminating route-shadowing vulnerabilities.
 - **Default Password Reset with Strict RBAC Protection** — One-click password reset endpoint (`POST /api/admin/users/:id/reset-password`) sets credentials to official identifiers (students: enrollment number, supervisors: employee ID) and flags `forcePasswordReset: true`. Coordinators are strictly forbidden from modifying or resetting Admin/Coordinator accounts (`FORBIDDEN_TARGET_STAFF`), and all staff resets trigger instant audit notifications to Administrators.
 - **First-Login Password Reset Interceptor** — Accounts provisioned via Excel or default reset are flagged with `forcePasswordReset: true`. Operational APIs (topic browsing, team interactions, submissions) are intercepted with HTTP 403 `PASSWORD_RESET_REQUIRED` and frontend non-dismissible modals until default credentials are replaced.
 - **Granular Error Codes & Leakage Prevention** — Standardized machine-readable error codes (`USER_NOT_FOUND`, `INVALID_PASSWORD`, `ACCOUNT_DEACTIVATED`, etc.) prevent internal stack trace leakage while providing clear diagnostic telemetry. Password hashes and internal salts are strictly stripped from all API responses.
+
+### Access Control & Authorization
+- **Authorization** — Role-based access control (Admin / Coordinator / Supervisor / Student) enforced server-side via `requireRole()` plus per-resource ownership checks (projects, assessments, notifications).
+- **Consolidated Route Authorization & Shadowing Elimination** — User management routes (`POST`, `PATCH`, `DELETE` under `/api/admin/users`) are strictly consolidated into `server/routes/admin.ts` with explicit RBAC checks, eliminating route-shadowing vulnerabilities.
 - **Strict Cohort/Program Isolation** — BCA and MCA topic visibility, team rosters, and proposal catalogs are strictly partitioned; students are isolated to their registered curriculum to prevent cross-cohort data leakage.
 - **Team Access Control, Safe Dissolution & Account Retention** — Students and Supervisors are prohibited from modifying or leaving project teams. Only Administrators and Coordinators have authorization to modify team rosters, reassign supervisor mentorship, or dissolve teams. Team dissolution strictly retains member student user accounts intact without data loss, safely unlinking team associations and milestones so students remain active and eligible for future team allotment.
-- **Authorization** — Role-based access control (Admin / Coordinator / Supervisor / Student) enforced server-side via `requireRole()` plus per-resource ownership checks (projects, assessments, notifications).
+
+### Network & Infrastructure Security
 - **Rate Limiting** — `express-rate-limit` on `/api/login` and `/api/register`.
 - **Security Headers & Network Hardening** — Helmet middleware with intranet/LAN-calibrated cross-origin policies, private caching headers on sensitive endpoints, and host adapter binding (`0.0.0.0`).
-- **Soft Deletes** — Users and topics are retained via an `is_deleted` flag; queries filter them automatically.
 - **Session-Authenticated WebSockets** — Real-time notification sockets validate the signed session cookie server-side; identity cannot be spoofed via query parameters.
+
+### Data Protection & Account Retention
+- **Soft Deletes** — Users and topics are retained via an `is_deleted` flag; queries filter them automatically.
 - **Hardened Destructive Operations** — Database reset requires the admin to re-enter their password (verified against the scrypt hash) and fully destroys the server session afterward.
+
+---
 
 ## Reporting a Vulnerability
 
