@@ -20,20 +20,20 @@
 
 ## 📋 Table of Contents
 
-- [✨ Key Features](#-key-features)
-- [📊 System Architecture & Workflow](#-system-architecture--workflow)
-- [🏗️ Tech Stack](#️-tech-stack)
-- [📁 Project Structure](#-project-structure)
-- [🚀 Getting Started](#-getting-started)
+- [✨ Key Features](#key-features)
+- [📊 System Architecture & Workflow](#system-architecture--workflow)
+- [🏗️ Tech Stack](#tech-stack)
+- [📁 Project Structure](#project-structure)
+- [🚀 Getting Started](#getting-started)
   - [Quick Start (Recommended)](#quick-start-recommended)
   - [Manual Installation](#manual-installation)
   - [Gracefully Updating an Existing Application](#gracefully-updating-an-existing-application)
-- [⚙️ Configuration](#️-configuration)
-- [📜 Available Scripts](#-available-scripts)
-- [👥 User Roles](#-user-roles)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
-- [🤖 AI Context & Future Fixes](#-ai-context--future-fixes)
+- [⚙️ Configuration](#configuration)
+- [📜 Available Scripts](#available-scripts)
+- [👥 User Roles](#user-roles)
+- [🤝 Contributing](#contributing)
+- [📄 License](#license)
+- [🤖 AI Context & Future Fixes](#ai-context--future-fixes)
 
 ---
 
@@ -265,11 +265,11 @@ All configuration is managed through a `.env` file at the project root.
 
 | Variable | Required | Description | Example |
 |---|:---:|---|---|
-| `DATABASE_URL` | ✅ | PostgreSQL connection string — the canonical config used by both the server and database tooling | `postgres://user:pass@localhost:5432/integral_project_hub` |
+| `DATABASE_URL` | ✅ | PostgreSQL connection string — the canonical config used by both the server and database tooling (optional if `DB_*` individual variables are used) | `postgres://user:pass@localhost:5432/integral_project_hub` |
 | `SESSION_SECRET` | ✅ | Secret key for session encryption | A long random string |
 | `PORT` | ❌ | Server port (default: `3000`) | `3000` |
 | `NODE_ENV` | ❌ | Environment mode | `development` / `production` |
-| `DB_HOST` `DB_PORT` `DB_NAME` `DB_USER` `DB_PASSWORD` | ❌ | Alternative individual database settings. If `DATABASE_URL` is set it takes precedence | `localhost`, `5432`, `integral_project_hub`... |
+| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | ❌ | Alternative individual database settings when `DATABASE_URL` is omitted (requires `DB_HOST`, `DB_NAME`, `DB_USER`; defaults `DB_PORT` to 5432 and `DB_PASSWORD` to empty string) | `localhost`, `5432`, `integral_project_hub`... |
 
 > [!NOTE]
 > See `.env.example` for a ready-to-use template. On first run, `start_server.bat` creates `.env` from this template automatically.

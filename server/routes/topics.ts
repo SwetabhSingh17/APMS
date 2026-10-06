@@ -392,9 +392,13 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
                 });
             }
 
-            const parsedFacultyId = parseInt(facultyId, 10);
-            if (isNaN(parsedFacultyId)) {
-                return res.status(400).json({ message: "Invalid faculty ID" });
+            const facultyIdStr = String(facultyId).trim();
+            if (!/^\d+$/.test(facultyIdStr)) {
+                return res.status(400).json({ message: "Invalid faculty ID: must be a positive integer" });
+            }
+            const parsedFacultyId = parseInt(facultyIdStr, 10);
+            if (parsedFacultyId <= 0) {
+                return res.status(400).json({ message: "Invalid faculty ID: must be a positive integer" });
             }
 
             const faculty = await storage.getUser(parsedFacultyId);

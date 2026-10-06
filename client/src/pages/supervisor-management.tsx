@@ -583,7 +583,7 @@ export default function SupervisorManagement() {
       createSearchDocument(
         g.name,
         g.projectTeamId,
-        g.supervisor?.titlePrefix,
+        g.supervisor?.prefix,
         g.supervisor?.firstName,
         g.supervisor?.lastName,
         g.members?.map((m: any) => [m.firstName, m.lastName, m.enrollmentNumber, m.email])
@@ -598,7 +598,7 @@ export default function SupervisorManagement() {
       createSearchDocument(
         g.name,
         g.projectTeamId,
-        g.supervisor?.titlePrefix,
+        g.supervisor?.prefix,
         g.supervisor?.firstName,
         g.supervisor?.lastName,
         g.members?.map((m: any) => [m.firstName, m.lastName, m.enrollmentNumber])

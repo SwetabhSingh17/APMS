@@ -932,9 +932,9 @@ export default function Projects() {
         t.topicCode,
         t.projectType,
         t.course,
-        (t.submittedBy as any)?.titlePrefix,
-        (t.submittedBy as any)?.firstName,
-        (t.submittedBy as any)?.lastName
+        t.submittedBy?.prefix,
+        t.submittedBy?.firstName,
+        t.submittedBy?.lastName
       )
     );
   };

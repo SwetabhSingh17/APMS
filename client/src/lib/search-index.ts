@@ -62,7 +62,10 @@ export function matchesSearchQuery(document: string, query: string | null | unde
   const queryTokens = tokenizeSearchQuery(query);
   if (queryTokens.length === 0) return true;
 
-  const docLower = (document || "").toLowerCase();
+  const docLower = (document || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
   for (const token of queryTokens) {
     if (!docLower.includes(token)) {
       return false;

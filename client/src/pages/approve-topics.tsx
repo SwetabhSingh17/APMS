@@ -348,9 +348,9 @@ export default function ApproveTopics() {
         topic.topicCode,
         topic.technology,
         topic.course,
-        (topic.submittedBy as any)?.titlePrefix,
-        (topic.submittedBy as any)?.firstName,
-        (topic.submittedBy as any)?.lastName
+        topic.submittedBy?.prefix,
+        topic.submittedBy?.firstName,
+        topic.submittedBy?.lastName
       )
     );
   };

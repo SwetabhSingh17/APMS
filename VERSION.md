@@ -46,12 +46,12 @@
    - **Instant Auto-Approval**: Bypasses the supervisor proposal and coordinator review queue, directly saving the topic with status `'approved'` (`POST /api/topics/direct`).
    - **Sequential PUGID Generation & Notifications**: Automatically assigns the next sequential topic code (`PUGID26xxx`) and dispatches an instant real-time notification to the allotted faculty supervisor.
 3. **Sidebar Navigation Reorganization & Label Renaming (`client/src/components/layout/sidebar.tsx`)** —
-   - Renamed header section **"Main Navigation"** $\rightarrow$ **"Navigation"**.
-   - Renamed **"Manage Project"** $\rightarrow$ **"Project Management"** and moved it under the **"Management"** section (alongside User Management, Team Management, and Supervisor Management).
-   - Renamed **"Setting"** $\rightarrow$ **"Account Setting"**.
+   - Renamed header section **"Main Navigation"** → **"Navigation"**.
+   - Renamed **"Manage Project"** → **"Project Management"** and moved it under the **"Management"** section (alongside User Management, Team Management, and Supervisor Management).
+   - Renamed **"Setting"** → **"Account Setting"**.
 4. **System Management Import Feedback & Notification Preferences Safekeeping** —
    - Updated `client/src/pages/system-management.tsx` to remove the forced redirect to `/auth` on successful database imports, clarifying that the administrator's active session is preserved.
-   - Updated `server/routes/users.ts` to safely validate and log payload fields for `PATCH /api/user/notifications`.
+   - Updated `server/routes/users.ts` and `server/db-storage.ts` to persist user notification preferences in-memory via `storage.updateUserNotificationPreferences`, eliminating database schema risk.
 5. **Production Safety & Live Database Compatibility** —
    - 100% backward-compatible database queries and storage functions.
    - Zero database migrations or schema alterations required, preserving ongoing live production system state.

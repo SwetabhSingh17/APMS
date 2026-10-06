@@ -5,15 +5,15 @@ This document outlines suggested architectural, security, and maintenance improv
 ---
 
 ## 📋 Table of Contents
-- [🚨 Priority Bugs & Issues to be Resolved](#-priority-bugs--issues-to-be-resolved)
-  - [🟠 High Priority](#-high-priority)
-  - [🟡 Medium Priority](#-medium-priority)
-  - [⚪ Low Priority](#-low-priority)
-- [💡 Long-Term & Architectural Improvements](#-long-term--architectural-improvements)
-  - [🏰 Secure like Fort Knox](#-secure-like-fort-knox)
-  - [🏎️ Fast like a Bugatti (Performance & Speed)](#️-fast-like-a-bugatti-performance--speed)
-  - [⚡ Agile like a Porsche (Developer Experience & Flexibility)](#-agile-like-a-porsche-developer-experience--flexibility)
-  - [📐 Futuristic like a Cybertruck (UI/UX & Innovation)](#-futuristic-like-a-cybertruck-uiux--innovation)
+- [🚨 Priority Bugs & Issues to be Resolved](#priority-bugs--issues-to-be-resolved)
+  - [🟠 High Priority](#high-priority)
+  - [🟡 Medium Priority](#medium-priority)
+  - [⚪ Low Priority](#low-priority)
+- [💡 Long-Term & Architectural Improvements](#long-term--architectural-improvements)
+  - [🏰 Secure like Fort Knox](#secure-like-fort-knox)
+  - [🏎️ Fast like a Bugatti (Performance & Speed)](#fast-like-a-bugatti-performance--speed)
+  - [⚡ Agile like a Porsche (Developer Experience & Flexibility)](#agile-like-a-porsche-developer-experience--flexibility)
+  - [📐 Futuristic like a Cybertruck (UI/UX & Innovation)](#futuristic-like-a-cybertruck-uiux--innovation)
   - [1. Authentication Modernization](#1-authentication-modernization)
   - [2. Code Quality and Testing](#2-code-quality-and-testing)
   - [3. Frontend Architecture](#3-frontend-architecture)
@@ -23,19 +23,19 @@ This document outlines suggested architectural, security, and maintenance improv
   - [7. System Architecture & Scalability](#7-system-architecture--scalability)
   - [8. Extended Administrative Capabilities](#8-extended-administrative-capabilities)
   - [9. Frontend Polish](#9-frontend-polish)
-- [✅ Resolved Issues & Release Changelog](#-resolved-issues--release-changelog)
-  - [v2.1.0 (Completed & Verified)](#v210---completed--verified)
-  - [v2.0.1 (Completed & Verified)](#v201---completed--verified)
-  - [v2.0.0 / v2 (Completed & Verified)](#v200--v2---completed--verified)
-  - [v1.9.7 (Completed & Verified)](#v197---completed--verified)
-  - [v1.9.6 (Completed & Verified)](#v196---completed--verified)
-  - [v1.9.5 (Completed & Verified)](#v195---completed--verified)
-  - [v1.9.4 (Completed & Verified)](#v194---completed--verified)
-  - [v1.9.3 (Completed & Verified)](#v193---completed--verified)
-  - [v1.9.2 (Completed & Verified)](#v192---completed--verified)
-  - [v1.9.1 (Completed & Verified)](#v191---completed--verified)
-  - [v1.9.0 (Completed & Verified)](#v190---completed--verified)
-  - [v1.6.0 (Completed & Security Audit)](#v160---completed--security-audit)
+- [✅ Resolved Issues & Release Changelog](#resolved-issues--release-changelog)
+  - [v2.1.0 - Completed & Verified](#v210---completed--verified)
+  - [v2.0.1 - Completed & Verified](#v201---completed--verified)
+  - [v2.0.0 / v2 - Completed & Verified](#v200--v2---completed--verified)
+  - [v1.9.7 - Completed & Verified](#v197---completed--verified)
+  - [v1.9.6 - Completed & Verified](#v196---completed--verified)
+  - [v1.9.5 - Completed & Verified](#v195---completed--verified)
+  - [v1.9.4 - Completed & Verified](#v194---completed--verified)
+  - [v1.9.3 - Completed & Verified](#v193---completed--verified)
+  - [v1.9.2 - Completed & Verified](#v192---completed--verified)
+  - [v1.9.1 - Completed & Verified](#v191---completed--verified)
+  - [v1.9.0 - Completed & Verified](#v190---completed--verified)
+  - [v1.6.0 - Completed & Security Audit](#v160---completed--security-audit)
   - [v1.4.1 Hotfixes](#v141-hotfixes)
   - [v1.4.0](#v140)
   - [v1.3.0](#v130)
@@ -207,9 +207,9 @@ This document outlines suggested architectural, security, and maintenance improv
   - **Affected Files:** `client/src/pages/system-management.tsx`
   - **Resolution:** Updated database restore/import success toast to `"Database restored and synchronized successfully."` and removed unnecessary forced logout and redirect to `/auth`, allowing active administrators to continue seamlessly while refreshing cached data in-place.
 
-- [x] **Notification Preferences Safe Stub Handling** — **COMPLETED**
-  - **Affected Files:** `server/routes/users.ts`
-  - **Resolution:** Updated `PATCH /api/user/notifications` to safely parse and validate notification preferences payloads with zero risk to the live production database.
+- [x] **Notification Preferences Persistence & Safekeeping** — **COMPLETED**
+  - **Affected Files:** `server/routes/users.ts`, `server/db-storage.ts`
+  - **Resolution:** Updated `PATCH /api/user/notifications` and `server/db-storage.ts` to persist normalized notification preferences in-memory via `storage.updateUserNotificationPreferences`, eliminating database schema risk.
 
 ---
 

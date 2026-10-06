@@ -181,7 +181,7 @@ export default function ManageProject() {
       group.projectTeamId,
       group.project?.topicTitle,
       group.project?.topicCode,
-      group.supervisor?.titlePrefix,
+      group.supervisor?.prefix,
       group.supervisor?.firstName,
       group.supervisor?.lastName,
       group.members?.map((m: any) => [m.firstName, m.lastName, m.enrollmentNumber, m.email])
@@ -685,7 +685,7 @@ export default function ManageProject() {
                         t.topicCode,
                         t.domain,
                         t.technology,
-                        t.submittedBy?.titlePrefix,
+                        t.submittedBy?.prefix,
                         t.submittedBy?.firstName,
                         t.submittedBy?.lastName
                       )

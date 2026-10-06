@@ -21,7 +21,7 @@ last_mapped_at: 2026-10-06
 ## Runtime
 
 **Environment:**
-- Node.js v20.16.11+ (ESM native, `"type": "module"` in `package.json`)
+- Node.js v20.0.0+ (ESM native, `"type": "module"` in `package.json`)
 - tsx 4.19.3 - TypeScript execution engine for server dev runtime and verification scripts
 
 **Package Manager:**

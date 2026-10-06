@@ -110,7 +110,7 @@ export default function TrackProgress() {
         project.student?.lastName,
         project.student?.enrollmentNumber,
         project.student?.email,
-        sup?.titlePrefix,
+        sup?.prefix,
         sup?.firstName,
         sup?.lastName
       );

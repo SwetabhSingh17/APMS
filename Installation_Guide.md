@@ -8,16 +8,16 @@ Just ask an adult to help you read these instructions, and let's get building! �
 
 ## 📋 Table of Contents
 
-- [📥 Step 0: Getting the Code!](#-step-0-getting-the-code)
-- [🎒 Step 1: Getting Our Tools Ready! (Installation)](#-step-1-getting-our-tools-ready-installation)
-  - [🪟 Windows Installation](#-windows-installation)
-  - [🍎 Mac Installation](#-mac-installation)
-  - [🐧 Linux Installation](#-linux-installation)
-- [💾 Step 2: Loading a Saved Game! (Optional)](#-step-2-loading-a-saved-game-optional)
-- [🎉 Step 3: Turning on the Power! It's Alive!](#-step-3-turning-on-the-power-its-alive)
-  - [🏎️ Bonus: Want to make it super fast? (Production)](#️-bonus-want-to-make-it-super-fast-production)
-- [🔄 Step 4: Updating an Existing Application](#-step-4-updating-an-existing-application)
-- [🧪 Step 5: Running System & Verification Tests](#-step-5-running-system--verification-tests)
+- [📥 Step 0: Getting the Code!](#step-0-getting-the-code)
+- [🎒 Step 1: Getting Our Tools Ready! (Installation)](#step-1-getting-our-tools-ready-installation)
+  - [🪟 Windows Installation](#windows-installation)
+  - [🍎 Mac Installation](#mac-installation)
+  - [🐧 Linux Installation](#linux-installation)
+- [💾 Step 2: Loading a Saved Game! (Optional)](#step-2-loading-a-saved-game-optional)
+- [🎉 Step 3: Turning on the Power! It's Alive!](#step-3-turning-on-the-power-its-alive)
+  - [🏎️ Bonus: Want to make it super fast? (Production)](#bonus-want-to-make-it-super-fast-production)
+- [🔄 Step 4: Updating an Existing Application](#step-4-updating-an-existing-application)
+- [🧪 Step 5: Running System & Verification Tests](#step-5-running-system--verification-tests)
 
 ---
 

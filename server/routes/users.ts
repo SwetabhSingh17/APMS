@@ -51,7 +51,8 @@ export function registerUserRoutes(router: Router, storage: DBStorage) {
                 deadlineReminders: deadlineReminders !== false,
                 systemAnnouncements: systemAnnouncements !== false,
             };
-            res.json({ message: "Notification preferences updated", preferences });
+            const updated = await storage.updateUserNotificationPreferences((req.user as any).id, preferences);
+            res.json({ message: "Notification preferences updated", preferences: updated });
         } catch (error) {
             res.status(500).json({ message: "Failed to update notification preferences" });
         }

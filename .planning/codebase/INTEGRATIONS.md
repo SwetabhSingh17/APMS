@@ -77,14 +77,14 @@ last_mapped_at: 2026-10-06
 ## Environment Configuration
 
 **Required env vars:**
-- `DATABASE_URL` - Canonical PostgreSQL connection URI (e.g., `postgres://postgres:password@127.0.0.1:5432/integral_project_hub`).
+- `DATABASE_URL` - Canonical PostgreSQL connection URI (e.g., `postgres://postgres:password@127.0.0.1:5432/integral_project_hub`). Optional when individual `DB_*` connection credentials (`DB_HOST`, `DB_NAME`, `DB_USER`) are provided instead.
 - `SESSION_SECRET` - Cryptographic string used by Express session for cookie HMAC signing.
 
 **Optional env vars:**
 - `PORT` - Port to listen on (defaults to 3000 in production, 5000 in dev).
 - `NODE_ENV` - Runtime mode (`development` or `production`).
 - `ENABLE_HSTS` - Boolean flag to toggle HTTP Strict Transport Security (HSTS) headers.
-- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` - Fallback database connection credentials when `DATABASE_URL` is omitted.
+- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` - Fallback database connection credentials when `DATABASE_URL` is omitted (requires `DB_HOST`, `DB_NAME`, and `DB_USER`, defaulting `DB_PORT` to 5432 and `DB_PASSWORD` to empty string).
 
 **Secrets location:**
 - Stored exclusively in local root `.env` file (excluded from version control via `.gitignore`).

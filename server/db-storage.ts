@@ -1573,12 +1573,17 @@ export class DBStorage {
   }): Promise<(StudentProject & { topic: ProjectTopic, student: User, supervisor?: User })[]> {
     const allProjects = await this.getAllProjects();
 
-    const tokenize = (q?: string): string[] => {
-      if (!q) return [];
-      return q
+    const normalizeText = (text?: string): string => {
+      if (!text) return "";
+      return text
         .toLowerCase()
         .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[\u0300-\u036f]/g, "");
+    };
+
+    const tokenize = (q?: string): string[] => {
+      if (!q) return [];
+      return normalizeText(q)
         .trim()
         .split(/\s+/)
         .filter(t => t.length > 0);
@@ -1592,7 +1597,7 @@ export class DBStorage {
     return allProjects.filter(p => {
       // 1. Project name / topic token matching
       if (projectTokens.length > 0) {
-        const topicDoc = `${p.topic.title} ${p.topic.description || ''} ${p.topic.technology || ''} ${p.topic.topicCode || ''}`.toLowerCase();
+        const topicDoc = normalizeText(`${p.topic.title} ${p.topic.description || ''} ${p.topic.technology || ''} ${p.topic.topicCode || ''}`);
         for (const token of projectTokens) {
           if (!topicDoc.includes(token)) return false;
         }
@@ -1600,7 +1605,7 @@ export class DBStorage {
 
       // 2. Student name token matching
       if (studentTokens.length > 0) {
-        const studentDoc = `${p.student.firstName} ${p.student.lastName}`.toLowerCase();
+        const studentDoc = normalizeText(`${p.student.firstName} ${p.student.lastName}`);
         for (const token of studentTokens) {
           if (!studentDoc.includes(token)) return false;
         }
@@ -1609,7 +1614,7 @@ export class DBStorage {
       // 3. Supervisor name token matching
       if (supervisorTokens.length > 0) {
         if (!p.supervisor) return false;
-        const supervisorDoc = `${p.supervisor.prefix || ''} ${p.supervisor.firstName} ${p.supervisor.lastName} ${p.supervisor.department || ''}`.toLowerCase();
+        const supervisorDoc = normalizeText(`${p.supervisor.prefix || ''} ${p.supervisor.firstName} ${p.supervisor.lastName} ${p.supervisor.department || ''}`);
         for (const token of supervisorTokens) {
           if (!supervisorDoc.includes(token)) return false;
         }
@@ -1617,7 +1622,7 @@ export class DBStorage {
 
       // 4. Enrollment number token matching
       if (enrollmentTokens.length > 0) {
-        const enrollmentDoc = (p.student.enrollmentNumber || '').toLowerCase();
+        const enrollmentDoc = normalizeText(p.student.enrollmentNumber || '');
         for (const token of enrollmentTokens) {
           if (!enrollmentDoc.includes(token)) return false;
         }
@@ -2631,6 +2636,35 @@ export class DBStorage {
 
     result.message = `Bulk topic onboarding completed. ${result.totalTopicsCreated} topics provisioned across ${result.matchedSupervisors} verified supervisors. ${result.unmatchedSupervisors} faculty records skipped.`;
     return result;
+  }
+
+  private userNotificationPreferences = new Map<number, {
+    emailNotifications: boolean;
+    projectUpdates: boolean;
+    deadlineReminders: boolean;
+    systemAnnouncements: boolean;
+  }>();
+
+  async getUserNotificationPreferences(userId: number) {
+    return this.userNotificationPreferences.get(userId) || {
+      emailNotifications: true,
+      projectUpdates: true,
+      deadlineReminders: true,
+      systemAnnouncements: true,
+    };
+  }
+
+  async updateUserNotificationPreferences(
+    userId: number,
+    preferences: {
+      emailNotifications: boolean;
+      projectUpdates: boolean;
+      deadlineReminders: boolean;
+      systemAnnouncements: boolean;
+    }
+  ) {
+    this.userNotificationPreferences.set(userId, preferences);
+    return preferences;
   }
 }
 

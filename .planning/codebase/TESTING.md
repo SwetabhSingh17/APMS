@@ -133,7 +133,7 @@ const testEnrollment = `TEST_ENROLL_${timestamp}`;
 const testUsername = `test_student_${timestamp}`;
 const [testStudent] = await db.insert(users).values({
   username: testUsername,
-  password: "TestPassword123!",
+  password: await hashPassword("TestPassword123!"), // Use hashPassword() for standard fixtures; plaintext is only used when testing legacy password migration
   firstName: "Test",
   lastName: "Student",
   email: `${testUsername}@example.com`,
