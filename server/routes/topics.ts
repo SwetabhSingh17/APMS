@@ -370,6 +370,58 @@ export function registerTopicRoutes(router: Router, storage: DBStorage) {
         }
     });
 
+    // Direct topic creation by Coordinator and Admin with Faculty Assignment
+    router.post("/api/topics/direct", requireRole([UserRole.COORDINATOR, UserRole.ADMIN]), async (req: Request, res: Response) => {
+        if (!isAuthenticatedRequest(req)) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        try {
+            const { title, description, technology, projectType, course, estimatedComplexity, facultyId } = req.body;
+
+            if (!title || !technology || !projectType || !course || !facultyId) {
+                return res.status(400).json({
+                    message: "Missing required fields: title, technology, projectType, course, and faculty are required"
+                });
+            }
+
+            const cleanCourse = String(course).trim().toUpperCase();
+            if (!["BCA", "MCA"].includes(cleanCourse)) {
+                return res.status(400).json({
+                    message: "Course must be either BCA or MCA"
+                });
+            }
+
+            const parsedFacultyId = parseInt(facultyId, 10);
+            if (isNaN(parsedFacultyId)) {
+                return res.status(400).json({ message: "Invalid faculty ID" });
+            }
+
+            const faculty = await storage.getUser(parsedFacultyId);
+            if (!faculty) {
+                return res.status(404).json({ message: "Selected faculty member not found" });
+            }
+
+            const creatorName = `${req.user?.firstName || ''} ${req.user?.lastName || ''}`.trim();
+
+            const topic = await storage.createDirectProjectTopic({
+                title: String(title).trim(),
+                description: description ? String(description).trim() : null,
+                technology: String(technology).trim(),
+                projectType: String(projectType).trim(),
+                course: cleanCourse,
+                estimatedComplexity: estimatedComplexity ? String(estimatedComplexity).trim() : "Medium",
+                facultyId: parsedFacultyId,
+                creatorName,
+            });
+
+            res.status(201).json(topic);
+        } catch (error) {
+            console.error("Error creating direct topic:", error);
+            res.status(500).json({ message: error instanceof Error ? error.message : "Failed to create topic" });
+        }
+    });
+
     // Update topic
     router.put("/api/topics/:id", requireRole([UserRole.SUPERVISOR, UserRole.COORDINATOR, UserRole.ADMIN]), async (req: Request, res: Response) => {
         if (!isAuthenticatedRequest(req)) {

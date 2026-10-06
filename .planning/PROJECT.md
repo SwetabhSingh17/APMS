@@ -21,14 +21,18 @@ Streamline and govern the academic project lifecycle with strict course isolatio
 - ✓ **CONFLICTS**: Enrollment number conflict detection and interactive resolution UI on Dashboard and User Management — existing (v2.0.1)
 - ✓ **NOTIFS**: Real-time WebSocket notifications with persistent user inboxes — existing (v2.0.1)
 - ✓ **TRACKING**: Student project progress dashboards, 5-phase milestones, and supervisor evaluations — existing (v2.0.1)
+- ✓ **SEARCH-ENGINE**: Multi-word whitespace tokenized matching and sub-millisecond in-memory search indexing across 10 catalogs and modals — validated (v2.1.0)
+- ✓ **DIRECT-TOPIC-ASSIGNMENT**: Admin & Coordinator direct topic authoring, auto-approval, and immediate faculty allotment — validated (v2.1.0)
+- ✓ **NAV-REORG**: Reorganized sidebar navigation hierarchy with Project Management grouping and Account Settings — validated (v2.1.0)
 
-### Active
+### Active (Milestone v2.2.0 Goals)
 
 - [ ] **BACKUP-RESTORE**: Upgrade backup export/import to include all 9 tables (including assessments, milestones, notifications) with topological foreign key insertion order — from Fixes_required.md
 - [ ] **SERVER-SEC-REG**: Enforce server-side registration closure toggle in `/api/register` matching the client-side overlay — from Fixes_required.md
 - [ ] **ACTIVITY-FEED**: Replace static mock activity list in `GET /api/activities` with dynamic database events — from Fixes_required.md
 - [ ] **INPUT-SANITIZATION**: Add server-side HTML/XSS sanitization on user-submitted text fields (topic descriptions, feedback) — from Fixes_required.md
 - [ ] **CONTROLLER-MODULARITY**: Extract business logic from Express route handlers into domain services for clean SOLID separation of concerns — from Fixes_required.md
+
 
 ### Out of Scope
 

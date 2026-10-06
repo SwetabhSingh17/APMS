@@ -14,6 +14,7 @@ import { UserRole } from "@shared/schema";
 import Modal from "@/components/ui/modal";
 import { Search, Phone } from "lucide-react";
 import { useCourseFilter } from "@/hooks/course-filter-context";
+import { filterBySearchQuery, createSearchDocument } from "@/lib/search-index";
 
 interface StudentProject {
   id: number;
@@ -131,16 +132,20 @@ export default function SupervisorEvaluations() {
 
   const filteredProjects = useMemo(() => {
     if (!projects) return [];
-    return projects.filter(project => {
-      const searchLower = searchQuery.toLowerCase();
-      return (
-        project.student.firstName.toLowerCase().includes(searchLower) ||
-        project.student.lastName.toLowerCase().includes(searchLower) ||
-        project.topic.title.toLowerCase().includes(searchLower) ||
-        project.topic.technology.toLowerCase().includes(searchLower) ||
-        project.student.department.toLowerCase().includes(searchLower)
-      );
-    });
+    return filterBySearchQuery(projects, searchQuery, project =>
+      createSearchDocument(
+        project.student?.firstName,
+        project.student?.lastName,
+        `${project.student?.firstName} ${project.student?.lastName}`,
+        (project.student as any)?.enrollmentNumber,
+        project.student?.department,
+        project.topic?.title,
+        (project.topic as any)?.topicCode,
+        project.topic?.technology,
+        (project as any)?.team?.projectTeamId,
+        (project as any)?.team?.name
+      )
+    );
   }, [projects, searchQuery]);
 
   if (!user || user.role !== UserRole.SUPERVISOR) {

@@ -1,0 +1,33 @@
+{
+  "contract": "1.0.0",
+  "flavor": "core",
+  "milestone": "v2.2.0",
+  "phases": [
+    {
+      "number": "1",
+      "name": "Backup & Restore Integrity",
+      "status": "pending"
+    },
+    {
+      "number": "2",
+      "name": "Security Hardening & Registration Controls",
+      "status": "pending"
+    },
+    {
+      "number": "3",
+      "name": "Live Activity & Audit Trail",
+      "status": "pending"
+    },
+    {
+      "number": "4",
+      "name": "Architecture Modularity & Clean Services",
+      "status": "pending"
+    }
+  ],
+  "next": {
+    "command": "/gsd-progress --next",
+    "label": "Advance to the next step (plan phase 1)",
+    "reason": "Phase 1 of 4 — needs a plan"
+  },
+  "updated_at": "2026-10-06T16:35:39.392Z"
+}

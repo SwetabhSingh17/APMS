@@ -63,6 +63,7 @@ import { UserRole } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useCourseFilter } from "@/hooks/course-filter-context";
+import { filterBySearchQuery, createSearchDocument } from "@/lib/search-index";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -533,80 +534,76 @@ export default function SupervisorManagement() {
     });
   };
 
-  // Filter supervisors
-  const filteredSupervisors = supervisors.filter((sup: ISupervisorData) => {
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      const fullName = `${sup.prefix ? `${sup.prefix} ` : ""}${sup.firstName} ${sup.lastName}`.toLowerCase();
-      const matchesSearch =
-        fullName.includes(q) ||
-        (sup.empId && sup.empId.toLowerCase().includes(q)) ||
-        (sup.email && sup.email.toLowerCase().includes(q)) ||
-        (sup.designation && sup.designation.toLowerCase().includes(q)) ||
-        (sup.department && sup.department.toLowerCase().includes(q)) ||
-        (sup.mobile && sup.mobile.toLowerCase().includes(q)) ||
-        sup.submittedTopics.some((t) =>
-          t.title.toLowerCase().includes(q) ||
-          (t.topicCode && t.topicCode.toLowerCase().includes(q)) ||
-          t.technology.toLowerCase().includes(q) ||
-          (t.assignedTeam && t.assignedTeam.name.toLowerCase().includes(q)) ||
-          (t.assignedTeam && t.assignedTeam.projectTeamId && t.assignedTeam.projectTeamId.toLowerCase().includes(q))
-        ) ||
-        sup.assignedTeams.some((team) =>
-          team.name.toLowerCase().includes(q) ||
-          (team.projectTeamId && team.projectTeamId.toLowerCase().includes(q))
-        );
-      if (!matchesSearch) return false;
-    }
+  // Filter supervisors using tokenized multi-word search engine
+  const searchedSupervisors = filterBySearchQuery(supervisors, searchQuery, (sup: ISupervisorData) =>
+    createSearchDocument(
+      sup.prefix,
+      sup.firstName,
+      sup.lastName,
+      sup.empId,
+      sup.email,
+      sup.designation,
+      sup.department,
+      sup.mobile,
+      sup.submittedTopics.map((t) => [
+        t.title,
+        t.topicCode,
+        t.technology,
+        t.assignedTeam?.name,
+        t.assignedTeam?.projectTeamId
+      ]),
+      sup.assignedTeams.map((team) => [team.name, team.projectTeamId])
+    )
+  );
 
+  const filteredSupervisors = searchedSupervisors.filter((sup: ISupervisorData) => {
     if (activeTab === "active") return sup.metrics.assignedTeams > 0;
     if (activeTab === "available") return sup.metrics.assignedTeams === 0;
     if (activeTab === "pending_topics") return sup.metrics.pendingTopics > 0;
-
     return true;
   });
 
   // Filter groups for the "Assign Group to Specific Topic" Modal
-  const candidateGroupsForTopic = allStudentGroups.filter((g: any) => {
-    if (!assignTopicModal) return false;
-    const targetCourse = assignTopicModal.topic.course;
+  const candidateGroupsForTopic = filterBySearchQuery(
+    allStudentGroups.filter((g: any) => {
+      if (!assignTopicModal) return false;
+      const targetCourse = assignTopicModal.topic.course;
 
-    // Must match the topic cohort course (BCA with BCA, MCA with MCA)
-    if (g.course && g.course !== targetCourse) return false;
+      // Must match the topic cohort course (BCA with BCA, MCA with MCA)
+      if (g.course && g.course !== targetCourse) return false;
 
-    // Filter by tab: unassigned vs all
-    if (groupTabFilter === "unassigned" && g.project?.topicId) {
-      return false;
-    }
-
-    // Filter by search query
-    if (groupSearchQuery.trim()) {
-      const q = groupSearchQuery.toLowerCase().trim();
-      const matches =
-        g.name?.toLowerCase().includes(q) ||
-        (g.projectTeamId && g.projectTeamId.toLowerCase().includes(q)) ||
-        (g.supervisor && `${g.supervisor.firstName} ${g.supervisor.lastName}`.toLowerCase().includes(q)) ||
-        g.members?.some((m: any) =>
-          m.firstName?.toLowerCase().includes(q) ||
-          m.lastName?.toLowerCase().includes(q) ||
-          m.enrollmentNumber?.toLowerCase().includes(q)
-        );
-      if (!matches) return false;
-    }
-
-    return true;
-  });
+      // Filter by tab: unassigned vs all
+      if (groupTabFilter === "unassigned" && g.project?.topicId) {
+        return false;
+      }
+      return true;
+    }),
+    groupSearchQuery,
+    (g: any) =>
+      createSearchDocument(
+        g.name,
+        g.projectTeamId,
+        g.supervisor?.titlePrefix,
+        g.supervisor?.firstName,
+        g.supervisor?.lastName,
+        g.members?.map((m: any) => [m.firstName, m.lastName, m.enrollmentNumber, m.email])
+      )
+  );
 
   // Filter groups for General Team Allotment Dialog
-  const filteredAllotmentGroups = allStudentGroups.filter((g: any) => {
-    if (!allotTeamSearch.trim()) return true;
-    const q = allotTeamSearch.toLowerCase().trim();
-    return (
-      g.name?.toLowerCase().includes(q) ||
-      (g.projectTeamId && g.projectTeamId.toLowerCase().includes(q)) ||
-      (g.supervisor && `${g.supervisor.firstName} ${g.supervisor.lastName}`.toLowerCase().includes(q))
-    );
-  });
+  const filteredAllotmentGroups = filterBySearchQuery(
+    allStudentGroups,
+    allotTeamSearch,
+    (g: any) =>
+      createSearchDocument(
+        g.name,
+        g.projectTeamId,
+        g.supervisor?.titlePrefix,
+        g.supervisor?.firstName,
+        g.supervisor?.lastName,
+        g.members?.map((m: any) => [m.firstName, m.lastName, m.enrollmentNumber])
+      )
+  );
 
   if (!user || (user.role !== UserRole.ADMIN && user.role !== UserRole.COORDINATOR)) {
     return (

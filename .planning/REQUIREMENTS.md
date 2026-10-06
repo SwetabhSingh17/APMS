@@ -3,9 +3,18 @@
 **Defined:** 2026-10-06
 **Core Value:** Streamline and govern the academic project lifecycle with strict course isolation (BCA vs MCA), balanced faculty mentorship workload limits, and transparent real-time status reflection across all departmental stakeholders.
 
-## v1 Requirements
+## Completed Requirements (Archived in v2.1.0)
 
-Requirements for current milestone improvements. Each maps to roadmap phases.
+See [milestones/v2.1.0-REQUIREMENTS.md](milestones/v2.1.0-REQUIREMENTS.md) for full audit.
+
+- [x] **SEARCH-01**: Multi-word and space-separated query tokenization across all client and server search interfaces
+- [x] **SEARCH-02**: High-performance index-behaving search engine module (`client/src/lib/search-index.ts`) with multi-attribute normalization, pre-indexing, and instant lookup
+- [x] **UI-01**: Admin and Coordinator Direct Topic Creation with Faculty Assignment in `/topics` (Approve Topics)
+- [x] **UI-02**: Navigation Pane Reorganization & Label Renaming (Main Navigation -> Navigation, Manage Project -> Project Management, Setting -> Account Setting)
+- [x] **UI-03**: Fix misleading import success message on `/system-management`
+- [x] **UI-04**: Implement or safely stub Notification Preferences in `server/routes/users.ts`
+
+## Active Requirements (Milestone v2.2.0)
 
 ### Data Integrity & Backups
 
@@ -28,9 +37,7 @@ Requirements for current milestone improvements. Each maps to roadmap phases.
 - [ ] **ARCH-01**: Route handlers delegate business logic to decoupled service modules
 - [ ] **ARCH-02**: Remove redundant HTTP server instantiation in `server/routes/index.ts`
 
-## v2 Requirements
-
-Deferred to future releases.
+## Deferred Requirements
 
 ### Performance & Scaling
 
@@ -54,10 +61,14 @@ Explicitly excluded. Documented to prevent scope creep.
 
 ## Traceability
 
-Which phases cover which requirements.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| SEARCH-01 | Archived v2.1.0 | Complete |
+| SEARCH-02 | Archived v2.1.0 | Complete |
+| UI-01 | Archived v2.1.0 | Complete |
+| UI-02 | Archived v2.1.0 | Complete |
+| UI-03 | Archived v2.1.0 | Complete |
+| UI-04 | Archived v2.1.0 | Complete |
 | BACKUP-01 | Phase 1 | Pending |
 | BACKUP-02 | Phase 1 | Pending |
 | BACKUP-03 | Phase 1 | Pending |
@@ -69,10 +80,9 @@ Which phases cover which requirements.
 | ARCH-02 | Phase 4 | Pending |
 
 **Coverage:**
-- v1 requirements: 9 total
-- Mapped to phases: 9
+- Active v2.2.0 requirements: 9 total
+- Archived v2.1.0 requirements: 6 total
 - Unmapped: 0
 
 ---
-*Requirements defined: 2026-10-06*
-*Last updated: 2026-10-06 after initialization*
+*Last updated: 2026-10-06 after archiving Milestone v2.1.0*

@@ -22,6 +22,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertProjectTopicSchema } from "@shared/schema";
+import { filterBySearchQuery, createSearchDocument } from "@/lib/search-index";
 import { z } from "zod";
 import {
   Search,
@@ -271,37 +272,36 @@ export default function Projects() {
   };
 
   const filterProjects = (projects: IStudentProjectWithTopic[]) => {
-    if (!searchQuery) return projects;
-
-    const query = searchQuery.toLowerCase();
-    return projects.filter(project =>
-      project.topic?.title.toLowerCase().includes(query) ||
-      (project.topic?.description?.toLowerCase().includes(query) || false) ||
-      project.topic?.technology.toLowerCase().includes(query) ||
-      project.student.firstName.toLowerCase().includes(query) ||
-      project.student.lastName.toLowerCase().includes(query) ||
-      project.student.email.toLowerCase().includes(query) ||
-      (project.supervisor?.firstName.toLowerCase().includes(query) || false) ||
-      (project.supervisor?.lastName.toLowerCase().includes(query) || false)
+    return filterBySearchQuery(projects, searchQuery, project =>
+      createSearchDocument(
+        project.topic?.title,
+        project.topic?.description,
+        project.topic?.technology,
+        project.topic?.topicCode,
+        project.student?.firstName,
+        project.student?.lastName,
+        project.student?.email,
+        project.student?.enrollmentNumber,
+        project.supervisor?.prefix,
+        project.supervisor?.firstName,
+        project.supervisor?.lastName,
+        project.supervisor?.email
+      )
     );
   };
 
   // Filter supervisor topics by search query
   const filterSupervisorTopics = (topics: ISupervisorTopicWithTeam[]) => {
-    if (!searchQuery) return topics;
-    const query = searchQuery.toLowerCase();
-    return topics.filter(item =>
-      item.topic.title.toLowerCase().includes(query) ||
-      (item.topic.description?.toLowerCase().includes(query) || false) ||
-      (item.topic.technology?.toLowerCase().includes(query) || false) ||
-      (item.topic.topicCode?.toLowerCase().includes(query) || false) ||
-      (item.team?.groupName.toLowerCase().includes(query) || false) ||
-      (item.team?.projectTeamId?.toLowerCase().includes(query) || false) ||
-      (item.team?.members.some(m =>
-        m.firstName.toLowerCase().includes(query) ||
-        m.lastName.toLowerCase().includes(query) ||
-        (m.enrollmentNumber?.toLowerCase().includes(query) || false)
-      ) || false)
+    return filterBySearchQuery(topics, searchQuery, item =>
+      createSearchDocument(
+        item.topic.title,
+        item.topic.description,
+        item.topic.technology,
+        item.topic.topicCode,
+        item.team?.groupName,
+        item.team?.projectTeamId,
+        item.team?.members?.map(m => [m.firstName, m.lastName, m.enrollmentNumber, m.email])
+      )
     );
   };
 
@@ -924,16 +924,18 @@ export default function Projects() {
   };
 
   const filterTopics = (topics: ProjectTopic[]) => {
-    if (!searchQuery) return topics;
-    const query = searchQuery.toLowerCase();
-    return topics.filter(t =>
-      t.title.toLowerCase().includes(query) ||
-      (t.description?.toLowerCase().includes(query) || false) ||
-      (t.technology?.toLowerCase().includes(query) || false) ||
-      (t.topicCode?.toLowerCase().includes(query) || false) ||
-      (t.projectType?.toLowerCase().includes(query) || false) ||
-      ((t.submittedBy as any)?.firstName?.toLowerCase().includes(query) || false) ||
-      ((t.submittedBy as any)?.lastName?.toLowerCase().includes(query) || false)
+    return filterBySearchQuery(topics, searchQuery, t =>
+      createSearchDocument(
+        t.title,
+        t.description,
+        t.technology,
+        t.topicCode,
+        t.projectType,
+        t.course,
+        (t.submittedBy as any)?.titlePrefix,
+        (t.submittedBy as any)?.firstName,
+        (t.submittedBy as any)?.lastName
+      )
     );
   };
 

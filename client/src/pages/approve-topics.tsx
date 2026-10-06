@@ -13,13 +13,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import Modal from "@/components/ui/modal";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle, XCircle, Search, Trash2, FileSpreadsheet } from "lucide-react";
+import { CheckCircle, XCircle, Search, Trash2, FileSpreadsheet, Plus, GraduationCap, Loader2, BookOpen } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ProjectTopic, UserRole } from "@shared/schema";
+import { ProjectTopic, UserRole, User } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { useCourseFilter } from "@/hooks/course-filter-context";
 import { TopicBulkOnboardingModal } from "@/components/admin/topic-bulk-onboarding-modal";
+import { filterBySearchQuery, createSearchDocument } from "@/lib/search-index";
 
 export default function ApproveTopics() {
   const { user } = useAuth();
@@ -31,7 +40,23 @@ export default function ApproveTopics() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isBulkTopicModalOpen, setIsBulkTopicModalOpen] = useState(false);
 
+  // Add Direct Topic Modal State for Admin & Coordinator
+  const [isAddTopicModalOpen, setIsAddTopicModalOpen] = useState(false);
+  const [newTopicTitle, setNewTopicTitle] = useState("");
+  const [newTopicDescription, setNewTopicDescription] = useState("");
+  const [newTopicTech, setNewTopicTech] = useState("");
+  const [newTopicType, setNewTopicType] = useState("Web Application");
+  const [newTopicCourse, setNewTopicCourse] = useState("BCA");
+  const [newTopicComplexity, setNewTopicComplexity] = useState("Medium");
+  const [newTopicFacultyId, setNewTopicFacultyId] = useState("");
+
   const { courseFilter, getCourseQuery } = useCourseFilter();
+
+  // Fetch list of supervisors for faculty selection
+  const { data: supervisors = [] } = useQuery<User[]>({
+    queryKey: ["/api/supervisors"],
+    enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN),
+  });
 
   const { data: pendingTopics = [], isLoading } = useQuery<ProjectTopic[]>({
     queryKey: [`/api/topics/pending${getCourseQuery() ? `?${getCourseQuery()}` : ''}`],
@@ -246,20 +271,88 @@ export default function ApproveTopics() {
     }
   };
 
-  const filterTopics = (topics: ProjectTopic[]) => {
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return topics.filter(
-        topic =>
-          topic.title.toLowerCase().includes(query) ||
-          topic.description?.toLowerCase().includes(query) ||
-          (topic.topicCode?.toLowerCase().includes(query) || false) ||
-          (topic.technology?.toLowerCase().includes(query) || false) ||
-          ((topic.submittedBy as any)?.firstName?.toLowerCase().includes(query) || false) ||
-          ((topic.submittedBy as any)?.lastName?.toLowerCase().includes(query) || false)
-      );
+  const createDirectTopicMutation = useMutation({
+    mutationFn: async (data: {
+      title: string;
+      description?: string;
+      technology: string;
+      projectType: string;
+      course: string;
+      estimatedComplexity: string;
+      facultyId: number;
+    }) => {
+      const res = await apiRequest("POST", "/api/topics/direct", data);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to create topic");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Topic Created & Approved",
+        description: "The topic was successfully created, approved, and assigned to the selected faculty.",
+      });
+      setIsAddTopicModalOpen(false);
+      setNewTopicTitle("");
+      setNewTopicDescription("");
+      setNewTopicTech("");
+      setNewTopicFacultyId("");
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === "string" && key.startsWith("/api/topics");
+        },
+      });
+    },
+    onError: (err: Error) => {
+      toast({
+        title: "Failed to create topic",
+        description: err.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateTopicSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTopicTitle.trim()) {
+      toast({ title: "Validation Error", description: "Topic title is required", variant: "destructive" });
+      return;
     }
-    return topics;
+    if (!newTopicTech.trim()) {
+      toast({ title: "Validation Error", description: "Required technologies are required", variant: "destructive" });
+      return;
+    }
+    if (!newTopicFacultyId) {
+      toast({ title: "Validation Error", description: "Please select a faculty member to assign", variant: "destructive" });
+      return;
+    }
+
+    createDirectTopicMutation.mutate({
+      title: newTopicTitle.trim(),
+      description: newTopicDescription.trim() || undefined,
+      technology: newTopicTech.trim(),
+      projectType: newTopicType,
+      course: newTopicCourse,
+      estimatedComplexity: newTopicComplexity,
+      facultyId: Number(newTopicFacultyId),
+    });
+  };
+
+  const filterTopics = (topics: ProjectTopic[]) => {
+    return filterBySearchQuery(topics, searchQuery, topic =>
+      createSearchDocument(
+        topic.title,
+        topic.description,
+        topic.topicCode,
+        topic.technology,
+        topic.course,
+        (topic.submittedBy as any)?.titlePrefix,
+        (topic.submittedBy as any)?.firstName,
+        (topic.submittedBy as any)?.lastName
+      )
+    );
   };
 
   const filteredPending = filterTopics(pendingTopics);
@@ -296,6 +389,13 @@ export default function ApproveTopics() {
           <p className="text-muted-foreground">Review and manage project topics submitted by faculty members</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setIsAddTopicModalOpen(true)}
+            className="gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add Topic</span>
+          </Button>
           <Button
             onClick={() => setIsBulkTopicModalOpen(true)}
             className="gap-1.5 bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
@@ -756,6 +856,172 @@ export default function ApproveTopics() {
         isOpen={isBulkTopicModalOpen}
         onClose={() => setIsBulkTopicModalOpen(false)}
       />
+
+      {/* Admin & Coordinator Direct Topic Creation Dialog */}
+      <Dialog open={isAddTopicModalOpen} onOpenChange={setIsAddTopicModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+              <BookOpen className="h-5 w-5 text-primary" />
+              <span>Add & Assign Project Topic</span>
+            </DialogTitle>
+            <DialogDescription>
+              Create an approved project topic and directly assign it to a faculty supervisor.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleCreateTopicSubmit} className="space-y-4 py-2">
+            {/* Faculty Supervisor Selection */}
+            <div className="space-y-1.5">
+              <Label htmlFor="faculty-select" className="text-sm font-semibold flex items-center gap-1.5">
+                <GraduationCap className="h-4 w-4 text-primary" />
+                Assign Faculty / Supervisor <span className="text-destructive">*</span>
+              </Label>
+              <Select value={newTopicFacultyId} onValueChange={setNewTopicFacultyId}>
+                <SelectTrigger id="faculty-select" className="w-full">
+                  <SelectValue placeholder="Select faculty supervisor..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {supervisors.map((s) => (
+                    <SelectItem key={s.id} value={String(s.id)}>
+                      {s.prefix ? `${s.prefix} ` : ""}{s.firstName} {s.lastName}
+                      {s.department ? ` — ${s.department}` : ""}
+                      {s.empId ? ` (${s.empId})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Topic Title */}
+            <div className="space-y-1.5">
+              <Label htmlFor="topic-title" className="text-sm font-semibold">
+                Topic Title <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="topic-title"
+                placeholder="e.g. AI-Powered Smart Campus Navigation System"
+                value={newTopicTitle}
+                onChange={(e) => setNewTopicTitle(e.target.value)}
+                required
+              />
+            </div>
+
+            {/* Course & Project Type Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="topic-course" className="text-sm font-semibold">
+                  Course / Program <span className="text-destructive">*</span>
+                </Label>
+                <Select value={newTopicCourse} onValueChange={setNewTopicCourse}>
+                  <SelectTrigger id="topic-course">
+                    <SelectValue placeholder="Select course" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BCA">BCA</SelectItem>
+                    <SelectItem value="MCA">MCA</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="topic-type" className="text-sm font-semibold">
+                  Project Domain / Type <span className="text-destructive">*</span>
+                </Label>
+                <Select value={newTopicType} onValueChange={setNewTopicType}>
+                  <SelectTrigger id="topic-type">
+                    <SelectValue placeholder="Select domain" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Web Application">Web Application</SelectItem>
+                    <SelectItem value="Mobile Application">Mobile Application</SelectItem>
+                    <SelectItem value="AI / Machine Learning">AI / Machine Learning</SelectItem>
+                    <SelectItem value="Cloud & DevOps">Cloud & DevOps</SelectItem>
+                    <SelectItem value="IoT & Embedded Systems">IoT & Embedded Systems</SelectItem>
+                    <SelectItem value="Cybersecurity">Cybersecurity</SelectItem>
+                    <SelectItem value="Data Science & Analytics">Data Science & Analytics</SelectItem>
+                    <SelectItem value="Desktop Application">Desktop Application</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Technology Stack & Estimated Complexity Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="topic-tech" className="text-sm font-semibold">
+                  Required Technologies <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="topic-tech"
+                  placeholder="e.g. React, Node.js, PostgreSQL, Tailwind"
+                  value={newTopicTech}
+                  onChange={(e) => setNewTopicTech(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="topic-complexity" className="text-sm font-semibold">
+                  Complexity Level
+                </Label>
+                <Select value={newTopicComplexity} onValueChange={setNewTopicComplexity}>
+                  <SelectTrigger id="topic-complexity">
+                    <SelectValue placeholder="Select complexity" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Easy">Easy</SelectItem>
+                    <SelectItem value="Medium">Medium</SelectItem>
+                    <SelectItem value="Hard">Hard</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div className="space-y-1.5">
+              <Label htmlFor="topic-desc" className="text-sm font-semibold">
+                Topic Description
+              </Label>
+              <Textarea
+                id="topic-desc"
+                placeholder="Provide a comprehensive summary of the project scope, objectives, and deliverables..."
+                rows={4}
+                value={newTopicDescription}
+                onChange={(e) => setNewTopicDescription(e.target.value)}
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsAddTopicModalOpen(false)}
+                disabled={createDirectTopicMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5"
+                disabled={createDirectTopicMutation.isPending}
+              >
+                {createDirectTopicMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Creating & Approving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4" />
+                    <span>Create & Approve Topic</span>
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }

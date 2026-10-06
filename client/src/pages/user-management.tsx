@@ -22,6 +22,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { useCourseFilter } from "@/hooks/course-filter-context";
+import { filterBySearchQuery, createSearchDocument } from "@/lib/search-index";
 
 // Helper functions for displaying user roles 
 function getRoleBadgeClasses(role: string): string {
@@ -371,22 +372,21 @@ export default function UserManagement() {
 
   const filterUsers = (items: UserData[] | undefined): UserData[] => {
     if (!items) return [];
-
-    let filtered = items;
-
-    // Filter by search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        item =>
-          item.username.toLowerCase().includes(query) ||
-          item.firstName.toLowerCase().includes(query) ||
-          item.lastName.toLowerCase().includes(query) ||
-          item.email.toLowerCase().includes(query)
-      );
-    }
-
-    return filtered;
+    return filterBySearchQuery(items, searchQuery, item =>
+      createSearchDocument(
+        item.username,
+        item.firstName,
+        item.lastName,
+        `${item.firstName} ${item.lastName}`,
+        item.email,
+        item.enrollmentNumber,
+        item.empId,
+        item.mobile,
+        (item as any).course,
+        item.department,
+        item.role
+      )
+    );
   };
 
   const filteredUsers = filterUsers(users);

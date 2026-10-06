@@ -95,11 +95,10 @@ export default function SystemManagement() {
             }
             toast({
                 title: "Import Successful",
-                description: "Database restored successfully. Please log in again.",
+                description: "Database restored and synchronized successfully.",
             });
-            // Clear auth state and redirect to login
-            queryClient.setQueryData(["/api/user"], null);
-            setLocation("/auth");
+            // Refresh queries without forcing the active administrator to log in again
+            queryClient.invalidateQueries();
         },
         onError: (error) => {
             toast({

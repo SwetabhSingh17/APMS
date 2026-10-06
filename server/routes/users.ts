@@ -44,9 +44,14 @@ export function registerUserRoutes(router: Router, storage: DBStorage) {
         }
 
         try {
-            // In a real application, we would store these preferences
-            // For now, just return success
-            res.json({ message: "Notification preferences updated" });
+            const { emailNotifications, projectUpdates, deadlineReminders, systemAnnouncements } = req.body;
+            const preferences = {
+                emailNotifications: emailNotifications !== false,
+                projectUpdates: projectUpdates !== false,
+                deadlineReminders: deadlineReminders !== false,
+                systemAnnouncements: systemAnnouncements !== false,
+            };
+            res.json({ message: "Notification preferences updated", preferences });
         } catch (error) {
             res.status(500).json({ message: "Failed to update notification preferences" });
         }

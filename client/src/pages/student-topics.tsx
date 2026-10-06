@@ -31,6 +31,7 @@ import {
 import { Info, Lock, Plus, Search, ChevronDown, ChevronUp, CheckCircle2, ArrowRight, AlertCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import Modal from "@/components/ui/modal";
+import { filterBySearchQuery, createSearchDocument } from "@/lib/search-index";
 
 export interface IApprovedTopicsResponse {
   hasSelectedTopic: boolean;
@@ -185,15 +186,10 @@ function BcaStudentTopics() {
   const myTopic = isArray ? undefined : (topicsData as IApprovedTopicsResponse)?.myTopic;
   const hasSelected = isArray ? false : ((topicsData as IApprovedTopicsResponse)?.hasSelectedTopic ?? false);
 
-  // Apply search query filtering across topic attributes
+  // Apply search query filtering across topic attributes using tokenized multi-word search engine
   const filterBySearch = (list: ProjectTopic[]) => {
-    if (!searchQuery.trim()) return list;
-    const q = searchQuery.toLowerCase().trim();
-    return list.filter(t =>
-      t.title.toLowerCase().includes(q) ||
-      (t.description?.toLowerCase().includes(q) || false) ||
-      (t.technology?.toLowerCase().includes(q) || false) ||
-      (t.topicCode?.toLowerCase().includes(q) || false)
+    return filterBySearchQuery(list, searchQuery, (t) =>
+      createSearchDocument(t.title, t.description, t.technology, t.topicCode, t.course, t.projectType)
     );
   };
 

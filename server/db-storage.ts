@@ -383,6 +383,68 @@ export class DBStorage {
     return newTopic as ProjectTopic;
   }
 
+  async getNextTopicCode(): Promise<string> {
+    const existingTopicsWithCodes = await db
+      .select({ topicCode: projectTopics.topicCode })
+      .from(projectTopics)
+      .where(and(isNotNull(projectTopics.topicCode), like(projectTopics.topicCode, "PUGID26%")));
+
+    let maxSequence = 0;
+    for (const t of existingTopicsWithCodes) {
+      if (t.topicCode) {
+        const match = t.topicCode.match(/^PUGID26(\d+)$/i);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxSequence) {
+            maxSequence = num;
+          }
+        }
+      }
+    }
+    const nextSequence = maxSequence + 1;
+    const seqStr = String(nextSequence).padStart(3, "0");
+    return `PUGID26${seqStr}`;
+  }
+
+  async createDirectProjectTopic(data: {
+    title: string;
+    description?: string | null;
+    technology: string;
+    projectType: string;
+    course: string;
+    estimatedComplexity?: string;
+    facultyId: number;
+    creatorName?: string;
+  }): Promise<ProjectTopic> {
+    const topicCode = await this.getNextTopicCode();
+
+    const [topic] = await db
+      .insert(projectTopics)
+      .values({
+        topicCode,
+        title: data.title,
+        description: data.description || null,
+        submittedById: data.facultyId,
+        technology: data.technology,
+        projectType: data.projectType,
+        course: data.course,
+        estimatedComplexity: data.estimatedComplexity || "Medium",
+        status: "approved",
+      })
+      .returning();
+
+    const createdTopic = topic as ProjectTopic;
+
+    // Notify the assigned faculty member
+    await this.createNotification({
+      userId: data.facultyId,
+      title: "Project Topic Assigned",
+      message: `A new approved project topic "${createdTopic.title}" (${createdTopic.topicCode}) has been created and assigned to you by ${data.creatorName || "the Project Coordinator"}.`
+    });
+
+    return createdTopic;
+  }
+
   async approveProjectTopic(id: number, feedback?: string): Promise<ProjectTopic | undefined> {
     const [topic] = await db.update(projectTopics)
       .set({ status: "approved", feedback })
@@ -1508,14 +1570,60 @@ export class DBStorage {
     enrollmentNumber?: string;
     department?: string;
     status?: string;
-  }): Promise<(StudentProject & { topic: ProjectTopic, student: User })[]> {
+  }): Promise<(StudentProject & { topic: ProjectTopic, student: User, supervisor?: User })[]> {
     const allProjects = await this.getAllProjects();
 
+    const tokenize = (q?: string): string[] => {
+      if (!q) return [];
+      return q
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim()
+        .split(/\s+/)
+        .filter(t => t.length > 0);
+    };
+
+    const projectTokens = tokenize(criteria.projectName);
+    const studentTokens = tokenize(criteria.studentName);
+    const supervisorTokens = tokenize(criteria.supervisorName);
+    const enrollmentTokens = tokenize(criteria.enrollmentNumber);
+
     return allProjects.filter(p => {
-      if (criteria.projectName && !p.topic.title.toLowerCase().includes(criteria.projectName.toLowerCase())) return false;
-      if (criteria.studentName && !(p.student.firstName + ' ' + p.student.lastName).toLowerCase().includes(criteria.studentName.toLowerCase())) return false;
-      if (criteria.enrollmentNumber && p.student.enrollmentNumber && !p.student.enrollmentNumber.includes(criteria.enrollmentNumber)) return false;
-      // if (criteria.department && p.student.department !== criteria.department) return false;
+      // 1. Project name / topic token matching
+      if (projectTokens.length > 0) {
+        const topicDoc = `${p.topic.title} ${p.topic.description || ''} ${p.topic.technology || ''} ${p.topic.topicCode || ''}`.toLowerCase();
+        for (const token of projectTokens) {
+          if (!topicDoc.includes(token)) return false;
+        }
+      }
+
+      // 2. Student name token matching
+      if (studentTokens.length > 0) {
+        const studentDoc = `${p.student.firstName} ${p.student.lastName}`.toLowerCase();
+        for (const token of studentTokens) {
+          if (!studentDoc.includes(token)) return false;
+        }
+      }
+
+      // 3. Supervisor name token matching
+      if (supervisorTokens.length > 0) {
+        if (!p.supervisor) return false;
+        const supervisorDoc = `${p.supervisor.prefix || ''} ${p.supervisor.firstName} ${p.supervisor.lastName} ${p.supervisor.department || ''}`.toLowerCase();
+        for (const token of supervisorTokens) {
+          if (!supervisorDoc.includes(token)) return false;
+        }
+      }
+
+      // 4. Enrollment number token matching
+      if (enrollmentTokens.length > 0) {
+        const enrollmentDoc = (p.student.enrollmentNumber || '').toLowerCase();
+        for (const token of enrollmentTokens) {
+          if (!enrollmentDoc.includes(token)) return false;
+        }
+      }
+
+      if (criteria.department && p.student.department !== criteria.department) return false;
       if (criteria.status && p.status !== criteria.status) return false;
       return true;
     });

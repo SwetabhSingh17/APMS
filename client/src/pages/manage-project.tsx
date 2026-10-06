@@ -16,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useCourseFilter } from "@/hooks/course-filter-context";
 import { CreateTeamDialog } from "@/components/create-team-dialog";
 import { ManageMembersDialog } from "@/components/manage-members-dialog";
+import { filterBySearchQuery, createSearchDocument } from "@/lib/search-index";
 
 export default function ManageProject() {
   const { user } = useAuth();
@@ -172,44 +173,37 @@ export default function ManageProject() {
     },
   });
 
-  // Filter groups by search
-  const filteredGroups = allGroups.filter((group: any) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      group.name?.toLowerCase().includes(q) ||
-      group.description?.toLowerCase().includes(q) ||
-      group.projectTeamId?.toLowerCase().includes(q) ||
-      group.project?.topicTitle?.toLowerCase().includes(q) ||
-      group.project?.topicCode?.toLowerCase().includes(q) ||
-      group.supervisor?.firstName?.toLowerCase().includes(q) ||
-      group.supervisor?.lastName?.toLowerCase().includes(q) ||
-      group.members?.some((m: any) =>
-        m.firstName?.toLowerCase().includes(q) ||
-        m.lastName?.toLowerCase().includes(q) ||
-        m.enrollmentNumber?.toLowerCase().includes(q)
-      )
-    );
-  });
+  // Filter groups by multi-word search
+  const filteredGroups = filterBySearchQuery(allGroups, searchQuery, (group: any) =>
+    createSearchDocument(
+      group.name,
+      group.description,
+      group.projectTeamId,
+      group.project?.topicTitle,
+      group.project?.topicCode,
+      group.supervisor?.titlePrefix,
+      group.supervisor?.firstName,
+      group.supervisor?.lastName,
+      group.members?.map((m: any) => [m.firstName, m.lastName, m.enrollmentNumber, m.email])
+    )
+  );
 
   // Split into Pending (no project selected) and Assigned (project selected)
   const pendingGroups = filteredGroups.filter((group: any) => !group.project);
   const assignedGroups = filteredGroups.filter((group: any) => !!group.project);
 
   // Filter supervisors in the change supervisor dialog
-  const filteredSupervisors = (supervisors || []).filter((s: User) => {
-    if (!supervisorSearchQuery) return true;
-    const q = supervisorSearchQuery.toLowerCase().trim();
-    const fullName = `${s.prefix ? `${s.prefix} ` : ""}${s.firstName} ${s.lastName}`.toLowerCase();
-    return (
-      fullName.includes(q) ||
-      s.firstName?.toLowerCase().includes(q) ||
-      s.lastName?.toLowerCase().includes(q) ||
-      (s.department?.toLowerCase().includes(q) || false) ||
-      (s.designation?.toLowerCase().includes(q) || false) ||
-      (s.email?.toLowerCase().includes(q) || false)
-    );
-  });
+  const filteredSupervisors = filterBySearchQuery(supervisors || [], supervisorSearchQuery, (s: User) =>
+    createSearchDocument(
+      s.prefix,
+      s.firstName,
+      s.lastName,
+      s.department,
+      s.designation,
+      s.email,
+      (s as any).empId
+    )
+  );
 
   const targetGroup = allGroups.find((g: any) => g.id === changeSupervisorGroupId);
 
@@ -676,20 +670,26 @@ export default function ManageProject() {
                 {(() => {
                   const groupCourse = (changeTopicGroup?.course || changeTopicGroup?.members?.[0]?.course || "").trim().toUpperCase();
                   
-                  const filteredTopics = approvedTopics.filter((t: any) => {
-                    // Match course if present
-                    if (groupCourse && t.course) {
-                      if (t.course.trim().toUpperCase() !== groupCourse) return false;
-                    }
-                    if (!topicSearchQuery.trim()) return true;
-                    const query = topicSearchQuery.toLowerCase();
-                    const title = (t.title || "").toLowerCase();
-                    const code = (t.code || "").toLowerCase();
-                    const domain = (t.domain || "").toLowerCase();
-                    const tech = (t.technology || "").toLowerCase();
-                    const submitter = `${t.submittedBy?.firstName || ""} ${t.submittedBy?.lastName || ""}`.toLowerCase();
-                    return title.includes(query) || code.includes(query) || domain.includes(query) || tech.includes(query) || submitter.includes(query);
-                  });
+                  const filteredTopics = filterBySearchQuery(
+                    approvedTopics.filter((t: any) => {
+                      if (groupCourse && t.course) {
+                        if (t.course.trim().toUpperCase() !== groupCourse) return false;
+                      }
+                      return true;
+                    }),
+                    topicSearchQuery,
+                    (t: any) =>
+                      createSearchDocument(
+                        t.title,
+                        t.code,
+                        t.topicCode,
+                        t.domain,
+                        t.technology,
+                        t.submittedBy?.titlePrefix,
+                        t.submittedBy?.firstName,
+                        t.submittedBy?.lastName
+                      )
+                  );
 
                   if (filteredTopics.length === 0) {
                     return (

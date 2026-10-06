@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Bell, CheckCheck, Search, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Notification } from "@shared/schema";
+import { filterBySearchQuery, createSearchDocument } from "@/lib/search-index";
 
 export default function Notifications() {
   const { user } = useAuth();
@@ -70,19 +71,17 @@ export default function Notifications() {
   };
 
   const list = notifications ?? [];
-  const filteredNotifications = list
-    .filter(notification => {
-      if (filter === 'unread') return !notification.isRead;
-      return true;
-    })
-    .filter(notification => {
-      if (!searchQuery) return true;
-      const query = searchQuery.toLowerCase();
-      return (
-        notification.title.toLowerCase().includes(query) ||
-        notification.message.toLowerCase().includes(query)
-      );
-    });
+  const statusFiltered = list.filter(notification => {
+    if (filter === 'unread') return !notification.isRead;
+    return true;
+  });
+
+  const filteredNotifications = filterBySearchQuery(statusFiltered, searchQuery, notification =>
+    createSearchDocument(
+      notification.title,
+      notification.message
+    )
+  );
 
   const unreadCount = list.filter(n => !n.isRead).length;
 

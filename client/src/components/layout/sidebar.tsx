@@ -90,7 +90,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?
       )}
 
       <nav className="flex-1 overflow-y-auto py-4">
-        <div className="px-3 mb-3 text-xs font-semibold text-muted-foreground uppercase">Main Navigation</div>
+        <div className="px-3 mb-3 text-xs font-semibold text-muted-foreground uppercase">Navigation</div>
 
         <Link href="/" onClick={isMobile ? onClose : undefined} className={linkClass("/")}>
           <Home className="w-5 h-5" />
@@ -143,15 +143,13 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?
         )}
 
         {(user?.role === UserRole.COORDINATOR || user?.role === UserRole.ADMIN) && (
-          <Link href="/manage-project" onClick={isMobile ? onClose : undefined} className={linkClass("/manage-project")}>
-            <FolderCog className="w-5 h-5" />
-            <span>Manage Project</span>
-          </Link>
-        )}
-
-        {(user?.role === UserRole.COORDINATOR || user?.role === UserRole.ADMIN) && (
           <>
             <div className="px-3 mt-6 mb-3 text-xs font-semibold text-muted-foreground uppercase">Management</div>
+
+            <Link href="/manage-project" onClick={isMobile ? onClose : undefined} className={linkClass("/manage-project")}>
+              <FolderCog className="w-5 h-5" />
+              <span>Project Management</span>
+            </Link>
 
             <Link href="/user-management" onClick={isMobile ? onClose : undefined} className={linkClass("/user-management")}>
               <Users className="w-5 h-5" />
@@ -179,7 +177,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?
 
         <Link href="/settings" onClick={isMobile ? onClose : undefined} className={linkClass("/settings")}>
           <Settings className="w-5 h-5" />
-          <span>Settings</span>
+          <span>Account Setting</span>
         </Link>
 
         <Link href="/notifications" onClick={isMobile ? onClose : undefined} className={linkClass("/notifications")}>

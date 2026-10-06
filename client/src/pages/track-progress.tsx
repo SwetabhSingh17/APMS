@@ -18,6 +18,7 @@ import axios, { AxiosResponse } from "axios";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useCourseFilter } from "@/hooks/course-filter-context";
+import { filterBySearchQuery, createSearchDocument } from "@/lib/search-index";
 
 interface ProjectWithMilestones extends StudentProject {
   topic: ProjectTopic;
@@ -99,25 +100,21 @@ export default function TrackProgress() {
 
   const filterProjects = (projectsList: ProjectWithMilestones[] | undefined) => {
     if (!projectsList) return [];
-    let filtered = [...projectsList];
-
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(project => {
-        const sup = project.supervisor || (project.topic as any)?.submittedBy;
-        const supName = sup ? `${sup.firstName} ${sup.lastName}`.toLowerCase() : "";
-        return (
-          project.topic?.title?.toLowerCase().includes(query) ||
-          project.topic?.topicCode?.toLowerCase().includes(query) ||
-          `${project.student?.firstName} ${project.student?.lastName}`.toLowerCase().includes(query) ||
-          project.student?.enrollmentNumber?.toLowerCase().includes(query) ||
-          project.topic?.technology?.toLowerCase().includes(query) ||
-          supName.includes(query)
-        );
-      });
-    }
-
-    return filtered;
+    return filterBySearchQuery(projectsList, searchQuery, project => {
+      const sup = project.supervisor || (project.topic as any)?.submittedBy;
+      return createSearchDocument(
+        project.topic?.title,
+        project.topic?.topicCode,
+        project.topic?.technology,
+        project.student?.firstName,
+        project.student?.lastName,
+        project.student?.enrollmentNumber,
+        project.student?.email,
+        sup?.titlePrefix,
+        sup?.firstName,
+        sup?.lastName
+      );
+    });
   };
 
   const filteredProjects = filterProjects(projects);

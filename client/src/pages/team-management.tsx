@@ -58,6 +58,7 @@ import { User, UserRole } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useCourseFilter } from "@/hooks/course-filter-context";
+import { filterBySearchQuery, createSearchDocument } from "@/lib/search-index";
 import { CreateTeamDialog } from "@/components/create-team-dialog";
 import { ManageMembersDialog } from "@/components/manage-members-dialog";
 import { useForm } from "react-hook-form";
@@ -309,33 +310,27 @@ export default function TeamManagement() {
     setSupervisorSearchQuery("");
   };
 
-  // Filter groups
-  const filteredGroups = allGroups.filter((group: ITeamData) => {
-    // 1. Text Search query
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      const matchesSearch =
-        group.name?.toLowerCase().includes(q) ||
-        (group.description && group.description.toLowerCase().includes(q)) ||
-        (group.projectTeamId && group.projectTeamId.toLowerCase().includes(q)) ||
-        (group.project?.topicTitle && group.project.topicTitle.toLowerCase().includes(q)) ||
-        (group.project?.topicCode && group.project.topicCode.toLowerCase().includes(q)) ||
-        (group.supervisor && `${group.supervisor.firstName} ${group.supervisor.lastName}`.toLowerCase().includes(q)) ||
-        group.members?.some((m) =>
-          m.firstName?.toLowerCase().includes(q) ||
-          m.lastName?.toLowerCase().includes(q) ||
-          m.enrollmentNumber?.toLowerCase().includes(q) ||
-          m.email?.toLowerCase().includes(q)
-        );
-      if (!matchesSearch) return false;
-    }
+  // Filter groups using tokenized multi-word search engine
+  const searchedGroups = filterBySearchQuery(allGroups, searchQuery, (group: ITeamData) =>
+    createSearchDocument(
+      group.name,
+      group.description,
+      group.projectTeamId,
+      group.project?.topicTitle,
+      group.project?.topicCode,
+      group.supervisor?.prefix,
+      group.supervisor?.firstName,
+      group.supervisor?.lastName,
+      group.members?.map((m) => [m.firstName, m.lastName, m.enrollmentNumber, m.email])
+    )
+  );
 
-    // 2. Tab filtering
+  const filteredGroups = searchedGroups.filter((group: ITeamData) => {
+    // Tab filtering
     if (activeTab === "pending") return !group.project;
     if (activeTab === "assigned") return !!group.project;
     if (activeTab === "bca") return group.course === "BCA";
     if (activeTab === "mca") return group.course === "MCA";
-
     return true;
   });
 
@@ -348,16 +343,17 @@ export default function TeamManagement() {
   const totalStudentsInTeams = allGroups.reduce((acc, g) => acc + (g.members?.length || 0), 0);
 
   // Filter supervisors for change supervisor dialog
-  const filteredSupervisors = supervisors.filter((s: User) => {
-    if (!supervisorSearchQuery.trim()) return true;
-    const q = supervisorSearchQuery.toLowerCase().trim();
-    const fullName = `${s.prefix ? `${s.prefix} ` : ""}${s.firstName} ${s.lastName}`.toLowerCase();
-    return (
-      fullName.includes(q) ||
-      (s.department && s.department.toLowerCase().includes(q)) ||
-      (s.email && s.email.toLowerCase().includes(q))
-    );
-  });
+  const filteredSupervisors = filterBySearchQuery(supervisors, supervisorSearchQuery, (s: User) =>
+    createSearchDocument(
+      s.prefix,
+      s.firstName,
+      s.lastName,
+      s.department,
+      s.email,
+      (s as any).empId,
+      (s as any).designation
+    )
+  );
 
   if (!user || (user.role !== UserRole.ADMIN && user.role !== UserRole.COORDINATOR)) {
     return (
