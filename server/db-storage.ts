@@ -1983,7 +1983,15 @@ export class DBStorage {
     // Drop live WebSockets
     disconnectAllClients();
 
-    const toDate = (v: any) => (v ? new Date(v) : null);
+    const toDate = (v: any): Date | null => {
+      if (!v) return null;
+      if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+      if (typeof v === "string" || typeof v === "number") {
+        const d = new Date(v);
+        return isNaN(d.getTime()) ? null : d;
+      }
+      return null;
+    };
 
     // 3. Execute atomic transaction
     try {
@@ -2025,7 +2033,14 @@ export class DBStorage {
 
         // 1. student_groups (Parent to user group references)
         const cleanGroups = (payload.studentGroups || []).map((group: any) => ({
-          ...group,
+          id: group.id,
+          name: group.name,
+          description: group.description ?? null,
+          supervisorId: group.supervisorId ?? null,
+          createdById: group.createdById ?? null,
+          course: group.course ?? null,
+          projectTeamId: group.projectTeamId ?? null,
+          maxSize: group.maxSize ?? 5,
           createdAt: toDate(group.createdAt) || new Date(),
           updatedAt: toDate(group.updatedAt) || new Date(),
         }));
@@ -2033,7 +2048,23 @@ export class DBStorage {
 
         // 2. users (foreign key to student_groups.id is now guaranteed to exist!)
         const cleanUsers = (payload.users || []).map((user: any) => ({
-          ...user,
+          id: user.id,
+          username: user.username,
+          password: user.password,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          role: user.role,
+          enrollmentNumber: user.enrollmentNumber ?? null,
+          course: user.course ?? null,
+          empId: user.empId ?? null,
+          prefix: user.prefix ?? null,
+          designation: user.designation ?? null,
+          mobile: user.mobile ?? null,
+          department: user.department ?? null,
+          groupId: user.groupId ?? null,
+          forcePasswordReset: Boolean(user.forcePasswordReset),
+          isDeleted: Boolean(user.isDeleted),
           createdAt: toDate(user.createdAt) || new Date(),
           updatedAt: toDate(user.updatedAt) || new Date(),
         }));
@@ -2041,14 +2072,29 @@ export class DBStorage {
 
         // 3. student_group_members (links users.id and student_groups.id)
         const cleanMembers = (payload.studentGroupMembers || []).map((member: any) => ({
-          ...member,
-          joinedAt: toDate(member.joinedAt) || new Date(),
+          id: member.id,
+          userId: member.userId,
+          groupId: member.groupId,
+          status: member.status || "accepted",
+          createdAt: toDate(member.createdAt) || new Date(),
+          updatedAt: toDate(member.updatedAt) || new Date(),
         }));
         await batchInsert(studentGroupMembers, cleanMembers, "Team Rosters & Memberships", 60, 70);
 
         // 4. project_topics (links submittedById -> users.id)
         const cleanTopics = (payload.projectTopics || []).map((topic: any) => ({
-          ...topic,
+          id: topic.id,
+          topicCode: topic.topicCode ?? null,
+          title: topic.title,
+          description: topic.description ?? null,
+          submittedById: topic.submittedById,
+          technology: topic.technology,
+          projectType: topic.projectType,
+          course: topic.course,
+          estimatedComplexity: topic.estimatedComplexity || "Medium",
+          status: topic.status || "pending",
+          feedback: topic.feedback ?? null,
+          isDeleted: Boolean(topic.isDeleted),
           createdAt: toDate(topic.createdAt) || new Date(),
           updatedAt: toDate(topic.updatedAt) || new Date(),
         }));
@@ -2056,7 +2102,11 @@ export class DBStorage {
 
         // 5. student_projects (links studentId -> users.id, topicId -> projectTopics.id)
         const cleanProjects = (payload.studentProjects || []).map((project: any) => ({
-          ...project,
+          id: project.id,
+          studentId: project.studentId,
+          topicId: project.topicId,
+          progress: project.progress ?? 0,
+          status: project.status || "in_progress",
           createdAt: toDate(project.createdAt) || new Date(),
           updatedAt: toDate(project.updatedAt) || new Date(),
         }));
@@ -2064,7 +2114,12 @@ export class DBStorage {
 
         // 6. project_assessments (links projectId -> studentProjects.id, supervisorId -> users.id)
         const cleanAssessments = (payload.projectAssessments || []).map((assessment: any) => ({
-          ...assessment,
+          id: assessment.id,
+          projectId: assessment.projectId,
+          supervisorId: assessment.supervisorId,
+          assessmentType: assessment.assessmentType,
+          marks: assessment.marks,
+          feedback: assessment.feedback ?? null,
           createdAt: toDate(assessment.createdAt) || new Date(),
           updatedAt: toDate(assessment.updatedAt) || new Date(),
         }));
@@ -2072,9 +2127,13 @@ export class DBStorage {
 
         // 7. project_milestones (links projectId -> studentProjects.id)
         const cleanMilestones = (payload.projectMilestones || []).map((milestone: any) => ({
-          ...milestone,
+          id: milestone.id,
+          projectId: milestone.projectId,
+          title: milestone.title,
+          description: milestone.description ?? null,
           dueDate: toDate(milestone.dueDate) || new Date(),
           completedAt: toDate(milestone.completedAt),
+          isCompleted: Boolean(milestone.isCompleted),
           createdAt: toDate(milestone.createdAt) || new Date(),
           updatedAt: toDate(milestone.updatedAt) || new Date(),
         }));
@@ -2082,7 +2141,13 @@ export class DBStorage {
 
         // 8. notifications (links userId -> users.id)
         const cleanNotifs = (payload.notifications || []).map((notif: any) => ({
-          ...notif,
+          id: notif.id,
+          userId: notif.userId,
+          title: notif.title,
+          message: notif.message,
+          type: notif.type,
+          isRead: Boolean(notif.isRead),
+          metadata: notif.metadata ?? null,
           createdAt: toDate(notif.createdAt) || new Date(),
           updatedAt: toDate(notif.updatedAt) || new Date(),
         }));

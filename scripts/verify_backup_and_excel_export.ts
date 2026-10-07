@@ -205,6 +205,48 @@ async function verifyBackupAndExcelExport() {
     assert(usersIdx < projectsIdx, "users precedes studentProjects in topological restore sequence");
 
     // -------------------------------------------------------------
+    // STEP 5b: ZIP Payload Deserialization & Date Type Safety Check
+    // -------------------------------------------------------------
+    console.log("\n--- 5b. ZIP Payload Deserialization & Date Type Safety Check ---");
+    const parsedPayload = await storage.parseBackupPayload(backupPackage.buffer);
+    assert(Boolean(parsedPayload.users && parsedPayload.studentGroups), "Parsed ZIP payload contains users and groups");
+
+    let rollbackInsertPassed = false;
+    try {
+        await db.transaction(async (tx) => {
+            const toDate = (v: any): Date | null => {
+                if (!v) return null;
+                if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+                if (typeof v === "string" || typeof v === "number") {
+                    const d = new Date(v);
+                    return isNaN(d.getTime()) ? null : d;
+                }
+                return null;
+            };
+
+            const sampleMembers = (parsedPayload.studentGroupMembers || []).slice(0, 5).map((m: any) => ({
+                id: m.id,
+                userId: m.userId,
+                groupId: m.groupId,
+                status: m.status || "accepted",
+                createdAt: toDate(m.createdAt) || new Date(),
+                updatedAt: toDate(m.updatedAt) || new Date(),
+            }));
+
+            await tx.insert(studentGroupMembers).values(sampleMembers).onConflictDoNothing();
+            rollbackInsertPassed = true;
+            tx.rollback();
+        });
+    } catch (err: any) {
+        if (err.message === "Rollback") {
+            rollbackInsertPassed = true;
+        } else {
+            console.error("Dry run insert failed with error:", err);
+        }
+    }
+    assert(rollbackInsertPassed, "Dry-run insert with parsed Date objects succeeded without toISOString errors");
+
+    // -------------------------------------------------------------
     // STEP 6: Zero Data Loss / Integrity Verification
     // -------------------------------------------------------------
     console.log("\n--- 6. Zero-Data-Loss Live Database Integrity Check ---");
