@@ -99,6 +99,11 @@ This document outlines suggested architectural, security, and maintenance improv
        - **Transactional Integrity:** Wrap entire restore operation in an atomic database transaction (`db.transaction`). If any table or record fails, roll back completely to prevent database corruption.
        - **Session Preservation:** Preserve the active administrator's session so they are not abruptly locked out upon restore completion.
        - **Automatic Pre-Restore Safety Snapshot:** Automatically generate a safety snapshot of the live database prior to applying any restore, guaranteeing 100% rollback capability.
+       - **Real-Time Streaming Telemetry & Date Type Safety (v2.2.0):**
+         - Live Server-Sent Events (SSE) progress bar with percentage and stage updates.
+         - Monospace live terminal feed with timestamped logs of every restore step.
+         - Resolved Drizzle ORM PostgreSQL driver `value.toISOString is not a function` error by explicitly parsing and converting ISO date strings to native `Date` objects across all 8 tables.
+         - High-visibility in-modal diagnostic error display with automatic rollback guarantee and pre-restore snapshot retention.
     3. **Multi-Page University Excel Export (Single Workbook with Multiple Sheets):**
        - A one-click export button that compiles and downloads an official University Excel workbook (`.xlsx`) containing multiple dedicated worksheets:
          - **Sheet 1: Overview & Summary** — High-level statistics: total students, supervisors, teams, topics proposed/approved/pending, BCA vs MCA breakdown, completion metrics.

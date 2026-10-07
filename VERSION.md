@@ -67,13 +67,14 @@
 5. **System Management UI Console & Automated Verification Suite** —
    - Upgraded `client/src/pages/system-management.tsx` with dedicated cards for A-Z Backup, University Excel Report, and Safe Restore.
    - Built a pre-flight inspection modal parsing `.zip` and `.json` files to display record counts (Users, Teams, Topics, Projects) and backup metadata before confirmation.
-   - Created `scripts/verify_backup_and_excel_export.ts` (`npm run test:backup`) covering 65 automated test assertions with 100% pass rate and zero live data loss.
+   - Created `scripts/verify_backup_and_excel_export.ts` (`npm run test:backup`) covering 67 automated test assertions with 100% pass rate and zero live data loss.
 6. **Real-Time Streaming Restoration & Live Diagnostic Telemetry** —
    - Replaced silent batch operations with Server-Sent Events (SSE) streaming (`POST /api/admin/import?stream=true`).
    - Integrated live animated progress bar, percentage tracker, and active stage indicators directly in the import modal.
    - Built an interactive collapsible terminal viewer streaming timestamped events for every restore phase (upload, parsing, snapshot creation, table batches, sequence alignment, completion).
    - High-visibility in-modal error recovery providing exact diagnostic error messages, reassuring that pre-restore snapshots and current data are preserved with zero data loss.
    - Enhanced ZIP parsing with magic-byte detection (`0x50, 0x4B`) for 100% reliability across operating systems and browsers.
+   - Resolved ISO string serialization issue in Drizzle PostgreSQL driver (`value.toISOString is not a function`) by sanitizing and converting string dates to native `Date` objects across all 8 tables.
 
 ---
 
