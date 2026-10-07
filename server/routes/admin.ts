@@ -124,35 +124,75 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
         }
     });
 
-    // Import/Restore Database (Supports JSON body and multipart upload for ZIP or JSON)
+    // Import/Restore Database (Supports SSE streaming, JSON body, and multipart upload for ZIP or JSON)
     router.post("/api/admin/import", requireRole([UserRole.ADMIN]), upload.single("file"), async (req: Request, res: Response) => {
         if (!isAuthenticatedRequest(req)) {
             return res.status(401).json({ message: "Unauthorized" });
         }
 
+        const isStream = req.query.stream === "true" || req.headers.accept?.includes("text/event-stream");
+
+        if (isStream) {
+            res.setHeader("Content-Type", "text/event-stream");
+            res.setHeader("Cache-Control", "no-cache, no-transform");
+            res.setHeader("Connection", "keep-alive");
+            res.flushHeaders?.();
+        }
+
+        const sendProgress = (update: { stage: string; percent: number; message: string; detail?: string }) => {
+            if (isStream) {
+                res.write(`data: ${JSON.stringify(update)}\n\n`);
+            }
+        };
+
         try {
+            sendProgress({
+                stage: "upload",
+                percent: 5,
+                message: "Backup payload received. Preparing restoration...",
+                detail: req.file ? `${req.file.originalname} (${(req.file.size / 1024).toFixed(1)} KB)` : "JSON payload"
+            });
+
             let payload: any;
             if (req.file) {
-                const isZip = req.file.mimetype.includes("zip") || req.file.originalname.endsWith(".zip");
-                if (isZip) {
-                    payload = req.file.buffer;
-                } else {
-                    const text = req.file.buffer.toString("utf-8");
-                    payload = JSON.parse(text);
-                }
+                payload = req.file.buffer;
             } else {
                 payload = req.body;
             }
 
             if (!payload || (typeof payload !== "object" && !Buffer.isBuffer(payload))) {
-                return res.status(400).json({ message: "Invalid import data or file" });
+                throw new Error("Invalid import data or file payload");
             }
 
-            await storage.importData(payload, { preserveSessions: true });
-            res.json({ message: "Database restored and synchronized successfully." });
+            await storage.importData(payload, {
+                preserveSessions: true,
+                onProgress: sendProgress
+            });
+
+            if (isStream) {
+                res.write(`data: ${JSON.stringify({
+                    stage: "complete",
+                    percent: 100,
+                    message: "Database restored and synchronized successfully.",
+                    success: true
+                })}\n\n`);
+                return res.end();
+            } else {
+                return res.json({ message: "Database restored and synchronized successfully." });
+            }
         } catch (error: any) {
             console.error("Import failed:", error);
-            res.status(500).json({ message: error.message || "Failed to import database" });
+            const errorMessage = error.message || "Failed to import database";
+            if (isStream) {
+                res.write(`data: ${JSON.stringify({
+                    error: true,
+                    stage: "error",
+                    message: errorMessage
+                })}\n\n`);
+                return res.end();
+            } else {
+                return res.status(500).json({ message: errorMessage });
+            }
         }
     });
 

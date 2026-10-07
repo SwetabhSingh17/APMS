@@ -1,4 +1,4 @@
-# APMS (Academic Project Management System) - AI Context
+# IU-APMP (Integral University Academic Project Management Portal) - AI Context
 
 ## Purpose
 This document provides comprehensive context about the APMS project. It is intended to be read by LLMs and AI assistants to quickly understand the project's architecture, technologies, data flow, and workflows, avoiding the need to explore every file.

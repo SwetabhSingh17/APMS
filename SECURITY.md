@@ -7,7 +7,7 @@ This document outlines the security policies, supported versions, protective mea
 ## 📋 Table of Contents
 
 - [Supported Versions](#supported-versions)
-- [Security Posture (v2.1.0)](#security-posture-v210)
+- [Security Posture (v2.2.0)](#security-posture-v220)
   - [Authentication & Cryptography](#authentication--cryptography)
   - [Access Control & Authorization](#access-control--authorization)
   - [Network & Infrastructure Security](#network--infrastructure-security)
@@ -29,9 +29,9 @@ Currently, the following versions of this project are actively supported with se
 
 ---
 
-## Security Posture (v2.1.0)
+## Security Posture (v2.2.0)
 
-APMS ships with the following protections in place:
+IU-APMP ships with the following protections in place:
 
 ### Authentication & Cryptography
 - **Authentication & Cryptography** — Passport.js local strategy with scrypt password hashing; PostgreSQL-backed sessions (`connect-pg-simple`) with a 15-minute rolling inactivity expiry.

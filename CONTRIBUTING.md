@@ -23,8 +23,8 @@ If you prefer to set up manually:
 
 1. **Fork** the repository and clone your fork:
    ```bash
-   git clone https://github.com/<your-username>/APMS.git
-   cd APMS
+   git clone https://github.com/<your-username>/IU-APMP.git
+   cd IU-APMP
    ```
 
 2. **Install dependencies:**

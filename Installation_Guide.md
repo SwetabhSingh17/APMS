@@ -27,8 +27,8 @@ First, we need to download the code to your computer!
 You can either download it as a ZIP file from GitHub and extract it, or if you have Git installed, you can open your Terminal/Command Prompt and type:
 
 ```bash
-git clone https://github.com/SwetabhSingh17/APMS.git
-cd APMS
+git clone https://github.com/SwetabhSingh17/IU-APMP.git
+cd IU-APMP
 ```
 
 ---

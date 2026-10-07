@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ============================================================================
-# APMS (Academic Project Management System v2.0.1) - Automatic Installation Script
+# IU-APMP (Integral University Academic Project Management Portal v2.2.0) - Automatic Installation Script
 # Created by: Swetabh Singh
 # For macOS and Linux Systems
 # ============================================================================

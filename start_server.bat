@@ -1,10 +1,11 @@
 @echo off
-title APMS Server
+title IU-APMP Server
 setlocal
 
 echo ==========================================================
-echo    APMS - Academic Project Management System (v2.0.1)
-echo    One-Click Production Server - By Swetabh Singh
+echo    IU-APMP - Academic Project Management Portal (v2.2.0)
+echo    Integral University - One-Click Production Server
+echo    By Swetabh Singh
 echo ==========================================================
 echo.
 
@@ -69,13 +70,13 @@ REM ----------------------------------------------------------
 REM Step 5: Check / Configure Windows Firewall for Port 3000
 REM ----------------------------------------------------------
 echo [4/5] Checking Windows Firewall rule for Port 3000...
-netsh advfirewall firewall show rule name="APMS Server Port 3000" >nul 2>nul
+netsh advfirewall firewall show rule name="IU-APMP Server Port 3000" >nul 2>nul
 if not errorlevel 1 (
     echo [INFO] Inbound firewall rule for Port 3000 is active.
     goto :fw_done
 )
 
-netsh advfirewall firewall add rule name="APMS Server Port 3000" dir=in action=allow protocol=TCP localport=3000 >nul 2>nul
+netsh advfirewall firewall add rule name="IU-APMP Server Port 3000" dir=in action=allow protocol=TCP localport=3000 >nul 2>nul
 if not errorlevel 1 (
     echo [INFO] Inbound firewall rule for Port 3000 configured successfully.
     goto :fw_done
@@ -84,7 +85,7 @@ if not errorlevel 1 (
 echo [INFO] Could not automatically add firewall rule - requires Administrator privileges.
 echo        If remote PCs cannot open http://YOUR-IP:3000, please run this once
 echo        in an Administrator Command Prompt:
-echo        netsh advfirewall firewall add rule name="APMS Server Port 3000" dir=in action=allow protocol=TCP localport=3000
+echo        netsh advfirewall firewall add rule name="IU-APMP Server Port 3000" dir=in action=allow protocol=TCP localport=3000
 
 :fw_done
 echo.
@@ -92,7 +93,7 @@ echo.
 REM ----------------------------------------------------------
 REM Step 6: Start the server
 REM ----------------------------------------------------------
-echo [5/5] Starting APMS server...
+echo [5/5] Starting IU-APMP server...
 echo.
 echo   Local access:   http://localhost:3000
 echo   Network access: Check console below for your IP, e.g. http://192.168.6.11:3000

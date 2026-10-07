@@ -7,8 +7,8 @@ REM ============================================================================
 
 echo.
 echo ========================================
-echo   APMS Setup (v2.0.1)
-echo   Academic Project Management System
+echo   IU-APMP Setup (v2.2.0)
+echo   Integral University Academic Project Management Portal
 echo   By - Swetabh Singh
 echo ========================================
 echo.

@@ -1888,54 +1888,85 @@ export class DBStorage {
 
     if (Buffer.isBuffer(data)) {
       try {
-        const zip = await JSZip.loadAsync(data);
-        const fullBackupFile = zip.file("portal_full_backup.json");
-        if (fullBackupFile) {
-          const content = await fullBackupFile.async("string");
-          return JSON.parse(content);
-        }
+        const isZip = data.length >= 2 && data[0] === 0x50 && data[1] === 0x4B;
+        if (isZip) {
+          const zip = await JSZip.loadAsync(data);
 
-        // Reconstruct from tables/ or root
-        const readTable = async (name: string) => {
-          const f = zip.file(`tables/${name}.json`) || zip.file(`${name}.json`);
-          if (f) {
-            const text = await f.async("string");
-            return JSON.parse(text);
+          // Find file in root or any subfolder
+          const findZipFile = (name: string) => {
+            const direct = zip.file(name);
+            if (direct) return direct;
+            const matches = zip.file(new RegExp(`(^|/)${name}$`, "i"));
+            return matches && matches.length > 0 ? matches[0] : null;
+          };
+
+          const fullBackupFile = findZipFile("portal_full_backup.json");
+          if (fullBackupFile) {
+            const content = await fullBackupFile.async("string");
+            return JSON.parse(content);
           }
-          return [];
-        };
 
-        return {
-          studentGroups: await readTable("student_groups"),
-          users: await readTable("users"),
-          studentGroupMembers: await readTable("student_group_members"),
-          projectTopics: await readTable("project_topics"),
-          studentProjects: await readTable("student_projects"),
-          projectAssessments: await readTable("project_assessments"),
-          projectMilestones: await readTable("project_milestones"),
-          notifications: await readTable("notifications"),
-        };
+          // Reconstruct from tables/ or root or nested
+          const readTable = async (name: string) => {
+            const f = findZipFile(`tables/${name}.json`) || findZipFile(`${name}.json`);
+            if (f) {
+              const text = await f.async("string");
+              return JSON.parse(text);
+            }
+            return [];
+          };
+
+          return {
+            studentGroups: await readTable("student_groups"),
+            users: await readTable("users"),
+            studentGroupMembers: await readTable("student_group_members"),
+            projectTopics: await readTable("project_topics"),
+            studentProjects: await readTable("student_projects"),
+            projectAssessments: await readTable("project_assessments"),
+            projectMilestones: await readTable("project_milestones"),
+            notifications: await readTable("notifications"),
+          };
+        } else {
+          const text = data.toString("utf-8");
+          return JSON.parse(text);
+        }
       } catch (err: any) {
-        console.error("Failed to parse backup ZIP file:", err);
-        throw new Error("Invalid or corrupted backup ZIP archive");
+        console.error("Failed to parse backup payload:", err);
+        throw new Error(`Invalid or corrupted backup archive: ${err.message}`);
       }
     }
 
     if (typeof data === "string") {
       try {
         return JSON.parse(data);
-      } catch (err) {
-        throw new Error("Invalid JSON import format");
+      } catch (err: any) {
+        throw new Error(`Invalid JSON import format: ${err.message}`);
       }
     }
 
     return data;
   }
 
-  async importData(data: any, options?: { preserveSessions?: boolean; skipSnapshot?: boolean }): Promise<boolean> {
+  async importData(
+    data: any,
+    options?: {
+      preserveSessions?: boolean;
+      skipSnapshot?: boolean;
+      onProgress?: (progress: { stage: string; percent: number; message: string; detail?: string }) => void;
+    }
+  ): Promise<boolean> {
     const preserveSessions = options?.preserveSessions !== false;
+    const emit = (stage: string, percent: number, message: string, detail?: string) => {
+      if (options?.onProgress) {
+        try {
+          options.onProgress({ stage, percent, message, detail });
+        } catch (_) {}
+      }
+      console.log(`[Import ${percent}%] [${stage}] ${message}${detail ? ` - ${detail}` : ""}`);
+    };
 
     // 1. Parse and validate input payload
+    emit("parsing", 10, "Decompressing archive & validating manifest...", "Parsing backup file structure");
     const payload = await this.parseBackupPayload(data);
 
     if (!payload.users && !payload.studentGroups && !payload.projectTopics && !payload.studentProjects) {
@@ -1944,7 +1975,7 @@ export class DBStorage {
 
     // 2. Automated Pre-Restore Safety Snapshot (ensures zero data loss)
     if (!options?.skipSnapshot) {
-      console.log("📸 Generating automated pre-restore safety snapshot...");
+      emit("snapshot", 20, "Creating automated pre-restore safety snapshot...", "Backing up live database to database/backups");
       const snapshotFile = await this.createPreRestoreSnapshot();
       console.log(`✅ Pre-restore safety snapshot saved to: ${snapshotFile}`);
     }
@@ -1956,6 +1987,7 @@ export class DBStorage {
 
     // 3. Execute atomic transaction
     try {
+      emit("preparing", 30, "Preparing database transaction & deferred constraints...", "Resetting table state");
       await db.transaction(async (tx) => {
         // Step A: Truncate tables (preserving sessions if requested)
         const dataTables = `"project_assessments", "project_milestones", "student_projects", "student_group_members", "student_groups", "project_topics", "notifications", "users"`;
@@ -1965,115 +1997,109 @@ export class DBStorage {
           await tx.execute(sql.raw(`TRUNCATE TABLE ${dataTables} RESTART IDENTITY CASCADE`));
         }
 
+        // Helper to insert in batches of 50 to prevent connection pool exhaustion and report progress
+        const batchInsert = async (
+          table: any,
+          items: any[],
+          tableName: string,
+          startPct: number,
+          endPct: number,
+          batchSize = 50
+        ) => {
+          if (!Array.isArray(items) || items.length === 0) return;
+          const totalBatches = Math.ceil(items.length / batchSize);
+          for (let b = 0; b < totalBatches; b++) {
+            const chunk = items.slice(b * batchSize, (b + 1) * batchSize);
+            await tx.insert(table).values(chunk).onConflictDoNothing();
+            const currentPct = Math.round(startPct + ((b + 1) / totalBatches) * (endPct - startPct));
+            emit(
+              "restoring",
+              currentPct,
+              `Restoring ${tableName}...`,
+              `Processed ${Math.min((b + 1) * batchSize, items.length)} of ${items.length} records`
+            );
+          }
+        };
+
         // Step B: Topological Dependency Order Insertion
 
         // 1. student_groups (Parent to user group references)
-        if (Array.isArray(payload.studentGroups)) {
-          for (const group of payload.studentGroups) {
-            const clean = {
-              ...group,
-              createdAt: toDate(group.createdAt) || new Date(),
-              updatedAt: toDate(group.updatedAt) || new Date(),
-            };
-            await tx.insert(studentGroups).values(clean).onConflictDoNothing();
-          }
-        }
+        const cleanGroups = (payload.studentGroups || []).map((group: any) => ({
+          ...group,
+          createdAt: toDate(group.createdAt) || new Date(),
+          updatedAt: toDate(group.updatedAt) || new Date(),
+        }));
+        await batchInsert(studentGroups, cleanGroups, "Student Project Teams", 35, 45);
 
         // 2. users (foreign key to student_groups.id is now guaranteed to exist!)
-        if (Array.isArray(payload.users)) {
-          for (const user of payload.users) {
-            const clean = {
-              ...user,
-              createdAt: toDate(user.createdAt) || new Date(),
-              updatedAt: toDate(user.updatedAt) || new Date(),
-            };
-            await tx.insert(users).values(clean).onConflictDoNothing();
-          }
-        }
+        const cleanUsers = (payload.users || []).map((user: any) => ({
+          ...user,
+          createdAt: toDate(user.createdAt) || new Date(),
+          updatedAt: toDate(user.updatedAt) || new Date(),
+        }));
+        await batchInsert(users, cleanUsers, "User Accounts & Credentials", 45, 60);
 
         // 3. student_group_members (links users.id and student_groups.id)
-        if (Array.isArray(payload.studentGroupMembers)) {
-          for (const member of payload.studentGroupMembers) {
-            const clean = {
-              ...member,
-              joinedAt: toDate(member.joinedAt) || new Date(),
-            };
-            await tx.insert(studentGroupMembers).values(clean).onConflictDoNothing();
-          }
-        }
+        const cleanMembers = (payload.studentGroupMembers || []).map((member: any) => ({
+          ...member,
+          joinedAt: toDate(member.joinedAt) || new Date(),
+        }));
+        await batchInsert(studentGroupMembers, cleanMembers, "Team Rosters & Memberships", 60, 70);
 
         // 4. project_topics (links submittedById -> users.id)
-        if (Array.isArray(payload.projectTopics)) {
-          for (const topic of payload.projectTopics) {
-            const clean = {
-              ...topic,
-              createdAt: toDate(topic.createdAt) || new Date(),
-              updatedAt: toDate(topic.updatedAt) || new Date(),
-            };
-            await tx.insert(projectTopics).values(clean).onConflictDoNothing();
-          }
-        }
+        const cleanTopics = (payload.projectTopics || []).map((topic: any) => ({
+          ...topic,
+          createdAt: toDate(topic.createdAt) || new Date(),
+          updatedAt: toDate(topic.updatedAt) || new Date(),
+        }));
+        await batchInsert(projectTopics, cleanTopics, "Project Topics Catalog", 70, 80);
 
         // 5. student_projects (links studentId -> users.id, topicId -> projectTopics.id)
-        if (Array.isArray(payload.studentProjects)) {
-          for (const project of payload.studentProjects) {
-            const clean = {
-              ...project,
-              createdAt: toDate(project.createdAt) || new Date(),
-              updatedAt: toDate(project.updatedAt) || new Date(),
-            };
-            await tx.insert(studentProjects).values(clean).onConflictDoNothing();
-          }
-        }
+        const cleanProjects = (payload.studentProjects || []).map((project: any) => ({
+          ...project,
+          createdAt: toDate(project.createdAt) || new Date(),
+          updatedAt: toDate(project.updatedAt) || new Date(),
+        }));
+        await batchInsert(studentProjects, cleanProjects, "Student Project Allocations", 80, 85);
 
         // 6. project_assessments (links projectId -> studentProjects.id, supervisorId -> users.id)
-        if (Array.isArray(payload.projectAssessments)) {
-          for (const assessment of payload.projectAssessments) {
-            const clean = {
-              ...assessment,
-              createdAt: toDate(assessment.createdAt) || new Date(),
-              updatedAt: toDate(assessment.updatedAt) || new Date(),
-            };
-            await tx.insert(projectAssessments).values(clean).onConflictDoNothing();
-          }
-        }
+        const cleanAssessments = (payload.projectAssessments || []).map((assessment: any) => ({
+          ...assessment,
+          createdAt: toDate(assessment.createdAt) || new Date(),
+          updatedAt: toDate(assessment.updatedAt) || new Date(),
+        }));
+        await batchInsert(projectAssessments, cleanAssessments, "Project Assessments & Marks", 85, 88);
 
         // 7. project_milestones (links projectId -> studentProjects.id)
-        if (Array.isArray(payload.projectMilestones)) {
-          for (const milestone of payload.projectMilestones) {
-            const clean = {
-              ...milestone,
-              dueDate: toDate(milestone.dueDate) || new Date(),
-              completedAt: toDate(milestone.completedAt),
-              createdAt: toDate(milestone.createdAt) || new Date(),
-              updatedAt: toDate(milestone.updatedAt) || new Date(),
-            };
-            await tx.insert(projectMilestones).values(clean).onConflictDoNothing();
-          }
-        }
+        const cleanMilestones = (payload.projectMilestones || []).map((milestone: any) => ({
+          ...milestone,
+          dueDate: toDate(milestone.dueDate) || new Date(),
+          completedAt: toDate(milestone.completedAt),
+          createdAt: toDate(milestone.createdAt) || new Date(),
+          updatedAt: toDate(milestone.updatedAt) || new Date(),
+        }));
+        await batchInsert(projectMilestones, cleanMilestones, "Milestones & Deadlines", 88, 91);
 
         // 8. notifications (links userId -> users.id)
-        if (Array.isArray(payload.notifications)) {
-          for (const notif of payload.notifications) {
-            const clean = {
-              ...notif,
-              createdAt: toDate(notif.createdAt) || new Date(),
-              updatedAt: toDate(notif.updatedAt) || new Date(),
-            };
-            await tx.insert(notifications).values(clean).onConflictDoNothing();
-          }
-        }
+        const cleanNotifs = (payload.notifications || []).map((notif: any) => ({
+          ...notif,
+          createdAt: toDate(notif.createdAt) || new Date(),
+          updatedAt: toDate(notif.updatedAt) || new Date(),
+        }));
+        await batchInsert(notifications, cleanNotifs, "System Audit Notifications", 91, 94);
 
         // Step C: Sequence realign inside transaction
+        emit("sequences", 96, "Synchronizing sequence counters...", "Aligning sequences past MAX(id)");
         await this.syncSequences(tx);
       });
 
       // Ensure default admin exists if user list lacked it
       await this.initializeDefaultUser();
 
+      emit("complete", 100, "Database restored and synchronized successfully!", "All tables and sequences verified");
       console.log("🎉 Database restored and topological sync finished successfully.");
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ Database import transaction failed:", error);
       throw error;
     }

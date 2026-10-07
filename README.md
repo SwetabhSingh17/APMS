@@ -1,7 +1,7 @@
 <p align="center">
-  <h1 align="center">🎓 APMS (Academic Project Management System)</h1>
+  <h1 align="center">🎓 IU-APMP (Integral University Academic Project Management Portal)</h1>
   <p align="center">
-    A comprehensive project management system for educational institutions — streamlining project topic approval, student group formation, supervisor mentoring, and progress tracking.
+    A comprehensive academic project management portal for Integral University — streamlining project topic approval, student group formation, supervisor mentoring, progress tracking, complete A-Z backup & restore, and official multi-page university reporting.
   </p>
 </p>
 
@@ -66,7 +66,10 @@
 - **First-Login Security Enforcement** — Students and faculty supervisors onboarded via Excel or default password reset receive temporary initial passwords matching their identifier; upon first login, a non-dismissible modal and backend security interceptor enforce a mandatory password change before granting system access.
 - **Institutional Branding & Registration Gate** — Features the official Department logo, university typography headers, creator attributions, and a registration closed overlay on the authentication page (`IS_REGISTRATION_OPEN = false`).
 - **Academic Profile Management & Designation RBAC** — Profile settings displays the supervisor's designation directly beneath their name. Faculty can update personal prefixes, name details, email, and mobile, while academic designation remains protected and immutable except by authorized administrators.
-- **System Management** — Database export/import, Excel reports, full reset capabilities.
+- **Complete A-Z Backup & Archive Export (.zip)** — One-click backup extracting 100% of portal state across all 8 database tables (`student_groups`, `users`, `student_group_members`, `project_topics`, `student_projects`, `project_assessments`, `project_milestones`, `notifications`), individual per-table JSONs, consolidated full dump, integrity manifest, and SQL emergency recovery scripts with automatic server-side retention in `database/backups/`.
+- **High-Fidelity Topological Restore Engine** — Restores the portal replicating original state exactly in strict foreign key dependency order with atomic transaction protection (`db.transaction`), PostgreSQL sequence synchronization (`setval`), session retention, and automatic pre-restore safety snapshots.
+- **Official Multi-Page University Excel Report (.xlsx)** — Generates an official 8-sheet master workbook (Overview KPIs, Students Master, Faculty Supervisors, Project Teams, Topics Catalog, Student Allocations, Assessments & Marks, Milestones & Deadlines) for departmental and university administrative use.
+- **System Management Console Upgrade** — Interactive console with pre-flight file inspection (badges, timestamp, record count previews), live progress bar, stage indicator, event logs, and in-dialog error diagnosis.
 - **Security Hardened** — Helmet HTTP headers, rate-limited auth endpoints, soft-delete data retention, session-authenticated WebSockets, automatic scrypt password migration, per-resource ownership checks, and password-verified destructive operations.
 - **Error Resilient** — Global React Error Boundaries with graceful fallback UI and standardized machine-readable API error codes.
 - **Cybertruck Spatial UI** — Glassmorphism, dynamic context pill (iOS-style), holographic data grids, physics-based micro-interactions, and animated cinematic splash screens.
@@ -177,8 +180,8 @@ For the simplest setup experience, use the automated Setup Assistant. It will au
 
 **Step 1: Get the Code**
 ```bash
-git clone https://github.com/SwetabhSingh17/APMS.git
-cd APMS
+git clone https://github.com/SwetabhSingh17/IU-APMP.git
+cd IU-APMP
 ```
 
 **Step 2: Run the Setup Assistant**
@@ -203,8 +206,8 @@ If you prefer to run the steps manually:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/SwetabhSingh17/APMS.git
-   cd APMS
+   git clone https://github.com/SwetabhSingh17/IU-APMP.git
+   cd IU-APMP
    ```
 
 2. **Install dependencies**
@@ -284,7 +287,8 @@ All configuration is managed through a `.env` file at the project root.
 | `npm run build` | Build for production (client + server) |
 | `npm start` | Start production server |
 | `npm run check` | Run TypeScript type checking (`tsc`) |
-| `npm test` | Run TypeScript check and complete automated test suite across all 9 test suites |
+| `npm test` | Run TypeScript check and complete automated test suite across all 10 test suites |
+| `npm run test:backup` | Run complete A-Z backup export, topological restore ordering, and multi-sheet university excel verification suite |
 | `npm run test:search` | Run multi-word search engine tokenization & sub-millisecond benchmark suite |
 | `npm run test:admin-topics` | Run direct topic creation with faculty assignment verification suite |
 | `npm run test:teams` | Run team management CRUD, safe dissolution & supervisor optional verification suite |
