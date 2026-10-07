@@ -257,7 +257,7 @@ export default function CreatorInfoPage() {
                         Back to Reality
                     </Button>
                     <div className="text-xs uppercase tracking-[0.3em] text-white/50 border border-white/10 px-4 py-2 rounded-full backdrop-blur-md">
-                        {import.meta.env.VITE_INSTITUTION_NAME || "APMS (Academic Project Management System)"}
+                        {import.meta.env.VITE_INSTITUTION_NAME || "IU-APMP (Integral University Academic Project Management Portal)"}
                     </div>
                 </header>
 

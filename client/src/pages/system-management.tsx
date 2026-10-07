@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useMutation } from "@tanstack/react-query";
-import { Download, Trash2, Database, Upload, FileDown } from "lucide-react";
+import { Download, Trash2, Database, Upload, FileDown, Archive, ShieldCheck, CheckCircle2, AlertCircle } from "lucide-react";
 import MainLayout from "@/components/layout/main-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,25 @@ import { useState, useRef } from "react";
 import { UserRole } from "@shared/schema";
 import { useLocation } from "wouter";
 
+interface IBackupPreview {
+    fileName: string;
+    fileSizeKB: string;
+    isZip: boolean;
+    portalName?: string;
+    version?: string;
+    timestamp?: string;
+    recordCounts?: {
+        users?: number;
+        studentGroups?: number;
+        studentGroupMembers?: number;
+        projectTopics?: number;
+        studentProjects?: number;
+        projectAssessments?: number;
+        projectMilestones?: number;
+        notifications?: number;
+        totalRecords?: number;
+    };
+}
 
 export default function SystemManagement() {
     const { user } = useAuth();
@@ -37,30 +56,109 @@ export default function SystemManagement() {
     const [resetDialogOpen, setResetDialogOpen] = useState(false);
     const [adminPassword, setAdminPassword] = useState("");
 
-    // Import State
+    // Import State & Pre-flight Inspection
     const [importDialogOpen, setImportDialogOpen] = useState(false);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [preview, setPreview] = useState<IBackupPreview | null>(null);
+    const [isInspecting, setIsInspecting] = useState(false);
 
-    // Export Mutation
+    // File selection & pre-flight inspection
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0] || null;
+        setSelectedFile(file);
+        if (!file) {
+            setPreview(null);
+            return;
+        }
+
+        setIsInspecting(true);
+        try {
+            const isZip = file.name.endsWith(".zip");
+            const sizeKB = (file.size / 1024).toFixed(1);
+
+            if (isZip) {
+                const JSZip = (await import("jszip")).default;
+                const zip = await JSZip.loadAsync(file);
+                let metadata: any = null;
+                let recordCounts: any = {};
+
+                const manifestFile = zip.file("manifest.json");
+                if (manifestFile) {
+                    const manifestText = await manifestFile.async("string");
+                    metadata = JSON.parse(manifestText);
+                    recordCounts = metadata.recordCounts || {};
+                }
+
+                setPreview({
+                    fileName: file.name,
+                    fileSizeKB: `${sizeKB} KB`,
+                    isZip: true,
+                    portalName: metadata?.portalName || "IU-APMP Archive",
+                    version: metadata?.version || "2.2.0",
+                    timestamp: metadata?.exportedAt || "N/A",
+                    recordCounts
+                });
+            } else {
+                const text = await file.text();
+                const data = JSON.parse(text);
+                const metadata = data.metadata || {};
+                const recordCounts = metadata.recordCounts || {
+                    users: data.users?.length || 0,
+                    studentGroups: data.studentGroups?.length || 0,
+                    studentGroupMembers: data.studentGroupMembers?.length || 0,
+                    projectTopics: data.projectTopics?.length || 0,
+                    studentProjects: data.studentProjects?.length || 0,
+                    projectAssessments: data.projectAssessments?.length || 0,
+                    projectMilestones: data.projectMilestones?.length || 0,
+                    notifications: data.notifications?.length || 0
+                };
+
+                setPreview({
+                    fileName: file.name,
+                    fileSizeKB: `${sizeKB} KB`,
+                    isZip: false,
+                    portalName: metadata.portalName || "IU-APMP JSON Backup",
+                    version: metadata.version || "2.2.0",
+                    timestamp: metadata.exportedAt || data.timestamp || "N/A",
+                    recordCounts
+                });
+            }
+        } catch (err: any) {
+            console.warn("Pre-flight inspection skipped:", err);
+            setPreview({
+                fileName: file.name,
+                fileSizeKB: `${(file.size / 1024).toFixed(1)} KB`,
+                isZip: file.name.endsWith(".zip")
+            });
+        } finally {
+            setIsInspecting(false);
+        }
+    };
+
+    // A-Z Backup Export Mutation (Downloads ZIP package)
     const exportMutation = useMutation({
         mutationFn: async () => {
-            const res = await apiRequest("POST", "/api/admin/export", {});
-            if (!res.ok) throw new Error("Export failed");
+            const res = await fetch("/api/admin/export", {
+                method: "POST",
+                credentials: "include"
+            });
+            if (!res.ok) throw new Error("Backup export failed");
             return res.blob();
         },
         onSuccess: (blob) => {
+            const safeDate = new Date().toISOString().split("T")[0];
             const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
+            const a = document.createElement("a");
             a.href = url;
-            a.download = `project-hub-backup-${new Date().toISOString().split('T')[0]}.json`;
+            a.download = `IU-APMP_Backup_${safeDate}.zip`;
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
 
             toast({
-                title: "Export Successful",
-                description: "Data exported successfully.",
+                title: "Backup & Export Successful",
+                description: "Complete A-Z portal backup package (.zip) downloaded and retained on server.",
             });
         },
         onError: (error) => {
@@ -75,14 +173,19 @@ export default function SystemManagement() {
     // Import Mutation
     const importMutation = useMutation({
         mutationFn: async () => {
-            if (!selectedFile) throw new Error("No file selected");
+            if (!selectedFile) throw new Error("No backup file selected");
 
-            const fileContent = await selectedFile.text();
-            const data = JSON.parse(fileContent);
+            const formData = new FormData();
+            formData.append("file", selectedFile);
 
-            const res = await apiRequest("POST", "/api/admin/import", data);
+            const res = await fetch("/api/admin/import", {
+                method: "POST",
+                body: formData,
+                credentials: "include"
+            });
+
             if (!res.ok) {
-                const errorData = await res.json();
+                const errorData = await res.json().catch(() => ({}));
                 throw new Error(errorData.message || "Import failed");
             }
             return res.json();
@@ -90,14 +193,14 @@ export default function SystemManagement() {
         onSuccess: () => {
             setImportDialogOpen(false);
             setSelectedFile(null);
+            setPreview(null);
             if (fileInputRef.current) {
                 fileInputRef.current.value = "";
             }
             toast({
-                title: "Import Successful",
-                description: "Database restored and synchronized successfully.",
+                title: "Database Restored Successfully",
+                description: "Database restored, foreign keys resolved, and sequences synchronized.",
             });
-            // Refresh queries without forcing the active administrator to log in again
             queryClient.invalidateQueries();
         },
         onError: (error) => {
@@ -109,29 +212,35 @@ export default function SystemManagement() {
         }
     });
 
-    // Excel Export Mutation
+    // Multi-Sheet University Excel Export Mutation
     const exportExcelMutation = useMutation({
         mutationFn: async () => {
-            const res = await apiRequest("POST", "/api/admin/export-excel", {});
+            const res = await fetch("/api/admin/export-excel?multiSheet=true", {
+                method: "POST",
+                credentials: "include"
+            });
             if (!res.ok) throw new Error("Excel export failed");
-            return res.json();
+            return res.blob();
         },
-        onSuccess: async (result) => {
-            // Dynamically load xlsx only when needed to avoid 283KB in the page bundle
-            const XLSX = await import('xlsx');
-            const ws = XLSX.utils.json_to_sheet(result.data);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Projects Report");
-            XLSX.writeFile(wb, `project-report-${new Date().toISOString().split('T')[0]}.xlsx`);
+        onSuccess: (blob) => {
+            const safeDate = new Date().toISOString().split("T")[0];
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `IU-APMP_University_Report_${safeDate}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
 
             toast({
-                title: "Export Successful",
-                description: "Excel report downloaded successfully.",
+                title: "University Excel Report Downloaded",
+                description: "Multi-sheet official university workbook (.xlsx) downloaded with all 8 worksheets.",
             });
         },
         onError: (error) => {
             toast({
-                title: "Export Failed",
+                title: "Excel Export Failed",
                 description: error.message,
                 variant: "destructive",
             });
@@ -150,14 +259,11 @@ export default function SystemManagement() {
         onSuccess: () => {
             setResetDialogOpen(false);
             setAdminPassword("");
-            // Wipe the ENTIRE query cache — after a hard reset every cached
-            // list (users, stats, topics, ...) belongs to erased data.
             queryClient.clear();
             toast({
                 title: "System Reset Successful",
                 description: "Database reset. Please log in with default credentials (admin / Admin@123).",
             });
-            // Clear auth state and redirect to login
             setLocation("/auth");
         },
         onError: (error) => {
@@ -173,46 +279,46 @@ export default function SystemManagement() {
         <MainLayout>
             <div className="mb-6">
                 <h1 className="text-2xl font-bold text-foreground mb-1">System Management</h1>
-                <p className="text-muted-foreground">Manage database backups and system resets.</p>
+                <p className="text-muted-foreground">Manage IU-APMP database backups, institutional exports, and system maintenance.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl">
-                {/* Export Data Card */}
+                {/* A-Z Backup & Export Card */}
                 <Card>
                     <CardHeader>
                         <div className="flex items-center gap-2">
-                            <Database className="h-6 w-6 text-primary" />
-                            <CardTitle>Data Export</CardTitle>
+                            <Archive className="h-6 w-6 text-primary" />
+                            <CardTitle>A-Z Backup & Export</CardTitle>
                         </div>
-                        <CardDescription>Export all system data (users, projects, topics) to JSON format.</CardDescription>
+                        <CardDescription>Export complete portal state (all 8 tables, grades, milestones, logs) into a ZIP archive.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <p className="text-sm text-muted-foreground mb-4">
-                            This will generate a full backup of the system database. Use this for archiving or migration purposes.
+                            Generates an all-inclusive backup package (.zip) containing per-table JSONs, full snapshot, manifest, and SQL recovery script. A timestamped copy is auto-retained in <code className="bg-muted px-1 py-0.5 rounded text-xs">database/backups/</code>.
                         </p>
                         <Button className="w-full gap-2" onClick={() => exportMutation.mutate()} disabled={exportMutation.isPending}>
                             <Download className="h-4 w-4" />
-                            {exportMutation.isPending ? "Exporting..." : "Export Database"}
+                            {exportMutation.isPending ? "Generating Archive..." : "Backup & Export Portal (.zip)"}
                         </Button>
                     </CardContent>
                 </Card>
 
-                {/* Excel Export Card */}
+                {/* University Excel Report Card */}
                 <Card>
                     <CardHeader>
                         <div className="flex items-center gap-2">
                             <FileDown className="h-6 w-6 text-primary" />
-                            <CardTitle>Excel Report</CardTitle>
+                            <CardTitle>University Excel Report</CardTitle>
                         </div>
-                        <CardDescription>Generate comprehensive Excel report of all projects.</CardDescription>
+                        <CardDescription>Official 8-sheet Excel workbook for university administrative use.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <p className="text-sm text-muted-foreground mb-4">
-                            Export a detailed Excel spreadsheet with student info, projects, marks, project teams, and submission status.
+                            Exports a formatted 8-sheet master workbook (.xlsx) with Overview KPIs, Students Master, Faculty Supervisors, Teams, Topics Catalog, Allocations, Assessments, and Milestones.
                         </p>
                         <Button className="w-full gap-2" variant="secondary" onClick={() => exportExcelMutation.mutate()} disabled={exportExcelMutation.isPending}>
                             <FileDown className="h-4 w-4" />
-                            {exportExcelMutation.isPending ? "Generating..." : "Export as Excel"}
+                            {exportExcelMutation.isPending ? "Generating Report..." : "Export University Excel (.xlsx)"}
                         </Button>
                     </CardContent>
                 </Card>
@@ -222,52 +328,102 @@ export default function SystemManagement() {
                     <CardHeader>
                         <div className="flex items-center gap-2">
                             <Upload className="h-6 w-6 text-primary" />
-                            <CardTitle>Data Import</CardTitle>
+                            <CardTitle>Portal Import & Restore</CardTitle>
                         </div>
-                        <CardDescription>Restore system from a previously exported JSON backup.</CardDescription>
+                        <CardDescription>Restore system from a ZIP or JSON backup replicating original state exactly.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <p className="text-sm text-muted-foreground mb-4">
-                            Warning: This will replace current data with the backup. Ensure you have a current export before proceeding.
+                            Restores database in topological dependency order (resolving foreign keys), re-syncs sequences, and auto-generates a safety snapshot of the live database before applying.
                         </p>
-                        <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+                        <Dialog open={importDialogOpen} onOpenChange={(open) => {
+                            setImportDialogOpen(open);
+                            if (!open) {
+                                setSelectedFile(null);
+                                setPreview(null);
+                            }
+                        }}>
                             <DialogTrigger asChild>
                                 <Button className="w-full gap-2" variant="secondary">
                                     <Upload className="h-4 w-4" />
-                                    Import Database
+                                    Import & Restore Portal
                                 </Button>
                             </DialogTrigger>
-                            <DialogContent>
+                            <DialogContent className="max-w-xl">
                                 <DialogHeader>
-                                    <DialogTitle>Confirm Database Import</DialogTitle>
+                                    <DialogTitle>Confirm Portal Import & Restore</DialogTitle>
                                     <DialogDescription>
-                                        Select a backup file to restore. This action cannot be undone.
+                                        Select an official IU-APMP backup file (.zip or .json) to restore.
                                     </DialogDescription>
                                 </DialogHeader>
-                                <div className="space-y-4 py-4">
+                                <div className="space-y-4 py-3">
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium">Backup File</label>
+                                        <label className="text-sm font-medium">Backup File (.zip or .json)</label>
                                         <Input
                                             ref={fileInputRef}
                                             type="file"
                                             aria-label="Backup file"
-                                            accept=".json"
-                                            onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                                            accept=".zip,.json"
+                                            onChange={handleFileChange}
                                         />
-                                        {selectedFile && (
-                                            <p className="text-xs text-muted-foreground">
-                                                Selected: {selectedFile.name}
+                                        {isInspecting && (
+                                            <p className="text-xs text-muted-foreground animate-pulse">
+                                                Inspecting backup manifest and structure...
                                             </p>
                                         )}
+                                    </div>
+
+                                    {preview && (
+                                        <div className="rounded-lg border bg-muted/40 p-3 space-y-2 text-sm">
+                                            <div className="flex items-center justify-between font-medium">
+                                                <span className="flex items-center gap-1.5 text-primary">
+                                                    <CheckCircle2 className="h-4 w-4" />
+                                                    {preview.portalName || "IU-APMP Backup"}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">{preview.fileSizeKB}</span>
+                                            </div>
+                                            {preview.timestamp && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    Created: {preview.timestamp} {preview.version && `(v${preview.version})`}
+                                                </p>
+                                            )}
+                                            {preview.recordCounts && (
+                                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-xs">
+                                                    <div className="rounded bg-background p-1.5 border text-center">
+                                                        <div className="font-semibold text-foreground">{preview.recordCounts.users ?? "—"}</div>
+                                                        <div className="text-muted-foreground">Users</div>
+                                                    </div>
+                                                    <div className="rounded bg-background p-1.5 border text-center">
+                                                        <div className="font-semibold text-foreground">{preview.recordCounts.studentGroups ?? "—"}</div>
+                                                        <div className="text-muted-foreground">Teams</div>
+                                                    </div>
+                                                    <div className="rounded bg-background p-1.5 border text-center">
+                                                        <div className="font-semibold text-foreground">{preview.recordCounts.projectTopics ?? "—"}</div>
+                                                        <div className="text-muted-foreground">Topics</div>
+                                                    </div>
+                                                    <div className="rounded bg-background p-1.5 border text-center">
+                                                        <div className="font-semibold text-foreground">{preview.recordCounts.studentProjects ?? "—"}</div>
+                                                        <div className="text-muted-foreground">Projects</div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <div className="flex items-start gap-2.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-xs text-emerald-700 dark:text-emerald-300">
+                                        <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5" />
+                                        <span>
+                                            <strong>Zero-Data-Loss Safety:</strong> An automatic pre-restore safety snapshot of the live database will be created in <code className="bg-emerald-500/20 px-1 py-0.5 rounded">database/backups/</code> before restoring, ensuring immediate recovery if needed.
+                                        </span>
                                     </div>
                                 </div>
                                 <DialogFooter>
                                     <Button variant="outline" onClick={() => setImportDialogOpen(false)}>Cancel</Button>
                                     <Button
                                         onClick={() => importMutation.mutate()}
-                                        disabled={!selectedFile || importMutation.isPending}
+                                        disabled={!selectedFile || importMutation.isPending || isInspecting}
                                     >
-                                        {importMutation.isPending ? "Importing..." : "Confirm Import"}
+                                        {importMutation.isPending ? "Restoring Database..." : "Confirm & Restore"}
                                     </Button>
                                 </DialogFooter>
                             </DialogContent>
@@ -295,7 +451,7 @@ export default function SystemManagement() {
                                     className="w-full gap-2"
                                     onClick={() => toast({
                                         title: "Export your data first",
-                                        description: "Reset is instant and irreversible. Click 'Export Database' before proceeding if you want an archive of last year's records.",
+                                        description: "Reset is instant and irreversible. Click 'Backup & Export' before proceeding if you want an archive of current records.",
                                         variant: "destructive",
                                     })}
                                 >
@@ -311,7 +467,7 @@ export default function SystemManagement() {
                                     </DialogDescription>
                                 </DialogHeader>
                                 <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                                    Tip: If you haven't already, cancel and run <span className="font-semibold">Export Database</span> first —
+                                    Tip: If you haven't already, cancel and run <span className="font-semibold">Backup & Export Portal</span> first —
                                     the reset wipes everything instantly and gives you no way back.
                                 </div>
                                 <div className="space-y-4 py-4">

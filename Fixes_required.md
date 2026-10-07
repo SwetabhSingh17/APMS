@@ -77,10 +77,45 @@ This document outlines suggested architectural, security, and maintenance improv
     - Faculty Selection: Instead of authoring as the logged-in user, provide a Faculty/Supervisor selector so the Admin or Coordinator can select any registered faculty member.
     - Direct Assignment & Auto-Approval: Directly save that project topic as already **Approved** and assign it to the selected faculty supervisor upon creation (bypassing the supervisor submission & approval queue).
 
-- [ ] **Backup Export/Restore Loses Data & Breaks on FK Order**
-  - `exportData()` (`server/db-storage.ts`) exports only users, topics, projects, groups, members — **project_assessments (grades), project_milestones, and notifications are never archived**, so year-change backups silently drop all evaluation history.
-  - `importData()` inserts **users before student_groups**, but `users.group_id` has an FK to `student_groups.id` → every user row carrying a `groupId` violates the constraint, is caught, logged, and **silently skipped** during restore.
-  *Fix:* Export/import all tables; import in dependency order (groups → users → members → topics → projects → assessments → milestones).
+- [x] **IU-APMP Project Renaming & Comprehensive A-Z Backup, Restore & Multi-Page Excel System**
+  - **Project Renaming:** Rename the project to **IU-APMP (Integral University Academic Project Management Portal)** across application headers, navigation sidebar, document titles, and package metadata.
+    - *(CRITICAL CONSTRAINT: Do NOT change the Login Page `client/src/pages/auth-page.tsx`. Its existing institutional branding, logos, and layout must remain 100% untouched).*
+  - **Issue Background:** Current `exportData()` in `server/db-storage.ts` only exports 5 tables, completely omitting `project_assessments` (marks/evaluations), `project_milestones`, and `notifications`. In addition, `importData()` attempts to insert `users` prior to `student_groups`, which causes foreign key constraint violations on `users.group_id -> student_groups.id`, resulting in silent drops of student records during restores.
+  - **Core Requirements (3 Key Deliverables):**
+    1. **Complete A-Z Backup & Export (Folder / Archive Export):**
+       - A dedicated "Backup & Export" button that extracts 100% of portal data (A-Z data of the entire portal) without omission:
+         - All 8 database tables: `student_groups`, `users`, `student_group_members`, `project_topics`, `student_projects`, `project_assessments`, `project_milestones`, `notifications`.
+         - Packages data into a downloadable archive / folder structure containing:
+           - Individual JSON files per table (`users.json`, `student_groups.json`, etc.)
+           - Consolidated full-system snapshot `portal_database_dump.json`
+           - Raw PostgreSQL dump / insert script `backup.sql` for emergency terminal recovery
+           - Integrity manifest `manifest.json` (timestamp, portal version `IU-APMP`, schema version, record counts per table, checksum)
+         - Automatically retains a local copy in the server's `database/backups/` directory with timestamped filenames for immediate server-side recovery.
+    2. **High-Fidelity Import & Restore Section (Exact Portal & Database Replication):**
+       - A dedicated Import Section in the UI that accepts uploaded backup files (ZIP archive or consolidated JSON) and restores the portal to an exact replica of the backup.
+       - **Topological Dependency Order Insertion:** Strictly order table restoration to respect all foreign key relationships:
+         `student_groups` → `users` → `student_group_members` → `project_topics` → `student_projects` → `project_assessments` → `project_milestones` → `notifications`.
+       - **PostgreSQL Sequence Synchronization:** Automatically execute `setval(pg_get_serial_sequence(...))` to align sequences past `MAX(id) + 1` across all 8 tables to prevent duplicate key collisions on future insertions.
+       - **Transactional Integrity:** Wrap entire restore operation in an atomic database transaction (`db.transaction`). If any table or record fails, roll back completely to prevent database corruption.
+       - **Session Preservation:** Preserve the active administrator's session so they are not abruptly locked out upon restore completion.
+       - **Automatic Pre-Restore Safety Snapshot:** Automatically generate a safety snapshot of the live database prior to applying any restore, guaranteeing 100% rollback capability.
+    3. **Multi-Page University Excel Export (Single Workbook with Multiple Sheets):**
+       - A one-click export button that compiles and downloads an official University Excel workbook (`.xlsx`) containing multiple dedicated worksheets:
+         - **Sheet 1: Overview & Summary** — High-level statistics: total students, supervisors, teams, topics proposed/approved/pending, BCA vs MCA breakdown, completion metrics.
+         - **Sheet 2: Students Master List** — Enrollment No, Full Name, Email, Mobile, Course, Team Name/ID, Project Topic Code, Topic Title, Assigned Supervisor, Progress %, Status.
+         - **Sheet 3: Faculty Supervisors** — Emp ID, Name (with Prefix), Designation, Department, Email, Mobile, Topics Submitted, Approved Topics, Assigned Teams, Mentorship Load (e.g., 3/5).
+         - **Sheet 4: Project Teams / Groups** — Team ID, Team Name, Course, Size, Leader Name & Enrollment, Complete Member Roster, Assigned Supervisor, Assigned Topic Code & Title.
+         - **Sheet 5: Project Topics Catalog** — Topic Code (PUGID), Title, Description, Course, Project Type, Technology Stack, Complexity, Proposing Supervisor, Approval Status, Allotted Group.
+         - **Sheet 6: Student Projects & Progress** — Project ID, Student Name, Enrollment, Course, Topic Code & Title, Supervisor, Overall Progress %, Status, Allocation Date.
+         - **Sheet 7: Evaluations & Assessments** — Student Name, Enrollment, Course, Topic, Evaluator Supervisor, Score / Marks Obtained, Feedback Comments, Assessment Timestamp.
+         - **Sheet 8: Milestones & Deadlines** — Project Title, Student/Team, Milestone Title, Description, Due Date, Status, Completion Date.
+       - Professional layout: styled header rows, formatted column widths, and institutional metadata banner ("Integral University Academic Project Management Portal - IU-APMP").
+  - **Critical Production Safety & Compatibility Constraints:**
+    - The live PostgreSQL database is already running with live student and faculty records and no external fallback backup.
+    - **Zero Destructive Migrations:** No altering, dropping, or truncating live production tables during normal operations.
+    - **Read-Only Data Extraction:** All export and backup operations must be non-blocking, pure read queries against existing schema.
+    - **Safe Non-Destructive Testing:** Test and verify all backup, restore, and export logic using dedicated mock/isolated test datasets without touching production records.
+    - **Full Backward Compatibility:** Must be 100% compatible with existing frontend pages, active user sessions, and running system state.
 
 - [ ] **Dashboard "Recent Activity" Is Fake** — `server/routes/stats.ts`
   `GET /api/activities` returns a hardcoded mock list shown to Coordinators/Admins as if it were live department activity.

@@ -1,7 +1,8 @@
 # Version History
 
 ## 📋 Table of Contents
-- [Version 2.1.0 (Current)](#version-210-current)
+- [Version 2.2.0 (Current)](#version-220-current)
+- [Version 2.1.0](#version-210)
 - [Version 2.0.1](#version-201)
 - [Version 2.0.0 [v2]](#version-200-v2)
 - [Version 1.9.7](#version-197)
@@ -32,7 +33,45 @@
 
 ---
 
-## Version 2.1.0 (Current)
+## Version 2.2.0 (Current)
+### IU-APMP Renaming, Comprehensive A-Z Backup, Topological Restore & Multi-Page University Excel Reporting
+1. **IU-APMP Project Renaming (Login Page Intact)** —
+   - Rebranded project as **IU-APMP (Integral University Academic Project Management Portal)** across application header titles (`client/index.html`), navigation sidebar (`client/src/components/layout/sidebar.tsx`), creator documentation (`client/src/pages/creator-info.tsx`), and package metadata (`package.json`).
+   - Strictly preserved the login page (`client/src/pages/auth-page.tsx`) **100% untouched**, protecting institutional branding, logos, and layout.
+2. **Complete A-Z Backup & Export (All 8 Database Tables & Archive Packaging)** —
+   - Overhauled `exportData()` in `server/db-storage.ts` to export all 8 system tables: `student_groups`, `users`, `student_group_members`, `project_topics`, `student_projects`, `project_assessments` (evaluations & grades), `project_milestones` (deliverables & deadlines), and `notifications`.
+   - Implemented `createFullBackupPackage()` generating a standalone `.zip` archive containing:
+     - `manifest.json`: Verification manifest with timestamp, portal identification, schema version, and record counts.
+     - `portal_full_backup.json`: Consolidated full-system JSON snapshot for fast programmatic restoration.
+     - `tables/*.json`: Individual table JSON dumps for modular inspection.
+     - `backup_recovery.sql`: Formatted SQL insert statements with deferred constraints and sequence resets for emergency terminal recovery.
+     - Automatically retains a server-side copy in `database/backups/`.
+   - Endpoint: `POST /api/admin/export` streams the complete `.zip` archive by default or consolidated JSON when requested with `?format=json`.
+3. **High-Fidelity Topological Restore Engine & Zero-Data-Loss Safety** —
+   - **Pre-Restore Safety Snapshot**: Automatically creates a timestamped safety snapshot of the live database in `database/backups/pre_restore_snapshot_[TIMESTAMP].json` before applying any restore.
+   - **Topological Dependency Order**: Restores tables inside an atomic transaction (`db.transaction`) in strict foreign key order (`student_groups` → `users` → `student_group_members` → `project_topics` → `student_projects` → `project_assessments` → `project_milestones` → `notifications`), eliminating FK constraint errors where users with `groupId` were previously dropped.
+   - **Sequence Synchronization**: Executes `setval(pg_get_serial_sequence(...))` to align PostgreSQL sequences past $\max(\text{id}) + 1$ across all 8 tables.
+   - **Admin Session Retention**: Preserves active administrator authentication cookies (`preserveSessions: true`), preventing session loss post-restore.
+   - Endpoint: `POST /api/admin/import` configured with `multer` supporting multipart `.zip` or `.json` file uploads.
+4. **Official Multi-Page University Excel Report Generator (`.xlsx`)** —
+   - Implemented `generateUniversityExcelReport()` in `server/db-storage.ts` using `ExcelJS` producing an official institutional 8-sheet master workbook:
+     - **Sheet 1: Overview & Summary**: High-level KPIs, BCA vs MCA distribution, completion rates, and department statistics.
+     - **Sheet 2: Students Master List**: 700+ student directory with enrollment numbers, mobile numbers, team assignments, topic codes, titles, supervisors, and progress.
+     - **Sheet 3: Faculty Supervisors**: 60+ supervisor directory with employee IDs, designations, departments, contact info, and mentorship loads.
+     - **Sheet 4: Project Teams**: 150+ team directory with full member rosters, assigned supervisors, and topic allotments.
+     - **Sheet 5: Project Topics Catalog**: 300+ topic directory with PUGID codes, courses, tech stacks, complexity levels, supervisors, and approval statuses.
+     - **Sheet 6: Student Projects & Progress**: Student allocations, progress percentages, and status flags.
+     - **Sheet 7: Evaluations & Assessments**: Complete grading records, evaluation scores, and feedback comments.
+     - **Sheet 8: Milestones & Deadlines**: Deliverables, milestones, due dates, and completion timestamps.
+   - Endpoint: `POST /api/admin/export-excel?multiSheet=true` and `GET /api/admin/export-excel` streams the formatted binary `.xlsx` workbook, while maintaining backward compatibility for legacy queries.
+5. **System Management UI Console & Automated Verification Suite** —
+   - Upgraded `client/src/pages/system-management.tsx` with dedicated cards for A-Z Backup, University Excel Report, and Safe Restore.
+   - Built a pre-flight inspection modal parsing `.zip` and `.json` files to display record counts (Users, Teams, Topics, Projects) and backup metadata before confirmation.
+   - Created `scripts/verify_backup_and_excel_export.ts` (`npm run test:backup`) covering 65 automated test assertions with 100% pass rate and zero live data loss.
+
+---
+
+## Version 2.1.0
 ### Multi-Word Search Engine & In-Memory Indexing, Admin Direct Topic Allotment & UI/UX Enhancements
 1. **Multi-Word Search Engine & In-Memory Indexing (`client/src/lib/search-index.ts`)** —
    - **Multi-Token Space-Separated Matching**: Overhauled search query parsing logic to tokenize on whitespace, matching each token across all searchable fields (Title, PUGID, Description, Technologies, Supervisor Name, Student Names, and Enrollment Numbers) and resolving the bug where words following spaces were ignored.

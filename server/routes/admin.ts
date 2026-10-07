@@ -57,16 +57,23 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
         }
     });
 
-    // Export Database Data
+    // Export Database Data (Supports full A-Z ZIP archive or consolidated JSON)
     router.post("/api/admin/export", requireRole([UserRole.ADMIN]), async (req: Request, res: Response) => {
         try {
-            const data = await storage.exportData();
+            const format = (req.query.format as string || req.body?.format as string || 'zip').toLowerCase();
 
-            // Set headers for file download
-            res.setHeader('Content-Type', 'application/json');
-            res.setHeader('Content-Disposition', 'attachment; filename=database-export.json');
+            if (format === 'json') {
+                const data = await storage.exportData();
+                res.setHeader('Content-Type', 'application/json');
+                res.setHeader('Content-Disposition', `attachment; filename="IU-APMP-Backup-${new Date().toISOString().split('T')[0]}.json"`);
+                return res.json(data);
+            }
 
-            res.json(data);
+            const packageResult = await storage.createFullBackupPackage();
+            res.setHeader('Content-Type', 'application/zip');
+            res.setHeader('Content-Disposition', `attachment; filename="${packageResult.filename}"`);
+            res.setHeader('Content-Length', packageResult.buffer.length.toString());
+            res.send(packageResult.buffer);
         } catch (error) {
             console.error("Export failed:", error);
             res.status(500).json({ message: "Failed to export data" });
@@ -117,44 +124,85 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
         }
     });
 
-    // Import/Restore Database
-    router.post("/api/admin/import", requireRole([UserRole.ADMIN]), async (req: Request, res: Response) => {
+    // Import/Restore Database (Supports JSON body and multipart upload for ZIP or JSON)
+    router.post("/api/admin/import", requireRole([UserRole.ADMIN]), upload.single("file"), async (req: Request, res: Response) => {
         if (!isAuthenticatedRequest(req)) {
             return res.status(401).json({ message: "Unauthorized" });
         }
 
         try {
-            const importData = req.body;
-
-            // Validate that we have data
-            if (!importData || typeof importData !== 'object') {
-                return res.status(400).json({ message: "Invalid import data" });
+            let payload: any;
+            if (req.file) {
+                const isZip = req.file.mimetype.includes("zip") || req.file.originalname.endsWith(".zip");
+                if (isZip) {
+                    payload = req.file.buffer;
+                } else {
+                    const text = req.file.buffer.toString("utf-8");
+                    payload = JSON.parse(text);
+                }
+            } else {
+                payload = req.body;
             }
 
-            // Validate required structure
-            if (!importData.users && !importData.projectTopics && !importData.studentProjects) {
-                return res.status(400).json({
-                    message: "Invalid import format: missing required data tables"
-                });
+            if (!payload || (typeof payload !== "object" && !Buffer.isBuffer(payload))) {
+                return res.status(400).json({ message: "Invalid import data or file" });
             }
 
-            await storage.importData(importData);
-            res.json({ message: "Database restored successfully" });
-        } catch (error) {
+            await storage.importData(payload, { preserveSessions: true });
+            res.json({ message: "Database restored and synchronized successfully." });
+        } catch (error: any) {
             console.error("Import failed:", error);
-            res.status(500).json({ message: "Failed to import database" });
+            res.status(500).json({ message: error.message || "Failed to import database" });
         }
     });
 
-    // Generate Excel Report
-    router.post("/api/admin/export-excel", requireRole([UserRole.ADMIN]), async (req: Request, res: Response) => {
+    // Generate Excel Report (Supports both official 8-sheet XLSX and legacy JSON format)
+    router.post("/api/admin/export-excel", requireRole([UserRole.ADMIN, UserRole.COORDINATOR]), async (req: Request, res: Response) => {
         if (!isAuthenticatedRequest(req)) {
             return res.status(401).json({ message: "Unauthorized" });
         }
 
         try {
+            const wantsBinary = req.query.multiSheet === 'true' ||
+                                req.body?.multiSheet === true ||
+                                req.query.format === 'xlsx' ||
+                                req.headers['accept']?.includes('application/vnd');
+
+            if (wantsBinary) {
+                const buffer = await storage.generateUniversityExcelReport();
+                const safeDate = new Date().toISOString().replace(/[:.]/g, "-").replace("T", "_");
+                const filename = `IU-APMP_University_Report_${safeDate}.xlsx`;
+
+                res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+                res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+                res.setHeader('Content-Length', buffer.length.toString());
+                return res.send(buffer);
+            }
+
+            // Default / JSON response for legacy client consumers
             const reportData = await storage.generateExcelReport();
             res.json({ data: reportData });
+        } catch (error) {
+            console.error("Excel export failed:", error);
+            res.status(500).json({ message: "Failed to generate Excel report" });
+        }
+    });
+
+    // Direct GET download for multi-sheet official university Excel workbook
+    router.get("/api/admin/export-excel", requireRole([UserRole.ADMIN, UserRole.COORDINATOR]), async (req: Request, res: Response) => {
+        if (!isAuthenticatedRequest(req)) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        try {
+            const buffer = await storage.generateUniversityExcelReport();
+            const safeDate = new Date().toISOString().replace(/[:.]/g, "-").replace("T", "_");
+            const filename = `IU-APMP_University_Report_${safeDate}.xlsx`;
+
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            res.setHeader('Content-Length', buffer.length.toString());
+            res.send(buffer);
         } catch (error) {
             console.error("Excel export failed:", error);
             res.status(500).json({ message: "Failed to generate Excel report" });

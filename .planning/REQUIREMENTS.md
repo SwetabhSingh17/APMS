@@ -16,11 +16,20 @@ See [milestones/v2.1.0-REQUIREMENTS.md](milestones/v2.1.0-REQUIREMENTS.md) for f
 
 ## Active Requirements (Milestone v2.2.0)
 
-### Data Integrity & Backups
+### Project Branding & Identity
 
-- [ ] **BACKUP-01**: Backup export archives all 9 database tables including assessments, milestones, and notifications
-- [ ] **BACKUP-02**: Backup restore inserts records in strict topological dependency order without foreign key violations
-- [ ] **BACKUP-03**: Sequences are re-synchronized past imported maximum IDs after restore
+- [x] **RENAME-01**: Rename portal to IU-APMP (Integral University Academic Project Management Portal) across sidebar, page titles, navigation, and package metadata, strictly leaving login page (`auth-page.tsx`) untouched
+
+### Data Integrity, A-Z Backup & Restore
+
+- [x] **BACKUP-01**: Complete A-Z Backup Export archives all 8 database tables (groups, users, members, topics, projects, assessments, milestones, notifications) plus metadata manifest
+- [x] **BACKUP-02**: Backup export packages data into downloadable folder/archive containing individual JSON files per table, full database dump, and SQL fallback script, auto-saving to `database/backups/`
+- [x] **BACKUP-03**: Topological restore engine reconstructs database with exact fidelity in foreign key dependency order without constraint violations
+- [x] **BACKUP-04**: Atomic transaction restore with automated pre-restore safety snapshot, PostgreSQL sequence synchronization past MAX(id), and active admin session retention
+
+### University Reporting & Exports
+
+- [x] **EXCEL-01**: Multi-sheet university Excel workbook export generating 8 dedicated worksheets (Overview, Students Master, Faculty Supervisors, Project Teams, Project Topics, Student Projects, Assessments, Milestones) for institutional use
 
 ### Security & Access Control
 

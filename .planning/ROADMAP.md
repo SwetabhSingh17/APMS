@@ -10,28 +10,33 @@ This roadmap defines the next evolution cycle of the Integral University Academi
 
 ## Active Phases (Milestone v2.2.0)
 
-- [ ] **Phase 1: Backup & Restore Integrity** - Guarantee complete 9-table backups and topological restore order without foreign key conflicts
+- [x] **Phase 1: IU-APMP Renaming, A-Z Backup, Topological Restore & Multi-Page Excel Export** - Complete 8-table archive export, safe transactional restore, 8-sheet university Excel reporting, and IU-APMP project rebranding (login page unchanged)
 - [ ] **Phase 2: Security Hardening & Registration Controls** - Enforce server-side registration locks and input sanitization on user submissions
 - [ ] **Phase 3: Live Activity & Audit Trail** - Replace mock activity feeds with persistent departmental audit event streams
 - [ ] **Phase 4: Architecture Modularity & Clean Services** - Decouple route handlers into domain services and clean up dead server instances
 
 ## Phase Details
 
-### Phase 1: Backup & Restore Integrity
+### Phase 1: IU-APMP Renaming, A-Z Backup, Topological Restore & Multi-Page Excel Export
 
-**Goal**: Ensure database exports capture complete evaluation history and restores execute safely without foreign key errors.
+**Goal**: Deliver a 100% complete A-Z backup & restore system with foreign key dependency order, an official 8-sheet university Excel export, and standardize portal branding as IU-APMP (leaving login page untouched) with zero production data loss.
 **Depends on**: Nothing (first phase)
-**Requirements**: BACKUP-01, BACKUP-02, BACKUP-03
+**Requirements**: RENAME-01, BACKUP-01, BACKUP-02, BACKUP-03, BACKUP-04, EXCEL-01
 **Success Criteria** (what must be TRUE):
-  1. `exportData()` exports all 9 tables: users, groups, members, topics, projects, milestones, assessments, notifications, sessions.
-  2. `importData()` inserts records in topological order (groups → users → members → topics → projects → assessments → milestones).
-  3. PostgreSQL sequence counters are safely aligned past imported maximum IDs to avoid duplicate key errors.
+  1. Project rebranded as IU-APMP (Integral University Academic Project Management Portal) across navigation, sidebar, titles, and metadata while strictly preserving `auth-page.tsx` untouched.
+  2. Backup & Export button generates a complete archive (zip/folder) containing all 8 tables (`student_groups`, `users`, `student_group_members`, `project_topics`, `student_projects`, `project_assessments`, `project_milestones`, `notifications`), manifest with counts, and SQL insert dump, saving a copy in `database/backups/`.
+  3. Import & Restore reconstructs the portal with exact fidelity in topological order (`groups` → `users` → `members` → `topics` → `projects` → `assessments` → `milestones` → `notifications`) inside an atomic transaction with automated pre-restore safety snapshot.
+  4. PostgreSQL sequence counters are safely aligned past imported maximum IDs across all tables.
+  5. Multi-Page Excel Export generates an official single `.xlsx` workbook containing 8 dedicated worksheets for departmental and university administrative reporting.
+  6. All operations maintain 100% backward compatibility and zero disruption to the active running production database.
 
-**Plans**: 2 plans
+**Plans**: 4 plans
 
 Plans:
-- [ ] 01-01: Update `exportData` and `importData` in `server/db-storage.ts` for all 9 tables and foreign key order
-- [ ] 01-02: Add automated backup/restore verification test script to `scripts/`
+- [x] 01-01: A-Z Complete Portal Backup Engine & Server Archive Packaging
+- [x] 01-02: High-Fidelity Topological Restore Engine with Atomic Transaction & Pre-Restore Snapshot
+- [x] 01-03: Multi-Sheet University Excel Report Generator & Project Renaming to IU-APMP
+- [x] 01-04: System Management UI Console Upgrade & Non-Destructive Test Suite
 
 ### Phase 2: Security Hardening & Registration Controls
 
@@ -84,7 +89,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Backup & Restore Integrity | 0/2 | Not started | - |
+| 1. IU-APMP Renaming, A-Z Backup, Topological Restore & Multi-Page Excel Export | 4/4 | Complete | 2026-10-07 |
 | 2. Security Hardening & Registration Controls | 0/2 | Not started | - |
 | 3. Live Activity & Audit Trail | 0/1 | Not started | - |
 | 4. Architecture Modularity & Clean Services | 0/2 | Not started | - |

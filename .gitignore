@@ -46,6 +46,8 @@ yarn-error.log*
 # ==============================================================================
 database/backups/*.sql
 database/backups/*.dump
+database/backups/*.zip
+database/backups/*.json
 
 # ==============================================================================
 # Temporary / Debug Files

@@ -16,6 +16,10 @@ import session from "express-session";
 import { pool } from "./db";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
+import * as fs from "fs/promises";
+import * as path from "path";
+import JSZip from "jszip";
+import ExcelJS from "exceljs";
 
 // Use the exact type that IStorage expects.
 const PostgresSessionStore = connectPg(session);
@@ -1660,19 +1664,173 @@ export class DBStorage {
 
   // Admin operations
   async exportData(): Promise<any> {
+    const groupsData = await db.select().from(studentGroups);
     const usersData = await db.select().from(users);
+    const groupMembersData = await db.select().from(studentGroupMembers);
     const topicsData = await db.select().from(projectTopics);
     const projectsData = await db.select().from(studentProjects);
-    const groupsData = await db.select().from(studentGroups);
-    const groupMembersData = await db.select().from(studentGroupMembers);
+    const assessmentsData = await db.select().from(projectAssessments);
+    const milestonesData = await db.select().from(projectMilestones);
+    const notificationsData = await db.select().from(notifications);
+
+    const timestamp = new Date().toISOString();
+    const metadata = {
+      portalName: "Integral University Academic Project Management Portal (IU-APMP)",
+      portalCode: "IU-APMP",
+      version: "2.2.0",
+      exportedAt: timestamp,
+      recordCounts: {
+        studentGroups: groupsData.length,
+        users: usersData.length,
+        studentGroupMembers: groupMembersData.length,
+        projectTopics: topicsData.length,
+        studentProjects: projectsData.length,
+        projectAssessments: assessmentsData.length,
+        projectMilestones: milestonesData.length,
+        notifications: notificationsData.length,
+        totalRecords: (
+          groupsData.length +
+          usersData.length +
+          groupMembersData.length +
+          topicsData.length +
+          projectsData.length +
+          assessmentsData.length +
+          milestonesData.length +
+          notificationsData.length
+        )
+      }
+    };
 
     return {
+      metadata,
       users: usersData,
-      projectTopics: topicsData,
-      studentProjects: projectsData,
       studentGroups: groupsData,
       studentGroupMembers: groupMembersData,
-      timestamp: new Date().toISOString()
+      projectTopics: topicsData,
+      studentProjects: projectsData,
+      projectAssessments: assessmentsData,
+      projectMilestones: milestonesData,
+      notifications: notificationsData,
+      timestamp
+    };
+  }
+
+  generateSqlDump(data: any): string {
+    const escapeSql = (val: any): string => {
+      if (val === null || val === undefined) return 'NULL';
+      if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
+      if (typeof val === 'number') return String(val);
+      if (val instanceof Date) return `'${val.toISOString()}'`;
+      if (typeof val === 'object') {
+        const jsonStr = JSON.stringify(val).replace(/'/g, "''");
+        return `'${jsonStr}'::jsonb`;
+      }
+      return `'${String(val).replace(/'/g, "''")}'`;
+    };
+
+    const generateTableInserts = (tableName: string, rows: any[]): string => {
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return `-- Table: "${tableName}" (0 records)\n`;
+      }
+      const columns = Object.keys(rows[0]);
+      const quotedCols = columns.map(c => `"${c.replace(/"/g, '""')}"`).join(', ');
+      const statements: string[] = [`-- Table: "${tableName}" (${rows.length} records)`];
+      for (const row of rows) {
+        const values = columns.map(col => escapeSql(row[col])).join(', ');
+        statements.push(`INSERT INTO "${tableName}" (${quotedCols}) VALUES (${values}) ON CONFLICT DO NOTHING;`);
+      }
+      return statements.join('\n') + '\n';
+    };
+
+    const header = [
+      '--',
+      '-- IU-APMP PostgreSQL Database Recovery Dump',
+      '-- Portal: Integral University Academic Project Management Portal (IU-APMP)',
+      `-- Generated at: ${data.timestamp || new Date().toISOString()}`,
+      '--',
+      'BEGIN;',
+      'SET CONSTRAINTS ALL DEFERRED;\n'
+    ].join('\n');
+
+    const body = [
+      generateTableInserts('student_groups', data.studentGroups || []),
+      generateTableInserts('users', data.users || []),
+      generateTableInserts('student_group_members', data.studentGroupMembers || []),
+      generateTableInserts('project_topics', data.projectTopics || []),
+      generateTableInserts('student_projects', data.studentProjects || []),
+      generateTableInserts('project_assessments', data.projectAssessments || []),
+      generateTableInserts('project_milestones', data.projectMilestones || []),
+      generateTableInserts('notifications', data.notifications || [])
+    ].join('\n');
+
+    const sequences = [
+      '-- Synchronize Sequence Counters',
+      'SELECT setval(pg_get_serial_sequence(\'"users"\', \'id\'), COALESCE((SELECT MAX(id) FROM "users"), 0) + 1, false);',
+      'SELECT setval(pg_get_serial_sequence(\'"student_groups"\', \'id\'), COALESCE((SELECT MAX(id) FROM "student_groups"), 0) + 1, false);',
+      'SELECT setval(pg_get_serial_sequence(\'"student_group_members"\', \'id\'), COALESCE((SELECT MAX(id) FROM "student_group_members"), 0) + 1, false);',
+      'SELECT setval(pg_get_serial_sequence(\'"project_topics"\', \'id\'), COALESCE((SELECT MAX(id) FROM "project_topics"), 0) + 1, false);',
+      'SELECT setval(pg_get_serial_sequence(\'"student_projects"\', \'id\'), COALESCE((SELECT MAX(id) FROM "student_projects"), 0) + 1, false);',
+      'SELECT setval(pg_get_serial_sequence(\'"project_assessments"\', \'id\'), COALESCE((SELECT MAX(id) FROM "project_assessments"), 0) + 1, false);',
+      'SELECT setval(pg_get_serial_sequence(\'"project_milestones"\', \'id\'), COALESCE((SELECT MAX(id) FROM "project_milestones"), 0) + 1, false);',
+      'SELECT setval(pg_get_serial_sequence(\'"notifications"\', \'id\'), COALESCE((SELECT MAX(id) FROM "notifications"), 0) + 1, false);',
+      'COMMIT;\n'
+    ].join('\n');
+
+    return `${header}\n${body}\n${sequences}`;
+  }
+
+  async createFullBackupPackage(): Promise<{
+    buffer: Buffer;
+    filename: string;
+    filePath: string;
+    exportData: any;
+  }> {
+    const data = await this.exportData();
+    const zip = new JSZip();
+
+    // 1. Manifest
+    zip.file("manifest.json", JSON.stringify(data.metadata, null, 2));
+
+    // 2. Full consolidated dump for fast programmatic import
+    zip.file("portal_full_backup.json", JSON.stringify(data, null, 2));
+
+    // 3. Individual table files in tables/
+    const tablesFolder = zip.folder("tables") || zip;
+    tablesFolder.file("student_groups.json", JSON.stringify(data.studentGroups, null, 2));
+    tablesFolder.file("users.json", JSON.stringify(data.users, null, 2));
+    tablesFolder.file("student_group_members.json", JSON.stringify(data.studentGroupMembers, null, 2));
+    tablesFolder.file("project_topics.json", JSON.stringify(data.projectTopics, null, 2));
+    tablesFolder.file("student_projects.json", JSON.stringify(data.studentProjects, null, 2));
+    tablesFolder.file("project_assessments.json", JSON.stringify(data.projectAssessments, null, 2));
+    tablesFolder.file("project_milestones.json", JSON.stringify(data.projectMilestones, null, 2));
+    tablesFolder.file("notifications.json", JSON.stringify(data.notifications, null, 2));
+
+    // 4. SQL recovery script
+    const sqlDump = this.generateSqlDump(data);
+    zip.file("backup_recovery.sql", sqlDump);
+
+    // Generate zip buffer
+    const buffer = await zip.generateAsync({
+      type: "nodebuffer",
+      compression: "DEFLATE",
+      compressionOptions: { level: 9 }
+    });
+
+    // Save local copy to database/backups
+    const backupsDir = path.join(process.cwd(), "database", "backups");
+    await fs.mkdir(backupsDir, { recursive: true });
+
+    const safeDate = new Date().toISOString().replace(/[:.]/g, "-").replace("T", "_");
+    const filename = `IU-APMP_Backup_${safeDate}.zip`;
+    const filePath = path.join(backupsDir, filename);
+
+    await fs.writeFile(filePath, buffer);
+
+    return {
+      buffer,
+      filename,
+      filePath,
+      exportData: data
     };
   }
 
@@ -1712,77 +1870,211 @@ export class DBStorage {
     return this.initializeDefaultUser();
   }
 
-  async importData(data: any): Promise<boolean> {
+  async createPreRestoreSnapshot(): Promise<string> {
+    const data = await this.exportData();
+    const backupsDir = path.join(process.cwd(), "database", "backups");
+    await fs.mkdir(backupsDir, { recursive: true });
+
+    const safeDate = new Date().toISOString().replace(/[:.]/g, "-").replace("T", "_");
+    const filename = `pre_restore_snapshot_${safeDate}.json`;
+    const filePath = path.join(backupsDir, filename);
+
+    await fs.writeFile(filePath, JSON.stringify(data, null, 2), "utf-8");
+    return filePath;
+  }
+
+  async parseBackupPayload(data: any): Promise<any> {
+    if (!data) throw new Error("No import data provided");
+
+    if (Buffer.isBuffer(data)) {
+      try {
+        const zip = await JSZip.loadAsync(data);
+        const fullBackupFile = zip.file("portal_full_backup.json");
+        if (fullBackupFile) {
+          const content = await fullBackupFile.async("string");
+          return JSON.parse(content);
+        }
+
+        // Reconstruct from tables/ or root
+        const readTable = async (name: string) => {
+          const f = zip.file(`tables/${name}.json`) || zip.file(`${name}.json`);
+          if (f) {
+            const text = await f.async("string");
+            return JSON.parse(text);
+          }
+          return [];
+        };
+
+        return {
+          studentGroups: await readTable("student_groups"),
+          users: await readTable("users"),
+          studentGroupMembers: await readTable("student_group_members"),
+          projectTopics: await readTable("project_topics"),
+          studentProjects: await readTable("student_projects"),
+          projectAssessments: await readTable("project_assessments"),
+          projectMilestones: await readTable("project_milestones"),
+          notifications: await readTable("notifications"),
+        };
+      } catch (err: any) {
+        console.error("Failed to parse backup ZIP file:", err);
+        throw new Error("Invalid or corrupted backup ZIP archive");
+      }
+    }
+
+    if (typeof data === "string") {
+      try {
+        return JSON.parse(data);
+      } catch (err) {
+        throw new Error("Invalid JSON import format");
+      }
+    }
+
+    return data;
+  }
+
+  async importData(data: any, options?: { preserveSessions?: boolean; skipSnapshot?: boolean }): Promise<boolean> {
+    const preserveSessions = options?.preserveSessions !== false;
+
+    // 1. Parse and validate input payload
+    const payload = await this.parseBackupPayload(data);
+
+    if (!payload.users && !payload.studentGroups && !payload.projectTopics && !payload.studentProjects) {
+      throw new Error("Invalid import payload: missing required database entities");
+    }
+
+    // 2. Automated Pre-Restore Safety Snapshot (ensures zero data loss)
+    if (!options?.skipSnapshot) {
+      console.log("📸 Generating automated pre-restore safety snapshot...");
+      const snapshotFile = await this.createPreRestoreSnapshot();
+      console.log(`✅ Pre-restore safety snapshot saved to: ${snapshotFile}`);
+    }
+
+    // Drop live WebSockets
+    disconnectAllClients();
+
+    const toDate = (v: any) => (v ? new Date(v) : null);
+
+    // 3. Execute atomic transaction
     try {
-      // First, clear existing data (except admin user).
-      // preserveSessions keeps the importing admin logged in.
-      await this.resetDatabase({ preserveSessions: true });
+      await db.transaction(async (tx) => {
+        // Step A: Truncate tables (preserving sessions if requested)
+        const dataTables = `"project_assessments", "project_milestones", "student_projects", "student_group_members", "student_groups", "project_topics", "notifications", "users"`;
+        if (!preserveSessions) {
+          await tx.execute(sql.raw(`TRUNCATE TABLE ${dataTables}, "session" RESTART IDENTITY CASCADE`));
+        } else {
+          await tx.execute(sql.raw(`TRUNCATE TABLE ${dataTables} RESTART IDENTITY CASCADE`));
+        }
 
-      // Import users (skip admin since it exists)
-      if (data.users && Array.isArray(data.users)) {
-        for (const user of data.users) {
-          if (user.role !== UserRole.ADMIN) {
-            try {
-              await db.insert(users).values(user).onConflictDoNothing();
-            } catch (err) {
-              console.error("Failed to insert user:", user.id, err);
-            }
+        // Step B: Topological Dependency Order Insertion
+
+        // 1. student_groups (Parent to user group references)
+        if (Array.isArray(payload.studentGroups)) {
+          for (const group of payload.studentGroups) {
+            const clean = {
+              ...group,
+              createdAt: toDate(group.createdAt) || new Date(),
+              updatedAt: toDate(group.updatedAt) || new Date(),
+            };
+            await tx.insert(studentGroups).values(clean).onConflictDoNothing();
           }
         }
-      }
 
-      // Import student groups
-      if (data.studentGroups && Array.isArray(data.studentGroups)) {
-        for (const group of data.studentGroups) {
-          try {
-            await db.insert(studentGroups).values(group).onConflictDoNothing();
-          } catch (err) {
-            console.error("Failed to insert group:", group.id, err);
+        // 2. users (foreign key to student_groups.id is now guaranteed to exist!)
+        if (Array.isArray(payload.users)) {
+          for (const user of payload.users) {
+            const clean = {
+              ...user,
+              createdAt: toDate(user.createdAt) || new Date(),
+              updatedAt: toDate(user.updatedAt) || new Date(),
+            };
+            await tx.insert(users).values(clean).onConflictDoNothing();
           }
         }
-      }
 
-      // Import student group members
-      if (data.studentGroupMembers && Array.isArray(data.studentGroupMembers)) {
-        for (const member of data.studentGroupMembers) {
-          try {
-            await db.insert(studentGroupMembers).values(member).onConflictDoNothing();
-          } catch (err) {
-            console.error("Failed to insert group member:", err);
+        // 3. student_group_members (links users.id and student_groups.id)
+        if (Array.isArray(payload.studentGroupMembers)) {
+          for (const member of payload.studentGroupMembers) {
+            const clean = {
+              ...member,
+              joinedAt: toDate(member.joinedAt) || new Date(),
+            };
+            await tx.insert(studentGroupMembers).values(clean).onConflictDoNothing();
           }
         }
-      }
 
-      // Import project topics
-      if (data.projectTopics && Array.isArray(data.projectTopics)) {
-        for (const topic of data.projectTopics) {
-          try {
-            await db.insert(projectTopics).values(topic).onConflictDoNothing();
-          } catch (err) {
-            console.error("Failed to insert topic:", topic.id, err);
+        // 4. project_topics (links submittedById -> users.id)
+        if (Array.isArray(payload.projectTopics)) {
+          for (const topic of payload.projectTopics) {
+            const clean = {
+              ...topic,
+              createdAt: toDate(topic.createdAt) || new Date(),
+              updatedAt: toDate(topic.updatedAt) || new Date(),
+            };
+            await tx.insert(projectTopics).values(clean).onConflictDoNothing();
           }
         }
-      }
 
-      // Import student projects
-      if (data.studentProjects && Array.isArray(data.studentProjects)) {
-        for (const project of data.studentProjects) {
-          try {
-            await db.insert(studentProjects).values(project).onConflictDoNothing();
-          } catch (err) {
-            console.error("Failed to insert project:", project.id, err);
+        // 5. student_projects (links studentId -> users.id, topicId -> projectTopics.id)
+        if (Array.isArray(payload.studentProjects)) {
+          for (const project of payload.studentProjects) {
+            const clean = {
+              ...project,
+              createdAt: toDate(project.createdAt) || new Date(),
+              updatedAt: toDate(project.updatedAt) || new Date(),
+            };
+            await tx.insert(studentProjects).values(clean).onConflictDoNothing();
           }
         }
-      }
 
-      // PostgreSQL does NOT advance serial sequences when rows are inserted
-      // with explicit ids. Re-sync every sequence past the imported MAX(id)
-      // so newly created records can never collide with imported ones.
-      await this.syncSequences();
+        // 6. project_assessments (links projectId -> studentProjects.id, supervisorId -> users.id)
+        if (Array.isArray(payload.projectAssessments)) {
+          for (const assessment of payload.projectAssessments) {
+            const clean = {
+              ...assessment,
+              createdAt: toDate(assessment.createdAt) || new Date(),
+              updatedAt: toDate(assessment.updatedAt) || new Date(),
+            };
+            await tx.insert(projectAssessments).values(clean).onConflictDoNothing();
+          }
+        }
 
+        // 7. project_milestones (links projectId -> studentProjects.id)
+        if (Array.isArray(payload.projectMilestones)) {
+          for (const milestone of payload.projectMilestones) {
+            const clean = {
+              ...milestone,
+              dueDate: toDate(milestone.dueDate) || new Date(),
+              completedAt: toDate(milestone.completedAt),
+              createdAt: toDate(milestone.createdAt) || new Date(),
+              updatedAt: toDate(milestone.updatedAt) || new Date(),
+            };
+            await tx.insert(projectMilestones).values(clean).onConflictDoNothing();
+          }
+        }
+
+        // 8. notifications (links userId -> users.id)
+        if (Array.isArray(payload.notifications)) {
+          for (const notif of payload.notifications) {
+            const clean = {
+              ...notif,
+              createdAt: toDate(notif.createdAt) || new Date(),
+              updatedAt: toDate(notif.updatedAt) || new Date(),
+            };
+            await tx.insert(notifications).values(clean).onConflictDoNothing();
+          }
+        }
+
+        // Step C: Sequence realign inside transaction
+        await this.syncSequences(tx);
+      });
+
+      // Ensure default admin exists if user list lacked it
+      await this.initializeDefaultUser();
+
+      console.log("🎉 Database restored and topological sync finished successfully.");
       return true;
     } catch (error) {
-      console.error("Import failed:", error);
+      console.error("❌ Database import transaction failed:", error);
       throw error;
     }
   }
@@ -1790,7 +2082,8 @@ export class DBStorage {
   /**
    * Aligns each table's id sequence to MAX(id) + 1. Safe on empty tables.
    */
-  private async syncSequences(): Promise<void> {
+  async syncSequences(tx?: any): Promise<void> {
+    const executor = tx || db;
     const tables = [
       "users",
       "student_groups",
@@ -1803,7 +2096,7 @@ export class DBStorage {
     ];
     for (const table of tables) {
       try {
-        await db.execute(sql.raw(
+        await executor.execute(sql.raw(
           `SELECT setval(pg_get_serial_sequence('"${table}"', 'id'), COALESCE((SELECT MAX(id) FROM "${table}"), 0) + 1, false)`
         ));
       } catch (err) {
@@ -1858,6 +2151,423 @@ export class DBStorage {
     }));
 
     return reportData;
+  }
+
+  async generateUniversityExcelReport(): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "Integral University Academic Project Management Portal (IU-APMP)";
+    workbook.lastModifiedBy = "IU-APMP System";
+    workbook.created = new Date();
+
+    const headerFill: ExcelJS.Fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF1E3A8A" } // Deep navy blue
+    };
+    const headerFont: Partial<ExcelJS.Font> = {
+      name: "Calibri",
+      size: 11,
+      bold: true,
+      color: { argb: "FFFFFFFF" }
+    };
+    const cellFont: Partial<ExcelJS.Font> = {
+      name: "Calibri",
+      size: 10
+    };
+    const thinBorder: Partial<ExcelJS.Borders> = {
+      top: { style: "thin", color: { argb: "FFE5E7EB" } },
+      left: { style: "thin", color: { argb: "FFE5E7EB" } },
+      bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
+      right: { style: "thin", color: { argb: "FFE5E7EB" } }
+    };
+
+    const styleWorksheet = (sheet: ExcelJS.Worksheet) => {
+      const headerRow = sheet.getRow(1);
+      headerRow.height = 26;
+      headerRow.eachCell((cell) => {
+        cell.fill = headerFill;
+        cell.font = headerFont;
+        cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+      });
+
+      sheet.eachRow((row, rowNumber) => {
+        if (rowNumber > 1) {
+          row.height = 20;
+          row.eachCell((cell) => {
+            cell.font = cellFont;
+            cell.border = thinBorder;
+            cell.alignment = { vertical: "middle" };
+          });
+        }
+      });
+
+      sheet.columns.forEach((column) => {
+        let maxLen = 12;
+        if (column.header) {
+          maxLen = Math.max(maxLen, String(column.header).length);
+        }
+        column.eachCell?.({ includeEmpty: false }, (cell) => {
+          const val = cell.value ? String(cell.value) : "";
+          if (val.length > maxLen) {
+            maxLen = Math.min(val.length, 50);
+          }
+        });
+        column.width = maxLen + 4;
+      });
+    };
+
+    // Query all database entities (strictly read-only)
+    const allUsers = await db.select().from(users).where(eq(users.isDeleted, false));
+    const allGroups = await db.select().from(studentGroups);
+    const allMembers = await db.select().from(studentGroupMembers);
+    const allTopics = await db.select().from(projectTopics).where(eq(projectTopics.isDeleted, false));
+    const allProjects = await db.select().from(studentProjects);
+    const allAssessments = await db.select().from(projectAssessments);
+    const allMilestones = await db.select().from(projectMilestones);
+
+    // Build lookup maps for fast association
+    const userMap = new Map<number, typeof allUsers[0]>();
+    allUsers.forEach(u => userMap.set(u.id, u));
+
+    const groupMap = new Map<number, typeof allGroups[0]>();
+    allGroups.forEach(g => groupMap.set(g.id, g));
+
+    const topicMap = new Map<number, typeof allTopics[0]>();
+    allTopics.forEach(t => topicMap.set(t.id, t));
+
+    const membersByGroup = new Map<number, typeof allMembers>();
+    allMembers.forEach(m => {
+      const list = membersByGroup.get(m.groupId) || [];
+      list.push(m);
+      membersByGroup.set(m.groupId, list);
+    });
+
+    const students = allUsers.filter(u => u.role === UserRole.STUDENT);
+    const supervisors = allUsers.filter(u => u.role === UserRole.SUPERVISOR || u.role === UserRole.COORDINATOR);
+
+    // ==========================================
+    // Sheet 1: Overview & Summary
+    // ==========================================
+    const ws1 = workbook.addWorksheet("Overview & Summary", { views: [{ showGridLines: true }] });
+    ws1.columns = [
+      { header: "Metric / Institutional Parameter", key: "param", width: 40 },
+      { header: "Value / Statistic", key: "val", width: 35 },
+      { header: "Notes / Description", key: "notes", width: 45 }
+    ];
+
+    const bcaStudents = students.filter(s => (s.course || "").toUpperCase() === "BCA").length;
+    const mcaStudents = students.filter(s => (s.course || "").toUpperCase() === "MCA").length;
+    const approvedTopics = allTopics.filter(t => t.status === "approved").length;
+    const pendingTopics = allTopics.filter(t => t.status === "pending").length;
+    const completedProjects = allProjects.filter(p => p.progress >= 100).length;
+    const completedMilestones = allMilestones.filter(m => m.status === "completed").length;
+    const totalMarks = allAssessments.reduce((acc, a) => acc + (a.score || 0), 0);
+    const avgScore = allAssessments.length > 0 ? (totalMarks / allAssessments.length).toFixed(2) : "N/A";
+
+    ws1.addRows([
+      { param: "Portal Name", val: "IU-APMP", notes: "Integral University Academic Project Management Portal" },
+      { param: "Department", val: "Department of Computer Application", notes: "Faculty of Computer Science & Applications" },
+      { param: "Institution", val: "Integral University, Lucknow", notes: "Official Academic Year 2026-27" },
+      { param: "Report Generation Timestamp", val: new Date().toISOString(), notes: "Generated via Administrator Console" },
+      { param: "Total Registered Students", val: students.length, notes: `BCA: ${bcaStudents} | MCA: ${mcaStudents}` },
+      { param: "Total Registered Faculty Supervisors", val: supervisors.length, notes: "Mentors & Project Coordinators" },
+      { param: "Total Student Project Teams", val: allGroups.length, notes: "Formed cohorts across BCA & MCA" },
+      { param: "Total Project Topics Proposed", val: allTopics.length, notes: `Approved: ${approvedTopics} | Pending: ${pendingTopics}` },
+      { param: "Total Allocated Student Projects", val: allProjects.length, notes: `Completed: ${completedProjects} | In Progress: ${allProjects.length - completedProjects}` },
+      { param: "Total Faculty Assessments Recorded", val: allAssessments.length, notes: `Average Score: ${avgScore}` },
+      { param: "Total Project Milestones Defined", val: allMilestones.length, notes: `Completed: ${completedMilestones} | Pending: ${allMilestones.length - completedMilestones}` }
+    ]);
+    styleWorksheet(ws1);
+
+    // ==========================================
+    // Sheet 2: Students Master List
+    // ==========================================
+    const ws2 = workbook.addWorksheet("Students Master List", { views: [{ showGridLines: true }] });
+    ws2.columns = [
+      { header: "S.No", key: "sno", width: 8 },
+      { header: "Enrollment Number", key: "enrollment", width: 18 },
+      { header: "Student Name", key: "name", width: 25 },
+      { header: "Email Address", key: "email", width: 28 },
+      { header: "Mobile Number", key: "mobile", width: 16 },
+      { header: "Course", key: "course", width: 10 },
+      { header: "Team ID", key: "teamId", width: 16 },
+      { header: "Team Name", key: "teamName", width: 25 },
+      { header: "Assigned Topic Code", key: "topicCode", width: 18 },
+      { header: "Assigned Topic Title", key: "topicTitle", width: 35 },
+      { header: "Assigned Supervisor", key: "supervisor", width: 25 },
+      { header: "Progress (%)", key: "progress", width: 14 },
+      { header: "Project Status", key: "status", width: 16 }
+    ];
+
+    const projectByStudent = new Map<number, typeof allProjects[0]>();
+    allProjects.forEach(p => projectByStudent.set(p.studentId, p));
+
+    students.forEach((student, idx) => {
+      const group = student.groupId ? groupMap.get(student.groupId) : undefined;
+      const project = projectByStudent.get(student.id);
+      const topic = project ? topicMap.get(project.topicId) : undefined;
+      const supervisor = group?.supervisorId ? userMap.get(group.supervisorId) : (topic?.submittedById ? userMap.get(topic.submittedById) : undefined);
+      const supervisorName = supervisor ? `${supervisor.prefix || ''} ${supervisor.firstName} ${supervisor.lastName}`.trim() : "Not Assigned";
+
+      ws2.addRow({
+        sno: idx + 1,
+        enrollment: student.enrollmentNumber || "N/A",
+        name: `${student.firstName} ${student.lastName}`.trim(),
+        email: student.email,
+        mobile: student.mobile || "N/A",
+        course: (student.course || "N/A").toUpperCase(),
+        teamId: group ? (group.projectTeamId || `GRP-${group.id}`) : "Individual",
+        teamName: group ? group.name : "N/A",
+        topicCode: topic?.topicCode || "N/A",
+        topicTitle: topic?.title || "Not Assigned",
+        supervisor: supervisorName,
+        progress: project ? `${project.progress}%` : "0%",
+        status: project ? (project.status || "In Progress") : "Pending Topic Selection"
+      });
+    });
+    styleWorksheet(ws2);
+
+    // ==========================================
+    // Sheet 3: Faculty Supervisors
+    // ==========================================
+    const ws3 = workbook.addWorksheet("Faculty Supervisors", { views: [{ showGridLines: true }] });
+    ws3.columns = [
+      { header: "S.No", key: "sno", width: 8 },
+      { header: "Emp ID", key: "empId", width: 14 },
+      { header: "Faculty Name", key: "name", width: 25 },
+      { header: "Designation", key: "designation", width: 22 },
+      { header: "Department", key: "department", width: 25 },
+      { header: "Email Address", key: "email", width: 28 },
+      { header: "Mobile Number", key: "mobile", width: 16 },
+      { header: "Topics Proposed", key: "topicsProposed", width: 16 },
+      { header: "Approved Topics", key: "approvedTopics", width: 16 },
+      { header: "Mentored Teams", key: "mentoredTeams", width: 16 },
+      { header: "Mentorship Load", key: "load", width: 18 }
+    ];
+
+    supervisors.forEach((sup, idx) => {
+      const supTopics = allTopics.filter(t => t.submittedById === sup.id);
+      const supApproved = supTopics.filter(t => t.status === "approved").length;
+      const mentored = allGroups.filter(g => g.supervisorId === sup.id).length;
+
+      ws3.addRow({
+        sno: idx + 1,
+        empId: sup.empId || "N/A",
+        name: `${sup.prefix || ''} ${sup.firstName} ${sup.lastName}`.trim(),
+        designation: sup.designation || "Faculty",
+        department: sup.department || "Computer Application",
+        email: sup.email,
+        mobile: sup.mobile || "N/A",
+        topicsProposed: supTopics.length,
+        approvedTopics: supApproved,
+        mentoredTeams: mentored,
+        load: `${mentored}/5`
+      });
+    });
+    styleWorksheet(ws3);
+
+    // ==========================================
+    // Sheet 4: Project Teams
+    // ==========================================
+    const ws4 = workbook.addWorksheet("Project Teams", { views: [{ showGridLines: true }] });
+    ws4.columns = [
+      { header: "S.No", key: "sno", width: 8 },
+      { header: "Team ID", key: "teamId", width: 16 },
+      { header: "Team Name", key: "name", width: 25 },
+      { header: "Course", key: "course", width: 10 },
+      { header: "Size", key: "size", width: 10 },
+      { header: "Assigned Supervisor", key: "supervisor", width: 25 },
+      { header: "Assigned Topic Code", key: "topicCode", width: 18 },
+      { header: "Assigned Topic Title", key: "topicTitle", width: 35 },
+      { header: "Team Roster (Members & Enrollments)", key: "roster", width: 50 }
+    ];
+
+    allGroups.forEach((group, idx) => {
+      const gMembers = membersByGroup.get(group.id) || [];
+      const rosterStrings = gMembers.map(m => {
+        const u = userMap.get(m.userId);
+        return u ? `${u.firstName} ${u.lastName} (${u.enrollmentNumber || 'No Enroll'})` : `User#${m.userId}`;
+      });
+
+      let teamTopicCode = "N/A";
+      let teamTopicTitle = "Not Assigned";
+      for (const m of gMembers) {
+        const p = projectByStudent.get(m.userId);
+        if (p && topicMap.has(p.topicId)) {
+          const t = topicMap.get(p.topicId)!;
+          teamTopicCode = t.topicCode || "N/A";
+          teamTopicTitle = t.title;
+          break;
+        }
+      }
+
+      const supervisor = group.supervisorId ? userMap.get(group.supervisorId) : undefined;
+      const supervisorName = supervisor ? `${supervisor.prefix || ''} ${supervisor.firstName} ${supervisor.lastName}`.trim() : "Not Assigned";
+
+      ws4.addRow({
+        sno: idx + 1,
+        teamId: group.projectTeamId || `GRP-${group.id}`,
+        name: group.name,
+        course: (group.course || "N/A").toUpperCase(),
+        size: gMembers.length,
+        supervisor: supervisorName,
+        topicCode: teamTopicCode,
+        topicTitle: teamTopicTitle,
+        roster: rosterStrings.join("; ") || "No members"
+      });
+    });
+    styleWorksheet(ws4);
+
+    // ==========================================
+    // Sheet 5: Project Topics Catalog
+    // ==========================================
+    const ws5 = workbook.addWorksheet("Project Topics Catalog", { views: [{ showGridLines: true }] });
+    ws5.columns = [
+      { header: "S.No", key: "sno", width: 8 },
+      { header: "Topic Code", key: "code", width: 16 },
+      { header: "Topic Title", key: "title", width: 35 },
+      { header: "Course", key: "course", width: 10 },
+      { header: "Project Type", key: "type", width: 16 },
+      { header: "Technology Stack", key: "tech", width: 30 },
+      { header: "Complexity", key: "complexity", width: 14 },
+      { header: "Proposing Supervisor", key: "supervisor", width: 25 },
+      { header: "Approval Status", key: "status", width: 16 },
+      { header: "Description", key: "desc", width: 50 }
+    ];
+
+    allTopics.forEach((topic, idx) => {
+      const supervisor = userMap.get(topic.submittedById);
+      const supervisorName = supervisor ? `${supervisor.prefix || ''} ${supervisor.firstName} ${supervisor.lastName}`.trim() : "Unknown";
+
+      ws5.addRow({
+        sno: idx + 1,
+        code: topic.topicCode || `PUGID${topic.id}`,
+        title: topic.title,
+        course: (topic.course || "N/A").toUpperCase(),
+        type: topic.projectType || "N/A",
+        tech: topic.technology || "N/A",
+        complexity: topic.estimatedComplexity || "Medium",
+        supervisor: supervisorName,
+        status: (topic.status || "pending").toUpperCase(),
+        desc: topic.description || "N/A"
+      });
+    });
+    styleWorksheet(ws5);
+
+    // ==========================================
+    // Sheet 6: Student Projects & Progress
+    // ==========================================
+    const ws6 = workbook.addWorksheet("Student Projects & Progress", { views: [{ showGridLines: true }] });
+    ws6.columns = [
+      { header: "S.No", key: "sno", width: 8 },
+      { header: "Project ID", key: "id", width: 12 },
+      { header: "Student Name", key: "studentName", width: 25 },
+      { header: "Enrollment Number", key: "enrollment", width: 18 },
+      { header: "Course", key: "course", width: 10 },
+      { header: "Topic Code", key: "topicCode", width: 16 },
+      { header: "Topic Title", key: "topicTitle", width: 35 },
+      { header: "Supervisor", key: "supervisor", width: 25 },
+      { header: "Progress (%)", key: "progress", width: 14 },
+      { header: "Status", key: "status", width: 16 },
+      { header: "Allocation Date", key: "date", width: 18 }
+    ];
+
+    allProjects.forEach((proj, idx) => {
+      const student = userMap.get(proj.studentId);
+      const topic = topicMap.get(proj.topicId);
+      const supervisor = topic ? userMap.get(topic.submittedById) : undefined;
+
+      ws6.addRow({
+        sno: idx + 1,
+        id: proj.id,
+        studentName: student ? `${student.firstName} ${student.lastName}`.trim() : "Unknown",
+        enrollment: student?.enrollmentNumber || "N/A",
+        course: (student?.course || "N/A").toUpperCase(),
+        topicCode: topic?.topicCode || "N/A",
+        topicTitle: topic?.title || "N/A",
+        supervisor: supervisor ? `${supervisor.prefix || ''} ${supervisor.firstName} ${supervisor.lastName}`.trim() : "N/A",
+        progress: `${proj.progress}%`,
+        status: proj.status || "In Progress",
+        date: proj.createdAt ? new Date(proj.createdAt).toLocaleDateString() : "N/A"
+      });
+    });
+    styleWorksheet(ws6);
+
+    // ==========================================
+    // Sheet 7: Evaluations & Assessments
+    // ==========================================
+    const ws7 = workbook.addWorksheet("Evaluations & Assessments", { views: [{ showGridLines: true }] });
+    ws7.columns = [
+      { header: "S.No", key: "sno", width: 8 },
+      { header: "Assessment ID", key: "id", width: 14 },
+      { header: "Student Name", key: "studentName", width: 25 },
+      { header: "Enrollment Number", key: "enrollment", width: 18 },
+      { header: "Course", key: "course", width: 10 },
+      { header: "Project Topic", key: "topic", width: 35 },
+      { header: "Evaluating Faculty", key: "supervisor", width: 25 },
+      { header: "Score / Marks", key: "score", width: 16 },
+      { header: "Feedback / Remarks", key: "feedback", width: 45 },
+      { header: "Date Assessed", key: "date", width: 18 }
+    ];
+
+    allAssessments.forEach((ass, idx) => {
+      const proj = allProjects.find(p => p.id === ass.projectId);
+      const student = proj ? userMap.get(proj.studentId) : undefined;
+      const topic = proj ? topicMap.get(proj.topicId) : undefined;
+      const supervisor = ass.supervisorId ? userMap.get(ass.supervisorId) : undefined;
+
+      ws7.addRow({
+        sno: idx + 1,
+        id: ass.id,
+        studentName: student ? `${student.firstName} ${student.lastName}`.trim() : "N/A",
+        enrollment: student?.enrollmentNumber || "N/A",
+        course: (student?.course || "N/A").toUpperCase(),
+        topic: topic?.title || "N/A",
+        supervisor: supervisor ? `${supervisor.prefix || ''} ${supervisor.firstName} ${supervisor.lastName}`.trim() : "N/A",
+        score: ass.score,
+        feedback: ass.feedback || "No remarks recorded",
+        date: ass.createdAt ? new Date(ass.createdAt).toLocaleDateString() : "N/A"
+      });
+    });
+    styleWorksheet(ws7);
+
+    // ==========================================
+    // Sheet 8: Milestones & Deadlines
+    // ==========================================
+    const ws8 = workbook.addWorksheet("Milestones & Deadlines", { views: [{ showGridLines: true }] });
+    ws8.columns = [
+      { header: "S.No", key: "sno", width: 8 },
+      { header: "Milestone ID", key: "id", width: 14 },
+      { header: "Milestone Title", key: "title", width: 30 },
+      { header: "Project Topic", key: "topic", width: 35 },
+      { header: "Student Name", key: "studentName", width: 25 },
+      { header: "Due Date", key: "dueDate", width: 16 },
+      { header: "Status", key: "status", width: 16 },
+      { header: "Completed Date", key: "completedDate", width: 18 },
+      { header: "Description / Objectives", key: "desc", width: 45 }
+    ];
+
+    allMilestones.forEach((mile, idx) => {
+      const proj = allProjects.find(p => p.id === mile.projectId);
+      const student = proj ? userMap.get(proj.studentId) : undefined;
+      const topic = proj ? topicMap.get(proj.topicId) : undefined;
+
+      ws8.addRow({
+        sno: idx + 1,
+        id: mile.id,
+        title: mile.title,
+        topic: topic?.title || "N/A",
+        studentName: student ? `${student.firstName} ${student.lastName}`.trim() : "N/A",
+        dueDate: mile.dueDate ? new Date(mile.dueDate).toLocaleDateString() : "N/A",
+        status: (mile.status || "pending").toUpperCase(),
+        completedDate: mile.completedAt ? new Date(mile.completedAt).toLocaleDateString() : "Pending",
+        desc: mile.description || "N/A"
+      });
+    });
+    styleWorksheet(ws8);
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
   }
 
   // --- Paginated Methods ---
