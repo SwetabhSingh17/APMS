@@ -6,7 +6,8 @@ import {
   IStudentOnboardingRow, IOnboardingResult, IOnboardingProgress,
   ISupervisorOnboardingRow, ISupervisorOnboardingResult,
   ITopicOnboardingRow, ITopicOnboardingResult, ITopicOnboardingSuccessRecord, ITopicOnboardingFailureRecord,
-  IEnrollmentConflict, IEnrollmentConflictStudent
+  IEnrollmentConflict, IEnrollmentConflictStudent,
+  userNotificationPreferences, IUserNotificationPreferences
 } from "@shared/schema";
 import { db } from "./db";
 import { notifyUser, disconnectAllClients } from "./websocket";
@@ -3439,15 +3440,64 @@ export class DBStorage {
     return result;
   }
 
-  private userNotificationPreferences = new Map<number, {
-    emailNotifications: boolean;
-    projectUpdates: boolean;
-    deadlineReminders: boolean;
-    systemAnnouncements: boolean;
-  }>();
+  private static ensurePreferencesTablePromise: Promise<void> | null = null;
+  private static async ensurePreferencesTable(): Promise<void> {
+    if (!DBStorage.ensurePreferencesTablePromise) {
+      DBStorage.ensurePreferencesTablePromise = (async () => {
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS user_notification_preferences (
+              id SERIAL PRIMARY KEY,
+              user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              email_notifications BOOLEAN NOT NULL DEFAULT true,
+              project_updates BOOLEAN NOT NULL DEFAULT true,
+              deadline_reminders BOOLEAN NOT NULL DEFAULT true,
+              system_announcements BOOLEAN NOT NULL DEFAULT true,
+              created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+              updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+              CONSTRAINT user_notification_preferences_user_id_unique UNIQUE (user_id)
+            );
+            CREATE INDEX IF NOT EXISTS user_notification_preferences_user_id_idx ON user_notification_preferences (user_id);
+          `);
+        } catch (err) {
+          console.warn('Notice: user_notification_preferences table ensure check:', err);
+        }
+      })();
+    }
+    return DBStorage.ensurePreferencesTablePromise;
+  }
 
-  async getUserNotificationPreferences(userId: number) {
-    return this.userNotificationPreferences.get(userId) || {
+  /**
+   * Retrieves notification preferences for a user from database persistence.
+   * If preferences have not been customized yet, default preferences (all enabled) are returned.
+   */
+  async getUserNotificationPreferences(userId: number): Promise<IUserNotificationPreferences> {
+    await DBStorage.ensurePreferencesTable();
+    try {
+      const [record] = await db
+        .select({
+          emailNotifications: userNotificationPreferences.emailNotifications,
+          projectUpdates: userNotificationPreferences.projectUpdates,
+          deadlineReminders: userNotificationPreferences.deadlineReminders,
+          systemAnnouncements: userNotificationPreferences.systemAnnouncements,
+        })
+        .from(userNotificationPreferences)
+        .where(eq(userNotificationPreferences.userId, userId))
+        .limit(1);
+
+      if (record) {
+        return {
+          emailNotifications: Boolean(record.emailNotifications),
+          projectUpdates: Boolean(record.projectUpdates),
+          deadlineReminders: Boolean(record.deadlineReminders),
+          systemAnnouncements: Boolean(record.systemAnnouncements),
+        };
+      }
+    } catch (error) {
+      console.error(`Error reading notification preferences for user ${userId}:`, error);
+    }
+
+    return {
       emailNotifications: true,
       projectUpdates: true,
       deadlineReminders: true,
@@ -3455,17 +3505,50 @@ export class DBStorage {
     };
   }
 
+  /**
+   * Updates notification preferences for a user in the database.
+   * Stores and returns defensive copies of preferences so caller mutations
+   * cannot alter the saved value.
+   */
   async updateUserNotificationPreferences(
     userId: number,
-    preferences: {
-      emailNotifications: boolean;
-      projectUpdates: boolean;
-      deadlineReminders: boolean;
-      systemAnnouncements: boolean;
-    }
-  ) {
-    this.userNotificationPreferences.set(userId, preferences);
-    return preferences;
+    preferences: IUserNotificationPreferences
+  ): Promise<IUserNotificationPreferences> {
+    await DBStorage.ensurePreferencesTable();
+
+    // Store a defensive copy of preferences so caller mutations cannot alter the saved value
+    const preferencesCopy: IUserNotificationPreferences = {
+      emailNotifications: preferences.emailNotifications !== false,
+      projectUpdates: preferences.projectUpdates !== false,
+      deadlineReminders: preferences.deadlineReminders !== false,
+      systemAnnouncements: preferences.systemAnnouncements !== false,
+    };
+
+    const now = new Date();
+
+    await db
+      .insert(userNotificationPreferences)
+      .values({
+        userId,
+        emailNotifications: preferencesCopy.emailNotifications,
+        projectUpdates: preferencesCopy.projectUpdates,
+        deadlineReminders: preferencesCopy.deadlineReminders,
+        systemAnnouncements: preferencesCopy.systemAnnouncements,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: userNotificationPreferences.userId,
+        set: {
+          emailNotifications: preferencesCopy.emailNotifications,
+          projectUpdates: preferencesCopy.projectUpdates,
+          deadlineReminders: preferencesCopy.deadlineReminders,
+          systemAnnouncements: preferencesCopy.systemAnnouncements,
+          updatedAt: now,
+        },
+      });
+
+    // Return a fresh defensive copy so caller mutations cannot alter the saved value
+    return { ...preferencesCopy };
   }
 }
 

@@ -75,6 +75,11 @@
    - High-visibility in-modal error recovery providing exact diagnostic error messages, reassuring that pre-restore snapshots and current data are preserved with zero data loss.
    - Enhanced ZIP parsing with magic-byte detection (`0x50, 0x4B`) for 100% reliability across operating systems and browsers.
    - Resolved ISO string serialization issue in Drizzle PostgreSQL driver (`value.toISOString is not a function`) by sanitizing and converting string dates to native `Date` objects across all 8 tables.
+7. **Database-Backed User Notification Preferences with Defensive Copying** —
+   - **PostgreSQL Persistence**: Replaced the per-process in-memory `Map` with a dedicated PostgreSQL table (`user_notification_preferences`) linked to users via foreign key with cascading delete, ensuring preferences persist across server restarts and multi-instance deployments.
+   - **Defensive Copying & Immutability**: Stored and returned defensive copies in `updateUserNotificationPreferences` so subsequent caller mutations cannot alter saved database state or internal storage values.
+   - **REST API & UI Synchronization**: Added `GET /api/user/notifications` in `server/routes/users.ts` and integrated `useQuery` synchronization in `client/src/pages/settings.tsx`, ensuring user preferences persist and correctly reflect on page load.
+   - **Zero-Data-Loss & Live System Compatibility**: Designed with 100% non-destructive idempotent table migration in `runMigrations()` and `CORE_TABLES`, preserving live database records with zero data loss.
 
 ---
 

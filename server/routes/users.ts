@@ -38,6 +38,19 @@ export function registerUserRoutes(router: Router, storage: DBStorage) {
     });
 
     // Notification Preferences
+    router.get("/api/user/notifications", async (req: Request, res: Response) => {
+        if (!req.isAuthenticated()) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        try {
+            const preferences = await storage.getUserNotificationPreferences((req.user as any).id);
+            res.json(preferences);
+        } catch (error) {
+            res.status(500).json({ message: "Failed to fetch notification preferences" });
+        }
+    });
+
     router.patch("/api/user/notifications", async (req: Request, res: Response) => {
         if (!req.isAuthenticated()) {
             return res.status(401).json({ message: "Unauthorized" });

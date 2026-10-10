@@ -247,9 +247,9 @@ This document outlines suggested architectural, security, and maintenance improv
   - **Affected Files:** `client/src/pages/system-management.tsx`
   - **Resolution:** Updated database restore/import success toast to `"Database restored and synchronized successfully."` and removed unnecessary forced logout and redirect to `/auth`, allowing active administrators to continue seamlessly while refreshing cached data in-place.
 
-- [x] **Notification Preferences Persistence & Safekeeping** — **COMPLETED**
-  - **Affected Files:** `server/routes/users.ts`, `server/db-storage.ts`
-  - **Resolution:** Updated `PATCH /api/user/notifications` and `server/db-storage.ts` to persist normalized notification preferences in-memory via `storage.updateUserNotificationPreferences`, eliminating database schema risk.
+- [x] **Notification Preferences Database Persistence & Safekeeping** — **COMPLETED**
+  - **Affected Files:** `server/routes/users.ts`, `server/db-storage.ts`, `server/db.ts`, `shared/schema.ts`, `client/src/pages/settings.tsx`
+  - **Resolution:** Upgraded from in-memory cache to a dedicated PostgreSQL table `user_notification_preferences` with non-destructive idempotent table creation in `runMigrations()`, defensive copying on write and return to prevent caller mutation bugs, RESTful GET endpoint, and UI state synchronization. Zero-data-loss verified across existing database tables.
 
 ---
 

@@ -114,6 +114,7 @@ const CORE_TABLES = [
   'project_milestones',
   'notifications',
   'session',
+  'user_notification_preferences',
 ] as const;
 
 /**
@@ -150,16 +151,7 @@ export async function runMigrations() {
     throw error;
   }
 
-  const missing = await getMissingCoreTables();
-  if (missing.length > 0) {
-    throw new Error(
-      `Database schema is not initialized (missing tables: ${missing.join(', ')}).\n` +
-      `Run "npm run db:ensure" (safe — creates what is missing) or "npm run db:setup" ` +
-      `(full reset) and restart the server.`
-    );
-  }
-
-  // Ensure supervisor-specific columns and indexes exist in users table
+  // Ensure supervisor-specific columns, indexes, and user_notification_preferences exist
   try {
     await db.execute(sql`
       ALTER TABLE users ADD COLUMN IF NOT EXISTS emp_id TEXT;
@@ -171,9 +163,31 @@ export async function runMigrations() {
 
       ALTER TABLE project_topics ADD COLUMN IF NOT EXISTS topic_code TEXT;
       CREATE INDEX IF NOT EXISTS topic_code_idx ON project_topics (topic_code);
+
+      CREATE TABLE IF NOT EXISTS user_notification_preferences (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        email_notifications BOOLEAN NOT NULL DEFAULT true,
+        project_updates BOOLEAN NOT NULL DEFAULT true,
+        deadline_reminders BOOLEAN NOT NULL DEFAULT true,
+        system_announcements BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        CONSTRAINT user_notification_preferences_user_id_unique UNIQUE (user_id)
+      );
+      CREATE INDEX IF NOT EXISTS user_notification_preferences_user_id_idx ON user_notification_preferences (user_id);
     `);
   } catch (colErr) {
-    console.warn('Notice: Custom columns check/migration:', colErr);
+    console.warn('Notice: Custom columns/tables check/migration:', colErr);
+  }
+
+  const missing = await getMissingCoreTables();
+  if (missing.length > 0) {
+    throw new Error(
+      `Database schema is not initialized (missing tables: ${missing.join(', ')}).\n` +
+      `Run "npm run db:ensure" (safe — creates what is missing) or "npm run db:setup" ` +
+      `(full reset) and restart the server.`
+    );
   }
 }
 

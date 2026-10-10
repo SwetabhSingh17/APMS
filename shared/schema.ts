@@ -164,6 +164,28 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
   updatedAt: true,
 });
 
+// User Notification Preferences table
+export const userNotificationPreferences = pgTable("user_notification_preferences", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull().unique(),
+  emailNotifications: boolean("email_notifications").notNull().default(true),
+  projectUpdates: boolean("project_updates").notNull().default(true),
+  deadlineReminders: boolean("deadline_reminders").notNull().default(true),
+  systemAnnouncements: boolean("system_announcements").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => {
+  return {
+    userIdIdx: index("user_notification_preferences_user_id_idx").on(table.userId),
+  };
+});
+
+export const insertUserNotificationPreferenceSchema = createInsertSchema(userNotificationPreferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Project milestones table
 export const projectMilestones = pgTable("project_milestones", {
   id: serial("id").primaryKey(),
@@ -255,6 +277,16 @@ export type InsertProjectMilestone = z.infer<typeof insertProjectMilestoneSchema
 
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+export type UserNotificationPreference = typeof userNotificationPreferences.$inferSelect;
+export type InsertUserNotificationPreference = z.infer<typeof insertUserNotificationPreferenceSchema>;
+
+export interface IUserNotificationPreferences {
+  emailNotifications: boolean;
+  projectUpdates: boolean;
+  deadlineReminders: boolean;
+  systemAnnouncements: boolean;
+}
 
 export type StudentGroup = typeof studentGroups.$inferSelect;
 export type InsertStudentGroup = z.infer<typeof insertStudentGroupSchema>;

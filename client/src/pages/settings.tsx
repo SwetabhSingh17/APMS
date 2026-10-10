@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import MainLayout from "@/components/layout/main-layout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,31 @@ export default function Settings() {
     deadlineReminders: true,
     systemAnnouncements: true,
   });
+
+  const { data: userPreferences } = useQuery<{
+    emailNotifications: boolean;
+    projectUpdates: boolean;
+    deadlineReminders: boolean;
+    systemAnnouncements: boolean;
+  }>({
+    queryKey: ["/api/user/notifications"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/user/notifications");
+      return await res.json();
+    },
+    enabled: !!user,
+  });
+
+  useEffect(() => {
+    if (userPreferences) {
+      setNotificationSettings({
+        emailNotifications: userPreferences.emailNotifications !== false,
+        projectUpdates: userPreferences.projectUpdates !== false,
+        deadlineReminders: userPreferences.deadlineReminders !== false,
+        systemAnnouncements: userPreferences.systemAnnouncements !== false,
+      });
+    }
+  }, [userPreferences]);
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -117,6 +142,7 @@ export default function Settings() {
       return await res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/notifications"] });
       toast({
         title: "Notification settings updated",
         description: "Your notification preferences have been saved.",
