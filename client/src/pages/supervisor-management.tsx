@@ -58,12 +58,14 @@ import {
   HelpCircle,
   LayoutGrid,
   List,
+  ShieldAlert,
 } from "lucide-react";
-import { UserRole } from "@shared/schema";
+import { UserRole, ISupervisorConflict } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useCourseFilter } from "@/hooks/course-filter-context";
 import { filterBySearchQuery, createSearchDocument } from "@/lib/search-index";
+import { SupervisorConflictModal } from "@/components/admin/supervisor-conflict-modal";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -235,6 +237,17 @@ export default function SupervisorManagement() {
   const [allotTeamSupervisor, setAllotTeamSupervisor] = useState<ISupervisorData | null>(null);
   const [allotTeamSearch, setAllotTeamSearch] = useState("");
 
+  // Supervisor Conflicts state and query
+  const [isGlobalConflictModalOpen, setIsGlobalConflictModalOpen] = useState<boolean>(false);
+  const [pendingSupervisorConflict, setPendingSupervisorConflict] = useState<ISupervisorConflict | null>(null);
+
+  const { data: conflictData } = useQuery<{ conflicts: ISupervisorConflict[], count: number }>({
+    queryKey: ["/api/admin/supervisor-conflicts"],
+    enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN),
+    refetchInterval: 15000,
+  });
+  const supervisorConflicts = conflictData?.conflicts || [];
+
   // Query parameter respecting global course filter
   const queryParam = getCourseQuery() ? `?${getCourseQuery()}` : "";
 
@@ -246,7 +259,9 @@ export default function SupervisorManagement() {
       if (!res.ok) throw new Error("Failed to fetch supervisors summary");
       return res.json();
     },
-    enabled: !!user && (user.role === UserRole.ADMIN || user.role === UserRole.COORDINATOR),
+    enabled: !!user && (user.role === UserRole.ADMIN || user.role === UserRole.COORDINATOR || user.role === UserRole.SUPERVISOR),
+    refetchOnWindowFocus: true,
+    staleTime: 2000,
   });
 
   // Fetch all student groups for team assignment dialogs
@@ -257,7 +272,9 @@ export default function SupervisorManagement() {
       if (!res.ok) throw new Error("Failed to fetch student groups");
       return res.json();
     },
-    enabled: !!user && (user.role === UserRole.ADMIN || user.role === UserRole.COORDINATOR),
+    enabled: !!user && (user.role === UserRole.ADMIN || user.role === UserRole.COORDINATOR || user.role === UserRole.SUPERVISOR),
+    refetchOnWindowFocus: true,
+    staleTime: 2000,
   });
 
   const supervisors = summaryResponse?.supervisors || [];
@@ -311,7 +328,8 @@ export default function SupervisorManagement() {
           key.startsWith("/api/projects") ||
           key.startsWith("/api/topics") ||
           key.startsWith("/api/users") ||
-          key.startsWith("/api/stats")
+          key.startsWith("/api/stats") ||
+          key.startsWith("/api/admin/supervisor-conflicts")
         );
       },
     });
@@ -487,8 +505,8 @@ export default function SupervisorManagement() {
 
   // General Team-Supervisor Assignment Mutation
   const assignTeamSupervisorMutation = useMutation({
-    mutationFn: async ({ groupId, supervisorId }: { groupId: number; supervisorId: number | null }) => {
-      const res = await apiRequest("PATCH", `/api/student-groups/${groupId}/supervisor`, { supervisorId });
+    mutationFn: async ({ groupId, supervisorId, resolution }: { groupId: number; supervisorId: number | null; resolution?: "copy" | "migrate" }) => {
+      const res = await apiRequest("PATCH", `/api/student-groups/${groupId}/supervisor`, { supervisorId, resolution });
       return res.json();
     },
     onSuccess: () => {
@@ -497,11 +515,20 @@ export default function SupervisorManagement() {
         description: "Team mentor allotment has been saved successfully.",
       });
       invalidateAllQueries();
+      setAllotTeamSupervisor(null);
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
+      const conflictDetails = error?.data?.details || error?.details;
+      if (conflictDetails || error?.status === 409 || error?.code === "SUPERVISOR_CONFLICT") {
+        if (conflictDetails) {
+          setPendingSupervisorConflict(conflictDetails);
+          setAllotTeamSupervisor(null);
+          return;
+        }
+      }
       toast({
         title: "Failed to update team allotment",
-        description: error.message,
+        description: error.message || "Failed to update team allotment",
         variant: "destructive",
       });
     },
@@ -642,6 +669,36 @@ export default function SupervisorManagement() {
             </Badge>
           </div>
         </div>
+
+        {/* Supervisor Conflicts Alert Banner */}
+        {supervisorConflicts.length > 0 && (
+          <div className="p-4 rounded-xl border-2 border-amber-500/40 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-amber-500/20 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <span>Supervisor Allotment Conflicts Detected</span>
+                  <Badge variant="outline" className="bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-500/40 font-mono text-xs">
+                    {supervisorConflicts.length} {supervisorConflicts.length === 1 ? "Team" : "Teams"}
+                  </Badge>
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5 max-w-2xl">
+                  Some teams have a supervisor assigned that differs from the original project topic proposer.
+                  This causes the team to appear on both faculty dashboards. Choose <strong>Option 1 (Copy Project)</strong> or <strong>Option 2 (Migrate Project)</strong> to resolve.
+                </p>
+              </div>
+            </div>
+            <Button
+              className="shrink-0 bg-amber-600 hover:bg-amber-700 text-white font-medium shadow-sm gap-2"
+              onClick={() => setIsGlobalConflictModalOpen(true)}
+            >
+              <ShieldAlert className="h-4 w-4" />
+              Review & Resolve ({supervisorConflicts.length})
+            </Button>
+          </div>
+        )}
 
         {/* Metric Summary Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
@@ -859,7 +916,9 @@ export default function SupervisorManagement() {
                         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-background text-xs">
                           <div className="space-y-0.5">
                             <div className="flex items-center gap-1.5">
-                              <span className="font-semibold text-foreground">{sup.metrics.assignedTeams}/5 Teams</span>
+                              <span className="font-semibold text-foreground">
+                                {sup.metrics.assignedTeams}/{sup.metrics.totalTopics} Teams
+                              </span>
                               <Badge
                                 variant="outline"
                                 className={`text-[10px] px-1.5 py-0 h-4 capitalize ${
@@ -879,18 +938,20 @@ export default function SupervisorManagement() {
                               {sup.metrics.totalStudentsSupervised} students mentored
                             </p>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs text-primary border-primary/30 hover:bg-primary/10 gap-1 ml-1"
-                            onClick={() => {
-                              setAllotTeamSupervisor(sup);
-                              setAllotTeamSearch("");
-                            }}
-                          >
-                            <ArrowRightLeft className="h-3 w-3" />
-                            <span className="hidden sm:inline">Allot Team</span>
-                          </Button>
+                          {(user?.role === UserRole.ADMIN || user?.role === UserRole.COORDINATOR) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs text-primary border-primary/30 hover:bg-primary/10 gap-1 ml-1"
+                              onClick={() => {
+                                setAllotTeamSupervisor(sup);
+                                setAllotTeamSearch("");
+                              }}
+                            >
+                              <ArrowRightLeft className="h-3 w-3" />
+                              <span className="hidden sm:inline">Allot Team</span>
+                            </Button>
+                          )}
                         </div>
 
                         {/* Quick Actions: View, Edit, Manage Topics - ALWAYS ON SCREEN */}
@@ -905,16 +966,18 @@ export default function SupervisorManagement() {
                             <Eye className="h-3.5 w-3.5" />
                             <span>View</span>
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 text-xs gap-1.5 hover:bg-muted"
-                            onClick={() => handleEditSupervisorOpen(sup)}
-                            title="Edit Supervisor Profile"
-                          >
-                            <Edit className="h-3.5 w-3.5" />
-                            <span>Edit</span>
-                          </Button>
+                          {(user?.role === UserRole.ADMIN || user?.role === UserRole.COORDINATOR) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-xs gap-1.5 hover:bg-muted"
+                              onClick={() => handleEditSupervisorOpen(sup)}
+                              title="Edit Supervisor Profile"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                              <span>Edit</span>
+                            </Button>
+                          )}
                           <Button
                             variant="default"
                             size="sm"
@@ -1393,7 +1456,7 @@ export default function SupervisorManagement() {
                             <div className="space-y-2">
                               <div className="flex items-center justify-between">
                                 <span className="text-xs font-semibold text-foreground">
-                                  {sup.metrics.assignedTeams} / 5 Teams
+                                  {sup.metrics.assignedTeams} / {sup.metrics.totalTopics} Teams
                                 </span>
                                 <Badge
                                   variant="outline"
@@ -1412,7 +1475,7 @@ export default function SupervisorManagement() {
                               </div>
 
                               <Progress
-                                value={Math.min(100, (sup.metrics.assignedTeams / 5) * 100)}
+                                value={sup.metrics.totalTopics > 0 ? Math.min(100, (sup.metrics.assignedTeams / sup.metrics.totalTopics) * 100) : 0}
                                 className="h-1.5"
                               />
 
@@ -1420,18 +1483,20 @@ export default function SupervisorManagement() {
                                 {sup.metrics.totalStudentsSupervised} students under mentorship
                               </p>
 
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 text-xs w-full gap-1.5 text-primary border-primary/30 hover:bg-primary/10 mt-1"
-                                onClick={() => {
-                                  setAllotTeamSupervisor(sup);
-                                  setAllotTeamSearch("");
-                                }}
-                              >
-                                <ArrowRightLeft className="h-3 w-3" />
-                                Allot Project Team
-                              </Button>
+                              {(user?.role === UserRole.ADMIN || user?.role === UserRole.COORDINATOR) && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 text-xs w-full gap-1.5 text-primary border-primary/30 hover:bg-primary/10 mt-1"
+                                  onClick={() => {
+                                    setAllotTeamSupervisor(sup);
+                                    setAllotTeamSearch("");
+                                  }}
+                                >
+                                  <ArrowRightLeft className="h-3 w-3" />
+                                  Allot Project Team
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
 
@@ -1447,15 +1512,17 @@ export default function SupervisorManagement() {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                                title="Edit Supervisor Profile"
-                                onClick={() => handleEditSupervisorOpen(sup)}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
+                              {(user?.role === UserRole.ADMIN || user?.role === UserRole.COORDINATOR) && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  title="Edit Supervisor Profile"
+                                  onClick={() => handleEditSupervisorOpen(sup)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -1742,7 +1809,23 @@ export default function SupervisorManagement() {
                     </div>
 
                     <div className="p-4 rounded-lg border bg-muted/20 space-y-3">
-                      <h4 className="font-semibold text-sm">Supervision & Topic Metrics</h4>
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-semibold text-sm">Supervision & Topic Metrics</h4>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs px-2 py-0.5 capitalize ${
+                            viewSupervisor.metrics.workloadStatus === "available"
+                              ? "border-green-500/30 text-green-600 bg-green-500/10"
+                              : viewSupervisor.metrics.workloadStatus === "optimal"
+                              ? "border-blue-500/30 text-blue-600 bg-blue-500/10"
+                              : viewSupervisor.metrics.workloadStatus === "high"
+                              ? "border-amber-500/30 text-amber-600 bg-amber-500/10"
+                              : "border-red-500/30 text-red-600 bg-red-500/10"
+                          }`}
+                        >
+                          Workload: {viewSupervisor.metrics.workloadStatus}
+                        </Badge>
+                      </div>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                         <div className="p-2 bg-background rounded-md border">
                           <p className="text-lg font-bold text-primary">{viewSupervisor.metrics.totalTopics}</p>
@@ -1753,8 +1836,10 @@ export default function SupervisorManagement() {
                           <p className="text-[11px] text-muted-foreground">Approved</p>
                         </div>
                         <div className="p-2 bg-background rounded-md border">
-                          <p className="text-lg font-bold text-blue-600">{viewSupervisor.metrics.assignedTeams}</p>
-                          <p className="text-[11px] text-muted-foreground">Teams Mentored</p>
+                          <p className="text-lg font-bold text-blue-600">
+                            {viewSupervisor.metrics.assignedTeams} / {viewSupervisor.metrics.totalTopics}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">Teams Allotted</p>
                         </div>
                         <div className="p-2 bg-background rounded-md border">
                           <p className="text-lg font-bold text-purple-600">{viewSupervisor.metrics.totalStudentsSupervised}</p>
@@ -2577,6 +2662,21 @@ export default function SupervisorManagement() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Global Multi-Conflict Review & Resolution Modal */}
+        <SupervisorConflictModal
+          open={isGlobalConflictModalOpen}
+          onOpenChange={setIsGlobalConflictModalOpen}
+        />
+
+        {/* Single Pending Supervisor Conflict Dialog */}
+        <SupervisorConflictModal
+          open={pendingSupervisorConflict !== null}
+          onOpenChange={(open) => {
+            if (!open) setPendingSupervisorConflict(null);
+          }}
+          selectedConflict={pendingSupervisorConflict}
+        />
       </div>
     </MainLayout>
   );

@@ -24,6 +24,8 @@ This document outlines suggested architectural, security, and maintenance improv
   - [8. Extended Administrative Capabilities](#8-extended-administrative-capabilities)
   - [9. Frontend Polish](#9-frontend-polish)
 - [✅ Resolved Issues & Release Changelog](#resolved-issues--release-changelog)
+  - [v2.3.0 - Completed & Verified](#v230---completed--verified)
+  - [v2.2.0 - Completed & Verified](#v220---completed--verified)
   - [v2.1.0 - Completed & Verified](#v210---completed--verified)
   - [v2.0.1 - Completed & Verified](#v201---completed--verified)
   - [v2.0.0 / v2 - Completed & Verified](#v200--v2---completed--verified)
@@ -228,6 +230,34 @@ This document outlines suggested architectural, security, and maintenance improv
 ---
 
 ## ✅ Resolved Issues & Release Changelog
+
+### v2.3.0 - Completed & Verified
+
+- [x] **Interactive Dual-Action Supervisor Conflict Resolution Engine** — **COMPLETED**
+  - **Affected Files:** `server/db-storage.ts`, `server/routes/admin.ts`, `client/src/components/admin/supervisor-conflict-modal.tsx`, `client/src/pages/dashboard.tsx`, `client/src/pages/supervisor-management.tsx`, `client/src/pages/team-management.tsx`, `client/src/pages/manage-project.tsx`
+  - **Resolution:** Resolved critical supervisor mentorship conflict bug where assigning a new supervisor to a student team without changing topic ownership caused the group to appear under both the original topic submitter and the newly assigned supervisor. Implemented automated conflict detection via `GET /api/admin/supervisor-conflicts`. Created dual-action resolution endpoint `POST /api/admin/supervisor-conflicts/:groupId/resolve` providing Option 1 (Copy / Clone Topic under a new `PUGID26xxx` code for the new supervisor and free the original topic for re-allotment) and Option 2 (Migrate Topic Ownership to the new supervisor). Integrated real-time alert banners on Dashboard and Supervisor Management alongside an interactive resolution modal.
+
+- [x] **Dynamic Supervisor Telemetry Ratio & Workload Capacity Formulation** — **COMPLETED**
+  - **Affected Files:** `server/db-storage.ts`, `client/src/pages/supervisor-management.tsx`, `client/src/pages/team-management.tsx`, `client/src/pages/manage-project.tsx`
+  - **Resolution:** Overhauled the broken "Number of Teams Allotted" metric on `/supervisor-management` to dynamically compute and display `Active Teams Allotted / Total Projects Submitted` (e.g., `5/6 Teams (High)`). Re-engineered `getSupervisorsWithSummary` to calculate capacity dynamically against submitted topic volume ($0 \to$ `Available`, $\ge C \to$ `Maximum`, $\ge \lceil C \times 0.7 \rceil \to$ `High`, else $\to$ `Optimal`). Added cross-page React Query cache invalidation for `/api/admin/supervisors-summary` on team and project updates.
+
+- [x] **Faculty Supervisor Access to Supervisor Directory** — **COMPLETED**
+  - **Affected Files:** `client/src/App.tsx`, `client/src/components/layout/sidebar.tsx`
+  - **Resolution:** Granted `UserRole.SUPERVISOR` access to `/supervisor-management` as a read-only "Faculty Directory" in sidebar navigation and route protection, allowing faculty members to view departmental peers, research areas, and mentoring loads.
+
+---
+
+### v2.2.0 - Completed & Verified
+
+- [x] **IU-APMP Institutional Rebranding** — **COMPLETED**
+  - **Affected Files:** `client/index.html`, `client/src/components/layout/sidebar.tsx`, `client/src/pages/creator-info.tsx`, `package.json`, `start-network.sh`, `start_server.bat`
+  - **Resolution:** Rebranded portal to IU-APMP across all headers, sidebar navigation, metadata, and scripts while preserving the authentication page layout intact.
+
+- [x] **Complete A-Z Backup, Safe Topological Restore & Multi-Page University Excel Reporting** — **COMPLETED**
+  - **Affected Files:** `server/db-storage.ts`, `server/routes/admin.ts`, `client/src/pages/system-management.tsx`, `scripts/verify_backup_and_excel_export.ts`
+  - **Resolution:** Implemented full system export packaging (.zip) covering all 8 tables, foreign-key ordered topological transactional restore with pre-restore safety snapshotting, sequence realignment, admin session retention, real-time SSE progress streaming with live terminal event viewer, and 8-sheet master Excel workbook generation.
+
+---
 
 ### v2.1.0 - Completed & Verified
 

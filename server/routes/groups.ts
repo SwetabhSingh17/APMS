@@ -358,6 +358,75 @@ export function registerGroupRoutes(router: Router, storage: DBStorage) {
                 return res.status(400).json({ message: "The selected user is not a valid supervisor" });
             }
 
+            const { resolution } = req.body;
+
+            // Check if the group has an active project topic allotted
+            const members = await storage.getStudentGroupMembers(groupId);
+            let activeTopic: any = null;
+            if (members.length > 0) {
+                for (const m of members) {
+                    const sp = await storage.getStudentProjects(m.id);
+                    if (sp.length > 0 && sp[0].topicId) {
+                        const top = await storage.getProjectTopic(sp[0].topicId);
+                        if (top) {
+                            activeTopic = top;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // If group has an allotted project topic submitted by a different supervisor
+            if (activeTopic && activeTopic.submittedById && activeTopic.submittedById !== targetSupervisorId) {
+                // If resolution was provided ("copy" or "migrate"), execute conflict resolution
+                if (resolution === "copy" || resolution === "migrate") {
+                    const result = await storage.resolveSupervisorConflict(groupId, resolution, {
+                        adminUser: req.user ? {
+                            id: req.user.id,
+                            firstName: req.user.firstName,
+                            lastName: req.user.lastName,
+                        } : undefined,
+                        newSupervisorId: targetSupervisorId,
+                    });
+                    return res.json(result.group);
+                }
+
+                // If resolution was NOT provided, return 409 Conflict with details
+                const oldSupervisor = await storage.getUser(activeTopic.submittedById);
+                return res.status(409).json({
+                    conflict: true,
+                    code: "SUPERVISOR_CONFLICT",
+                    message: `Supervisor conflict detected: Project "${activeTopic.topicCode || ''} - ${activeTopic.title}" was originally proposed by ${oldSupervisor ? `${oldSupervisor.firstName} ${oldSupervisor.lastName}` : 'another supervisor'}, but you are assigning ${supervisor.firstName} ${supervisor.lastName}. Please choose Option 1 (Copy Project) or Option 2 (Migrate Project) to proceed.`,
+                    details: {
+                        groupId: group.id,
+                        groupName: group.name,
+                        projectTeamId: group.projectTeamId,
+                        course: group.course,
+                        topicId: activeTopic.id,
+                        topicCode: activeTopic.topicCode,
+                        topicTitle: activeTopic.title,
+                        oldSupervisor: oldSupervisor ? {
+                            id: oldSupervisor.id,
+                            name: `${oldSupervisor.prefix ? `${oldSupervisor.prefix} ` : ""}${oldSupervisor.firstName} ${oldSupervisor.lastName}`.trim(),
+                            prefix: oldSupervisor.prefix,
+                            empId: oldSupervisor.empId,
+                            email: oldSupervisor.email,
+                            department: oldSupervisor.department,
+                            designation: oldSupervisor.designation,
+                        } : null,
+                        newSupervisor: {
+                            id: supervisor.id,
+                            name: `${supervisor.prefix ? `${supervisor.prefix} ` : ""}${supervisor.firstName} ${supervisor.lastName}`.trim(),
+                            prefix: supervisor.prefix,
+                            empId: supervisor.empId,
+                            email: supervisor.email,
+                            department: supervisor.department,
+                            designation: supervisor.designation,
+                        },
+                    }
+                });
+            }
+
             const previousSupervisorId = group.supervisorId;
 
             // Update the group

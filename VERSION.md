@@ -1,7 +1,8 @@
 # Version History
 
 ## 📋 Table of Contents
-- [Version 2.2.0 (Current)](#version-220-current)
+- [Version 2.3.0 (Current)](#version-230-current)
+- [Version 2.2.0](#version-220)
 - [Version 2.1.0](#version-210)
 - [Version 2.0.1](#version-201)
 - [Version 2.0.0 [v2]](#version-200-v2)
@@ -33,7 +34,36 @@
 
 ---
 
-## Version 2.2.0 (Current)
+## Version 2.3.0 (Current)
+### Dual-Action Supervisor Conflict Resolution Engine, Dynamic Telemetry Ratio & Faculty Directory Navigation
+1. **Interactive Dual-Action Supervisor Conflict Resolution System** —
+   - **Root Cause Resolution**: Resolved critical mentorship isolation anomaly where changing a student group's supervisor without updating topic ownership caused the group to appear under both the previous supervisor (topic author) and new supervisor (mentorship assignee).
+   - **Real-Time Automated Conflict Detection**: Implemented `getSupervisorConflicts()` in `server/db-storage.ts` and exposed `GET /api/admin/supervisor-conflicts`. Detects mismatches between `groups.supervisorId` and the allotted `project_topics.supervisorId` across all active teams.
+   - **Two Administrative Resolution Pathways (`POST /api/admin/supervisor-conflicts/:groupId/resolve`)**:
+     - **Option 1 (Copy & Assign Cloned Project)**: Clones the project topic for the new supervisor with an institutional identifier (`PUGID26xxx`), assigns the team to this cloned topic, and marks the previous supervisor's original topic as unassigned (`isAssigned: false`), leaving it available for new student teams.
+     - **Option 2 (Migrate Project Topic Ownership)**: Directly reassigns topic authorship (`supervisorId` on `project_topics`) to the new supervisor, preserving project title, tech stack, and milestone data under one unified record.
+   - **Interactive Conflict Modal (`client/src/components/admin/supervisor-conflict-modal.tsx`)**: Built a comprehensive administrative resolution dialog with detailed side-by-side comparison (Group Name, Project Title, Previous vs. New Supervisor), choice selectors, and real-time resolution triggers.
+   - **High-Visibility Alert Banners**: Integrated instant conflict warning banners on both the Admin Dashboard (`client/src/pages/dashboard.tsx`) and Supervisor Management page (`client/src/pages/supervisor-management.tsx`).
+2. **Dynamic Supervisor Telemetry Ratio & Workload Capacity Formulation** —
+   - **Active vs. Submitted Ratio**: Overhauled the "Teams Allotted" metric on `client/src/pages/supervisor-management.tsx` to display **Active Teams Allotted / Total Projects Submitted** (e.g. `5/6 Teams (High)`).
+   - **Dynamic Workload Status Calculation**: Re-engineered `getSupervisorsWithSummary()` in `server/db-storage.ts` to compute capacity relative to faculty topic submissions:
+     - $0$ assigned $\to$ `Available`
+     - $\ge \text{Capacity}$ assigned $\to$ `Maximum`
+     - $\ge \lceil \text{Capacity} \times 0.7 \rceil$ assigned $\to$ `High`
+     - Else $\to$ `Optimal`
+   - **Descriptive Telemetry Badges & Tooltips**: Added informative tooltips clarifying assigned teams, unassigned projects, and total submitted project capacity.
+3. **Faculty Supervisor Role Access for Supervisor Directory** —
+   - Enabled `UserRole.SUPERVISOR` access to `/supervisor-management` in `client/src/App.tsx`.
+   - Updated sidebar navigation (`client/src/components/layout/sidebar.tsx`) to render "Faculty Directory" for Supervisors, allowing faculty to view departmental colleagues, research domains, and telemetry.
+4. **Cross-Page Mutation Cache Invalidation & Seamless State Synchronization** —
+   - Invalidate `/api/admin/supervisors-summary` cache key on all team supervisor updates in `client/src/pages/team-management.tsx` and `client/src/pages/manage-project.tsx`.
+   - Invalidate `supervisor-conflicts` query cache immediately upon conflict resolution so warning badges and summary metrics update instantly without requiring manual page refresh.
+5. **Zero-Data-Loss & Live Production Compatibility** —
+   - All migrations, queries, and endpoints strictly adhere to non-destructive transaction safety, preserving live database records across the active semester deployment.
+
+---
+
+## Version 2.2.0
 ### IU-APMP Renaming, Comprehensive A-Z Backup, Topological Restore & Multi-Page University Excel Reporting
 1. **IU-APMP Project Renaming (Login Page Intact)** —
    - Rebranded project as **IU-APMP (Integral University Academic Project Management Portal)** across application header titles (`client/index.html`), navigation sidebar (`client/src/components/layout/sidebar.tsx`), creator documentation (`client/src/pages/creator-info.tsx`), and package metadata (`package.json`).

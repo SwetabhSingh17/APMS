@@ -45,8 +45,8 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
         }
     });
 
-    // Supervisor Management Summary (Admin and Coordinator only)
-    router.get("/api/admin/supervisors-summary", requireRole([UserRole.ADMIN, UserRole.COORDINATOR]), async (req: Request, res: Response) => {
+    // Supervisor Management Summary (Admin, Coordinator, and Supervisor)
+    router.get("/api/admin/supervisors-summary", requireRole([UserRole.ADMIN, UserRole.COORDINATOR, UserRole.SUPERVISOR]), async (req: Request, res: Response) => {
         try {
             const course = req.query.course as string | undefined;
             const summary = await storage.getSupervisorsSummary(course);
@@ -298,6 +298,54 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
         } catch (error: any) {
             console.error("Failed to resolve enrollment conflict:", error);
             res.status(400).json({ message: error.message || "Failed to resolve enrollment conflict", code: "RESOLVE_FAILED" });
+        }
+    });
+
+    // Retrieve all active supervisor allotment conflicts
+    router.get("/api/admin/supervisor-conflicts", requireRole([UserRole.ADMIN, UserRole.COORDINATOR]), async (_req: Request, res: Response) => {
+        try {
+            const conflicts = await storage.getSupervisorConflicts();
+            res.json({ conflicts, count: conflicts.length });
+        } catch (error: any) {
+            console.error("Failed to fetch supervisor conflicts:", error);
+            res.status(500).json({ message: "Failed to fetch supervisor conflicts" });
+        }
+    });
+
+    // Resolve a supervisor conflict using Option 1 ("copy") or Option 2 ("migrate")
+    router.post("/api/admin/supervisor-conflicts/resolve", requireRole([UserRole.ADMIN, UserRole.COORDINATOR]), async (req: Request, res: Response) => {
+        try {
+            const { groupId, resolution, newSupervisorId } = req.body;
+            const parsedGroupId = parseInt(groupId);
+
+            if (isNaN(parsedGroupId) || parsedGroupId <= 0) {
+                return res.status(400).json({ message: "Valid group ID is required", code: "INVALID_GROUP_ID" });
+            }
+
+            if (resolution !== "copy" && resolution !== "migrate") {
+                return res.status(400).json({ message: "Resolution must be either 'copy' (Option 1) or 'migrate' (Option 2)", code: "INVALID_RESOLUTION" });
+            }
+
+            const parsedNewSupervisorId = newSupervisorId ? parseInt(newSupervisorId) : undefined;
+            if (newSupervisorId && (isNaN(parsedNewSupervisorId!) || parsedNewSupervisorId! <= 0)) {
+                return res.status(400).json({ message: "Invalid new supervisor ID", code: "INVALID_SUPERVISOR_ID" });
+            }
+
+            const adminUser = req.user ? {
+                id: req.user.id,
+                firstName: req.user.firstName,
+                lastName: req.user.lastName,
+            } : undefined;
+
+            const result = await storage.resolveSupervisorConflict(parsedGroupId, resolution, {
+                adminUser,
+                newSupervisorId: parsedNewSupervisorId,
+            });
+
+            res.json(result);
+        } catch (error: any) {
+            console.error("Failed to resolve supervisor conflict:", error);
+            res.status(400).json({ message: error.message || "Failed to resolve supervisor conflict", code: "RESOLVE_FAILED" });
         }
     });
 

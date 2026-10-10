@@ -16,13 +16,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-06)
 
 **Core value:** Streamline and govern the academic project lifecycle with strict course isolation (BCA vs MCA), balanced faculty mentorship workload limits, and transparent real-time status reflection across all departmental stakeholders.
-**Current focus:** Milestone v2.1.0 Archived — Preparing Milestone v2.2.0 (Backup & Restore Integrity)
+**Current focus:** Milestone v2.3.0 Complete (Supervisor Conflict Resolution & Dynamic Telemetry)
 
 ## Current Position
 
-Milestone: v2.2.0 (Active) — Phase 1 Complete
-Next Phase: Phase 2 (Security Hardening & Registration Controls)
-Last activity: 2026-10-07 — Completed Phase 1 (Plans 01-01, 01-02, 01-03, 01-04)
+Milestone: v2.3.0 (Active Release)
+Last activity: 2026-10-11 — Completed v2.3.0 Features (Supervisor Conflict Modal, Dynamic Mentorship Telemetry, Cross-Page Cache Invalidation, Faculty Directory Access)
 
 ## Performance Metrics
 

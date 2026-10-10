@@ -9,13 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { User, UserRole } from "@shared/schema";
+import { User, UserRole, ISupervisorConflict } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Users, Search, ArrowRightLeft, UserPlus, FolderGit2, Clock, CheckCircle2, Check, Trash2, AlertTriangle, BookOpen, Phone } from "lucide-react";
+import { Loader2, Users, Search, ArrowRightLeft, UserPlus, FolderGit2, Clock, CheckCircle2, Check, Trash2, AlertTriangle, BookOpen, Phone, ShieldAlert, AlertCircle } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCourseFilter } from "@/hooks/course-filter-context";
 import { CreateTeamDialog } from "@/components/create-team-dialog";
 import { ManageMembersDialog } from "@/components/manage-members-dialog";
+import { SupervisorConflictModal } from "@/components/admin/supervisor-conflict-modal";
 import { filterBySearchQuery, createSearchDocument } from "@/lib/search-index";
 
 export default function ManageProject() {
@@ -32,6 +33,17 @@ export default function ManageProject() {
   const [topicSearchQuery, setTopicSearchQuery] = useState<string>("");
   const [updateSupervisorWithTopic, setUpdateSupervisorWithTopic] = useState<boolean>(true);
   const { courseFilter, getCourseQuery } = useCourseFilter();
+
+  // Supervisor Conflicts state and query
+  const [isGlobalConflictModalOpen, setIsGlobalConflictModalOpen] = useState<boolean>(false);
+  const [pendingSupervisorConflict, setPendingSupervisorConflict] = useState<ISupervisorConflict | null>(null);
+
+  const { data: conflictData } = useQuery<{ conflicts: ISupervisorConflict[], count: number }>({
+    queryKey: ["/api/admin/supervisor-conflicts"],
+    enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN),
+    refetchInterval: 15000,
+  });
+  const supervisorConflicts = conflictData?.conflicts || [];
 
   // Fetch all supervisors
   const { data: supervisors } = useQuery({
@@ -107,8 +119,8 @@ export default function ManageProject() {
 
   // Change supervisor mutation
   const changeSupervisorMutation = useMutation({
-    mutationFn: async ({ groupId, supervisorId }: { groupId: number; supervisorId: number }) => {
-      const res = await apiRequest("PATCH", `/api/student-groups/${groupId}/supervisor`, { supervisorId });
+    mutationFn: async ({ groupId, supervisorId, resolution }: { groupId: number; supervisorId: number; resolution?: "copy" | "migrate" }) => {
+      const res = await apiRequest("PATCH", `/api/student-groups/${groupId}/supervisor`, { supervisorId, resolution });
       return res.json();
     },
     onSuccess: () => {
@@ -124,7 +136,8 @@ export default function ManageProject() {
             key.startsWith("/api/projects") ||
             key.startsWith("/api/topics") ||
             key.startsWith("/api/stats") ||
-            key.startsWith("/api/admin/supervisors-summary")
+            key.startsWith("/api/admin/supervisors-summary") ||
+            key.startsWith("/api/admin/supervisor-conflicts")
           );
         },
       });
@@ -132,10 +145,18 @@ export default function ManageProject() {
       setSelectedSupervisorId("");
       setSupervisorSearchQuery("");
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      const conflictDetails = error?.data?.details || error?.details;
+      if (conflictDetails || error?.status === 409 || error?.code === "SUPERVISOR_CONFLICT") {
+        if (conflictDetails) {
+          setPendingSupervisorConflict(conflictDetails);
+          setChangeSupervisorGroupId(null);
+          return;
+        }
+      }
       toast({
         title: "Failed to change supervisor",
-        description: error.message,
+        description: error.message || "Failed to update supervisor allotment",
         variant: "destructive",
       });
     },
@@ -158,7 +179,8 @@ export default function ManageProject() {
           return typeof key === "string" && (
             key.startsWith("/api/student-groups") ||
             key.startsWith("/api/projects") ||
-            key.startsWith("/api/students")
+            key.startsWith("/api/students") ||
+            key.startsWith("/api/admin/supervisors-summary")
           );
         },
       });
@@ -267,6 +289,67 @@ export default function ManageProject() {
           </Button>
         </div>
 
+        {/* Supervisor Conflict Warning on Card */}
+        {group.isSupervisorConflict && (
+          <div className="p-3 rounded-lg border border-amber-500/40 bg-amber-500/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+            <div className="flex items-center gap-2.5 text-amber-900 dark:text-amber-300">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              <div>
+                <p className="font-semibold leading-tight flex items-center gap-1.5">
+                  <span>Supervisor Allotment Conflict</span>
+                  <Badge variant="outline" className="text-[10px] bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-500/30">
+                    Action Required
+                  </Badge>
+                </p>
+                <p className="text-[11px] text-amber-800/80 dark:text-amber-400/80 mt-0.5">
+                  Topic originally proposed by{" "}
+                  <strong>
+                    {group.topicProposer
+                      ? `${group.topicProposer.prefix ? `${group.topicProposer.prefix} ` : ""}${group.topicProposer.firstName} ${group.topicProposer.lastName}`
+                      : "another faculty member"}
+                  </strong>
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs border-amber-500/50 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 shrink-0 font-medium self-end sm:self-auto"
+              onClick={() => {
+                const confObj = supervisorConflicts.find((c) => c.groupId === group.id) || {
+                  groupId: group.id,
+                  groupName: group.name,
+                  projectTeamId: group.projectTeamId,
+                  course: group.course,
+                  topicId: group.project?.topicId,
+                  topicCode: group.project?.topicCode,
+                  topicTitle: group.project?.topicTitle || "Assigned Project",
+                  oldSupervisor: group.topicProposer
+                    ? {
+                        id: group.topicProposer.id,
+                        name: `${group.topicProposer.prefix ? `${group.topicProposer.prefix} ` : ""}${group.topicProposer.firstName} ${group.topicProposer.lastName}`.trim(),
+                        empId: group.topicProposer.empId,
+                        email: group.topicProposer.email,
+                      }
+                    : { id: 0, name: "Original Proposer", empId: null, email: "" },
+                  newSupervisor: group.supervisor
+                    ? {
+                        id: group.supervisor.id,
+                        name: `${group.supervisor.prefix ? `${group.supervisor.prefix} ` : ""}${group.supervisor.firstName} ${group.supervisor.lastName}`.trim(),
+                        empId: group.supervisor.empId,
+                        email: group.supervisor.email,
+                      }
+                    : { id: 0, name: "Assigned Supervisor", empId: null, email: "" },
+                  membersCount: group.members?.length || 0,
+                };
+                setPendingSupervisorConflict(confObj);
+              }}
+            >
+              Resolve Conflict
+            </Button>
+          </div>
+        )}
+
         {/* Selected Project Info */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
@@ -361,6 +444,36 @@ export default function ManageProject() {
           </div>
           <CreateTeamDialog />
         </div>
+
+        {/* Supervisor Conflicts Alert Banner */}
+        {supervisorConflicts.length > 0 && (
+          <div className="mb-6 p-4 rounded-xl border-2 border-amber-500/40 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-amber-500/20 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <span>Supervisor Allotment Conflicts Detected</span>
+                  <Badge variant="outline" className="bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-500/40 font-mono text-xs">
+                    {supervisorConflicts.length} {supervisorConflicts.length === 1 ? "Team" : "Teams"}
+                  </Badge>
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5 max-w-2xl">
+                  Some teams have a supervisor assigned that differs from the original project topic proposer.
+                  This causes the team to appear on both faculty dashboards. Choose <strong>Option 1 (Copy Project)</strong> or <strong>Option 2 (Migrate Project)</strong> to resolve.
+                </p>
+              </div>
+            </div>
+            <Button
+              className="shrink-0 bg-amber-600 hover:bg-amber-700 text-white font-medium shadow-sm gap-2"
+              onClick={() => setIsGlobalConflictModalOpen(true)}
+            >
+              <ShieldAlert className="h-4 w-4" />
+              Review & Resolve ({supervisorConflicts.length})
+            </Button>
+          </div>
+        )}
 
         {/* Search */}
         <div className="mb-6">
@@ -871,6 +984,21 @@ export default function ManageProject() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Global Multi-Conflict Review & Resolution Modal */}
+        <SupervisorConflictModal
+          open={isGlobalConflictModalOpen}
+          onOpenChange={setIsGlobalConflictModalOpen}
+        />
+
+        {/* Single Pending Supervisor Conflict Dialog */}
+        <SupervisorConflictModal
+          open={pendingSupervisorConflict !== null}
+          onOpenChange={(open) => {
+            if (!open) setPendingSupervisorConflict(null);
+          }}
+          selectedConflict={pendingSupervisorConflict}
+        />
       </div>
     </MainLayout>
   );

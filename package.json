@@ -1,7 +1,7 @@
 {
   "name": "iu-apmp",
   "description": "IU-APMP - Integral University Academic Project Management Portal",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "type": "module",
   "license": "MIT",
   "scripts": {

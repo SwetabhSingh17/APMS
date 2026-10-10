@@ -125,6 +125,10 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose?
               <ClipboardCheck className="mr-3 h-5 w-5" />
               <span>Evaluations</span>
             </Link>
+            <Link href="/supervisor-management" onClick={isMobile ? onClose : undefined} className={linkClass("/supervisor-management")}>
+              <GraduationCap className="w-5 h-5" />
+              <span>Supervisors</span>
+            </Link>
           </>
         )}
 

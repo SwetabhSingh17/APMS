@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { FileText, CheckCircle, Clock, AlertTriangle, CheckSquare, Users, Bell, AlertCircle, Download, Trash2, Database } from "lucide-react";
+import { FileText, CheckCircle, Clock, AlertTriangle, CheckSquare, Users, Bell, AlertCircle, Download, Trash2, Database, ShieldAlert } from "lucide-react";
 import MainLayout from "@/components/layout/main-layout";
 import StatsCard from "@/components/dashboard/stats-card";
 import Progress3D from "@/components/dashboard/progress-3d";
@@ -11,11 +11,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link, useLocation } from "wouter";
-import { UserRole, ProjectTopic, User, IEnrollmentConflict } from "@shared/schema";
+import { UserRole, ProjectTopic, User, IEnrollmentConflict, ISupervisorConflict } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 import { useCourseFilter } from "@/hooks/course-filter-context";
 import { useState } from "react";
 import Modal from "@/components/ui/modal";
+import { SupervisorConflictModal } from "@/components/admin/supervisor-conflict-modal";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -81,6 +82,15 @@ export default function Dashboard() {
     refetchInterval: 15000 // Refresh every 15 seconds
   });
   const conflicts = conflictData?.conflicts || [];
+
+  // Query for supervisor allotment conflicts (Admin and Coordinator only)
+  const [isSupervisorConflictModalOpen, setIsSupervisorConflictModalOpen] = useState(false);
+  const { data: supervisorConflictData } = useQuery<{ conflicts: ISupervisorConflict[], count: number }>({
+    queryKey: ["/api/admin/supervisor-conflicts"],
+    enabled: !!user && (user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN),
+    refetchInterval: 15000,
+  });
+  const supervisorConflicts = supervisorConflictData?.conflicts || [];
 
   const resolveConflictMutation = useMutation({
     mutationFn: async ({ userId, newEnrollmentNumber }: { userId: number, newEnrollmentNumber: string }) => {
@@ -343,6 +353,84 @@ export default function Dashboard() {
                     </Button>
                   </div>
                 ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Supervisor Allotment Conflict Alert Banner for Admin and Coordinator */}
+        {(user.role === UserRole.COORDINATOR || user.role === UserRole.ADMIN) && supervisorConflicts.length > 0 && (
+          <Card className="mb-6 border-2 border-indigo-500/60 bg-gradient-to-r from-indigo-500/15 via-purple-500/10 to-amber-500/15 shadow-sm">
+            <CardHeader className="pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                    <ShieldAlert className="h-5 w-5 animate-pulse" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-lg font-bold text-indigo-950 dark:text-indigo-200">
+                        Supervisor Allotment Conflict Detected
+                      </CardTitle>
+                      <span className="bg-indigo-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                        {supervisorConflicts.length} {supervisorConflicts.length === 1 ? "Conflict" : "Conflicts"}
+                      </span>
+                    </div>
+                    <CardDescription className="text-indigo-900/80 dark:text-indigo-300/80 mt-0.5">
+                      The system detected {supervisorConflicts.length} team(s) where the allotted supervisor differs from the project topic proposer. Reconcile with <strong>Option 1 (Copy Project)</strong> or <strong>Option 2 (Migrate Project)</strong>.
+                    </CardDescription>
+                  </div>
+                </div>
+                <Button
+                  className="shrink-0 font-semibold shadow-sm bg-indigo-600 hover:bg-indigo-700 text-white"
+                  onClick={() => setIsSupervisorConflictModalOpen(true)}
+                >
+                  <AlertCircle className="w-4 h-4 mr-2" />
+                  Resolve Supervisor Conflicts
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="bg-background/80 dark:bg-background/40 backdrop-blur rounded-lg p-3 border border-indigo-500/20 divide-y divide-border">
+                {supervisorConflicts.slice(0, 3).map((conflict) => (
+                  <div key={conflict.groupId} className="py-2.5 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-foreground text-xs">
+                        {conflict.groupName} ({conflict.projectTeamId || conflict.course})
+                      </span>
+                      <span className="text-muted-foreground text-xs">•</span>
+                      <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded text-primary">
+                        {conflict.topicCode || `TOPIC-${conflict.topicId}`}
+                      </span>
+                      <span className="text-xs text-foreground font-medium truncate max-w-[200px]" title={conflict.topicTitle}>
+                        "{conflict.topicTitle}"
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        (Old: <strong className="text-foreground">{conflict.oldSupervisor.name}</strong> ➔ New: <strong className="text-primary">{conflict.newSupervisor.name}</strong>)
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-7 self-start sm:self-auto border-indigo-500/40 hover:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300"
+                      onClick={() => setIsSupervisorConflictModalOpen(true)}
+                    >
+                      Resolve
+                    </Button>
+                  </div>
+                ))}
+                {supervisorConflicts.length > 3 && (
+                  <div className="pt-2 text-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-indigo-600 dark:text-indigo-400 h-6"
+                      onClick={() => setIsSupervisorConflictModalOpen(true)}
+                    >
+                      View all {supervisorConflicts.length} supervisor conflicts →
+                    </Button>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -707,6 +795,13 @@ export default function Dashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Supervisor Conflict Resolution Modal */}
+      <SupervisorConflictModal
+        open={isSupervisorConflictModalOpen}
+        onOpenChange={setIsSupervisorConflictModalOpen}
+        conflicts={supervisorConflicts}
+      />
     </MainLayout>
   );
 }

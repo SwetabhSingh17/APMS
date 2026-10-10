@@ -474,3 +474,42 @@ export interface IEnrollmentConflict {
   count: number;
   students: IEnrollmentConflictStudent[];
 }
+
+export interface ISupervisorConflict {
+  groupId: number;
+  groupName: string;
+  projectTeamId?: string | null;
+  course?: string | null;
+  topicId?: number;
+  topicCode?: string | null;
+  topicTitle: string;
+  topicDescription?: string | null;
+  technology?: string | null;
+  projectType?: string | null;
+  estimatedComplexity?: string | null;
+  oldSupervisor: {
+    id: number;
+    name: string;
+    prefix?: string | null;
+    empId?: string | null;
+    email: string;
+    department?: string | null;
+    designation?: string | null;
+  };
+  newSupervisor: {
+    id: number;
+    name: string;
+    prefix?: string | null;
+    empId?: string | null;
+    email: string;
+    department?: string | null;
+    designation?: string | null;
+  };
+  membersCount: number;
+}
+
+export interface ISupervisorConflictResolutionPayload {
+  groupId: number;
+  resolution: "copy" | "migrate";
+  newSupervisorId?: number;
+}

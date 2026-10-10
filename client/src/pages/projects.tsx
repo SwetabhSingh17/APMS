@@ -62,6 +62,8 @@ interface ISupervisorTopicWithTeam {
     course: string | null;
     members: { id: number; firstName: string; lastName: string; enrollmentNumber: string | null; email: string; mobile?: string | null }[];
     progress: number;
+    isSupervisorConflict?: boolean;
+    assignedSupervisorId?: number | null;
   };
 }
 
@@ -462,6 +464,19 @@ export default function Projects() {
                           </span>
                         </div>
                       </div>
+
+                      {/* Conflict Notification for Supervisor */}
+                      {item.team.isSupervisorConflict && (
+                        <div className="p-3 rounded-lg border border-amber-500/40 bg-amber-500/10 text-xs flex items-start gap-2.5 text-amber-900 dark:text-amber-300">
+                          <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                          <div>
+                            <p className="font-semibold leading-tight">Reassignment Pending Coordinator Action</p>
+                            <p className="text-[11px] text-amber-800/80 dark:text-amber-400/80 mt-0.5">
+                              This student team was reassigned to another supervisor. The coordinator will either duplicate this topic for the new supervisor or migrate it.
+                            </p>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Progress bar */}
                       <div className="flex items-center gap-3">

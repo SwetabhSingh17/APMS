@@ -7,7 +7,7 @@ This document outlines the security policies, supported versions, protective mea
 ## 📋 Table of Contents
 
 - [Supported Versions](#supported-versions)
-- [Security Posture (v2.2.0)](#security-posture-v220)
+- [Security Posture (v2.3.0)](#security-posture-v230)
   - [Authentication & Cryptography](#authentication--cryptography)
   - [Access Control & Authorization](#access-control--authorization)
   - [Network & Infrastructure Security](#network--infrastructure-security)
@@ -22,14 +22,14 @@ Currently, the following versions of this project are actively supported with se
 
 | Version | Supported | Notes |
 |:---|:---:|:---|
-| **v2.x** | ✅ | Actively supported (Current production release) |
+| **v2.x** | ✅ | Actively supported (Current production release: v2.3.0) |
 | **v1.9.x** | ✅ | Critical security maintenance |
 | **v1.8.x** | ✅ | Legacy security maintenance |
 | **< v1.8** | ❌ | Unsupported; please upgrade to v2.x |
 
 ---
 
-## Security Posture (v2.2.0)
+## Security Posture (v2.3.0)
 
 IU-APMP ships with the following protections in place:
 
@@ -45,6 +45,7 @@ IU-APMP ships with the following protections in place:
 - **Consolidated Route Authorization & Shadowing Elimination** — User management routes (`POST`, `PATCH`, `DELETE` under `/api/admin/users`) are strictly consolidated into `server/routes/admin.ts` with explicit RBAC checks, eliminating route-shadowing vulnerabilities.
 - **Strict Cohort/Program Isolation** — BCA and MCA topic visibility, team rosters, and proposal catalogs are strictly partitioned; students are isolated to their registered curriculum to prevent cross-cohort data leakage.
 - **Team Access Control, Safe Dissolution & Account Retention** — Students and Supervisors are prohibited from modifying or leaving project teams. Only Administrators and Coordinators have authorization to modify team rosters, reassign supervisor mentorship, or dissolve teams. Team dissolution strictly retains member student user accounts intact without data loss, safely unlinking team associations and milestones so students remain active and eligible for future team allotment.
+- **Supervisor Mentorship Conflict Prevention & Isolation** — Strict integrity validation on group-to-topic and group-to-supervisor relationships detects and alerts when a team's supervisor is changed without updating project ownership. Dual-action resolution enforces either isolated topic cloning (`PUGID26xxx`) or clean topic ownership migration, maintaining database referential integrity and preventing unauthorized cross-supervisor data access.
 
 ### Network & Infrastructure Security
 - **Rate Limiting** — `express-rate-limit` on `/api/login` and `/api/register`.

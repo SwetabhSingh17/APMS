@@ -25,9 +25,14 @@ Streamline and govern the academic project lifecycle with strict course isolatio
 - ✓ **DIRECT-TOPIC-ASSIGNMENT**: Admin & Coordinator direct topic authoring, auto-approval, and immediate faculty allotment — validated (v2.1.0)
 - ✓ **NAV-REORG**: Reorganized sidebar navigation hierarchy with Project Management grouping and Account Settings — validated (v2.1.0)
 
-### Active (Milestone v2.2.0 Goals)
+- ✓ **BACKUP-RESTORE**: Upgrade backup export/import to include all 8 tables with topological foreign key insertion order, ZIP archive packaging, and pre-restore snapshots — validated (v2.2.0)
+- ✓ **EXCEL-REPORTING**: Official 8-sheet master university Excel report generator (`.xlsx`) — validated (v2.2.0)
+- ✓ **SUPERVISOR-CONFLICT-RESOLUTION**: Dual-action supervisor conflict detection and resolution modal (Option 1 clone with new PUGID vs Option 2 migrate) — validated (v2.3.0)
+- ✓ **DYNAMIC-TELEMETRY**: Real-time supervisor mentorship telemetry ratio (`Active Teams Allotted / Total Projects Submitted`) and dynamic workload capacity formula — validated (v2.3.0)
+- ✓ **SUPERVISOR-DIRECTORY-ACCESS**: Faculty supervisor role access to supervisor management directory and sidebar navigation — validated (v2.3.0)
 
-- [ ] **BACKUP-RESTORE**: Upgrade backup export/import to include all 9 tables (including assessments, milestones, notifications) with topological foreign key insertion order — from Fixes_required.md
+### Future Goals (Next Milestones)
+
 - [ ] **SERVER-SEC-REG**: Enforce server-side registration closure toggle in `/api/register` matching the client-side overlay — from Fixes_required.md
 - [ ] **ACTIVITY-FEED**: Replace static mock activity list in `GET /api/activities` with dynamic database events — from Fixes_required.md
 - [ ] **INPUT-SANITIZATION**: Add server-side HTML/XSS sanitization on user-submitted text fields (topic descriptions, feedback) — from Fixes_required.md

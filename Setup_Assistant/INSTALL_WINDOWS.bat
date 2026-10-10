@@ -7,7 +7,7 @@ REM ============================================================================
 
 echo.
 echo ========================================
-echo   IU-APMP Setup (v2.2.0)
+echo   IU-APMP Setup (v2.3.0)
 echo   Integral University Academic Project Management Portal
 echo   By - Swetabh Singh
 echo ========================================

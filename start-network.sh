@@ -4,7 +4,7 @@
 IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -n 1)
 
 echo "========================================="
-echo "Starting IU-APMP Server for Network (v2.2.0)"
+echo "Starting IU-APMP Server for Network (v2.3.0)"
 echo "========================================="
 echo ""
 echo "Local IP Address: $IP"

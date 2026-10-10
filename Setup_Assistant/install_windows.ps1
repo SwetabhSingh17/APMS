@@ -1,10 +1,10 @@
-# APMS (Academic Project Management System) - Windows Installation Script
+# IU-APMP (Integral University Academic Project Management Portal v2.3.0) - Windows Installation Script
 # Created by: Swetabh Singh
 # Run with: PowerShell -ExecutionPolicy Bypass -File install_windows.ps1
 
 Write-Host ""
 Write-Host "========================================"
-Write-Host "  APMS (Academic Project Management System) - Setup"
+Write-Host "  IU-APMP (Academic Project Management Portal v2.3.0) - Setup"
 Write-Host "  By - Swetabh Singh"
 Write-Host "========================================"
 Write-Host ""

@@ -7,6 +7,7 @@ import {
   ISupervisorOnboardingRow, ISupervisorOnboardingResult,
   ITopicOnboardingRow, ITopicOnboardingResult, ITopicOnboardingSuccessRecord, ITopicOnboardingFailureRecord,
   IEnrollmentConflict, IEnrollmentConflictStudent,
+  ISupervisorConflict,
   userNotificationPreferences, IUserNotificationPreferences
 } from "@shared/schema";
 import { db } from "./db";
@@ -272,6 +273,294 @@ export class DBStorage {
       .returning();
 
     return updatedUser as User;
+  }
+
+  /**
+   * Retrieves all active supervisor allotment conflicts.
+   * A conflict occurs when a group has an assigned supervisor (student_groups.supervisor_id),
+   * but the project topic assigned to the group was proposed by a different faculty member (project_topics.submitted_by_id).
+   */
+  async getSupervisorConflicts(filterGroupId?: number): Promise<ISupervisorConflict[]> {
+    const whereClause = filterGroupId
+      ? sql`sg.supervisor_id IS NOT NULL AND pt.submitted_by_id != sg.supervisor_id AND pt.is_deleted = false AND sg.id = ${filterGroupId}`
+      : sql`sg.supervisor_id IS NOT NULL AND pt.submitted_by_id != sg.supervisor_id AND pt.is_deleted = false`;
+
+    const result = await db.execute(sql`
+      SELECT DISTINCT ON (sg.id)
+        sg.id as "groupId",
+        sg.name as "groupName",
+        sg.project_team_id as "projectTeamId",
+        sg.course as "course",
+        pt.id as "topicId",
+        pt.topic_code as "topicCode",
+        pt.title as "topicTitle",
+        pt.description as "topicDescription",
+        pt.technology as "technology",
+        pt.project_type as "projectType",
+        pt.estimated_complexity as "estimatedComplexity",
+        u_old.id as "oldSupervisorId",
+        u_old.first_name as "oldSupervisorFirstName",
+        u_old.last_name as "oldSupervisorLastName",
+        u_old.prefix as "oldSupervisorPrefix",
+        u_old.emp_id as "oldSupervisorEmpId",
+        u_old.email as "oldSupervisorEmail",
+        u_old.department as "oldSupervisorDepartment",
+        u_old.designation as "oldSupervisorDesignation",
+        u_new.id as "newSupervisorId",
+        u_new.first_name as "newSupervisorFirstName",
+        u_new.last_name as "newSupervisorLastName",
+        u_new.prefix as "newSupervisorPrefix",
+        u_new.emp_id as "newSupervisorEmpId",
+        u_new.email as "newSupervisorEmail",
+        u_new.department as "newSupervisorDepartment",
+        u_new.designation as "newSupervisorDesignation",
+        (
+          SELECT COUNT(*)
+          FROM student_group_members sgm2
+          WHERE sgm2.group_id = sg.id AND sgm2.status = 'accepted'
+        ) as "membersCount"
+      FROM student_groups sg
+      INNER JOIN student_group_members sgm ON sgm.group_id = sg.id AND sgm.status = 'accepted'
+      INNER JOIN student_projects sp ON sp.student_id = sgm.user_id
+      INNER JOIN project_topics pt ON pt.id = sp.topic_id
+      INNER JOIN users u_old ON u_old.id = pt.submitted_by_id
+      INNER JOIN users u_new ON u_new.id = sg.supervisor_id
+      WHERE ${whereClause}
+      ORDER BY sg.id ASC
+    `);
+
+    const rows = Array.isArray(result) ? result : ((result as any)?.rows || []);
+    return rows.map((r: any) => ({
+      groupId: Number(r.groupId),
+      groupName: String(r.groupName),
+      projectTeamId: r.projectTeamId ? String(r.projectTeamId) : null,
+      course: r.course ? String(r.course) : null,
+      topicId: Number(r.topicId),
+      topicCode: r.topicCode ? String(r.topicCode) : null,
+      topicTitle: String(r.topicTitle),
+      topicDescription: r.topicDescription ? String(r.topicDescription) : null,
+      technology: r.technology ? String(r.technology) : null,
+      projectType: r.projectType ? String(r.projectType) : null,
+      estimatedComplexity: r.estimatedComplexity ? String(r.estimatedComplexity) : null,
+      oldSupervisor: {
+        id: Number(r.oldSupervisorId),
+        name: `${r.oldSupervisorPrefix ? `${r.oldSupervisorPrefix} ` : ""}${r.oldSupervisorFirstName} ${r.oldSupervisorLastName}`.trim(),
+        prefix: r.oldSupervisorPrefix || null,
+        empId: r.oldSupervisorEmpId || null,
+        email: String(r.oldSupervisorEmail),
+        department: r.oldSupervisorDepartment || null,
+        designation: r.oldSupervisorDesignation || null,
+      },
+      newSupervisor: {
+        id: Number(r.newSupervisorId),
+        name: `${r.newSupervisorPrefix ? `${r.newSupervisorPrefix} ` : ""}${r.newSupervisorFirstName} ${r.newSupervisorLastName}`.trim(),
+        prefix: r.newSupervisorPrefix || null,
+        empId: r.newSupervisorEmpId || null,
+        email: String(r.newSupervisorEmail),
+        department: r.newSupervisorDepartment || null,
+        designation: r.newSupervisorDesignation || null,
+      },
+      membersCount: Number(r.membersCount || 0),
+    }));
+  }
+
+  /**
+   * Resolves a supervisor allotment conflict using one of two user-chosen strategies:
+   * 
+   * Option 1 ("copy"):
+   * Copies the exact same project, assigns it a new unique sequential PUGID (e.g. PUGID26306),
+   * assigns that copied project to the New Supervisor, and updates the group's members to point
+   * to this new project. Both Old and New Supervisor have the project showing on their respective
+   * dashboards (Old Supervisor retains original PUGID as unpicked/available, New Supervisor has
+   * the copied project with new PUGID and the allotted group).
+   * 
+   * Option 2 ("migrate"):
+   * Migrates the same project with the same Project ID and PUGID from Old Supervisor to New Supervisor
+   * by changing project_topics.submitted_by_id = newSupervisorId. The project is removed from the Old
+   * Supervisor and is migrated to the New Supervisor.
+   */
+  async resolveSupervisorConflict(
+    groupId: number,
+    resolution: "copy" | "migrate",
+    options?: {
+      adminUser?: { id: number; firstName: string; lastName: string };
+      newSupervisorId?: number;
+    }
+  ): Promise<{
+    success: boolean;
+    message: string;
+    resolution: "copy" | "migrate";
+    group: StudentGroup;
+    topic: ProjectTopic;
+    oldTopic?: ProjectTopic;
+    newTopicCode?: string;
+  }> {
+    const group = await this.getGroup(groupId);
+    if (!group) {
+      throw new Error(`Project team with ID ${groupId} not found`);
+    }
+
+    const targetSupervisorId = options?.newSupervisorId || group.supervisorId;
+    if (!targetSupervisorId) {
+      throw new Error("No target supervisor specified to resolve this conflict");
+    }
+
+    const newSupervisor = await this.getUser(targetSupervisorId);
+    if (!newSupervisor || newSupervisor.role !== UserRole.SUPERVISOR) {
+      throw new Error("The selected user is not a valid faculty supervisor");
+    }
+
+    // Get group members and their current project
+    const members = await this.getStudentGroupMembers(group.id);
+    const acceptedMembers = members.filter(m => (m as any).status === "accepted" || (m as any).groupId === group.id);
+    const memberIds = acceptedMembers.map(m => m.id);
+
+    if (memberIds.length === 0) {
+      throw new Error("No accepted members found in this group");
+    }
+
+    // Find the current project assigned to any member
+    let currentTopicId: number | null = null;
+    for (const mId of memberIds) {
+      const sp = await this.getStudentProjects(mId);
+      if (sp.length > 0 && sp[0].topicId) {
+        currentTopicId = sp[0].topicId;
+        break;
+      }
+    }
+
+    if (!currentTopicId) {
+      // If group has no project allotted, just ensure group.supervisorId = targetSupervisorId
+      const [updatedGroup] = await db.update(studentGroups)
+        .set({ supervisorId: targetSupervisorId, updatedAt: new Date() })
+        .where(eq(studentGroups.id, group.id))
+        .returning();
+      return {
+        success: true,
+        message: `Supervisor assigned to ${newSupervisor.firstName} ${newSupervisor.lastName} (no project topic was allotted).`,
+        resolution,
+        group: updatedGroup as StudentGroup,
+        topic: null as any,
+      };
+    }
+
+    const originalTopic = await this.getProjectTopic(currentTopicId);
+    if (!originalTopic) {
+      throw new Error(`Project topic ID ${currentTopicId} not found`);
+    }
+
+    const oldSupervisor = await this.getUser(originalTopic.submittedById);
+    const oldSupervisorName = oldSupervisor
+      ? `${oldSupervisor.prefix ? `${oldSupervisor.prefix} ` : ""}${oldSupervisor.firstName} ${oldSupervisor.lastName}`.trim()
+      : "Previous Supervisor";
+    const newSupervisorName = `${newSupervisor.prefix ? `${newSupervisor.prefix} ` : ""}${newSupervisor.firstName} ${newSupervisor.lastName}`.trim();
+    const adminName = options?.adminUser ? `${options.adminUser.firstName} ${options.adminUser.lastName}` : "Administrator";
+
+    if (resolution === "copy") {
+      // OPTION 1: Copy the project, assign new PUGID, assign copied project to New Supervisor
+      const newTopicCode = await this.getNextTopicCode();
+
+      const [copiedTopic] = await db.insert(projectTopics).values({
+        topicCode: newTopicCode,
+        title: originalTopic.title,
+        description: originalTopic.description,
+        technology: originalTopic.technology,
+        projectType: originalTopic.projectType,
+        course: originalTopic.course,
+        estimatedComplexity: originalTopic.estimatedComplexity,
+        submittedById: targetSupervisorId,
+        status: "approved",
+        feedback: originalTopic.feedback,
+        isDeleted: false,
+      }).returning();
+
+      // Update student group supervisor
+      const [updatedGroup] = await db.update(studentGroups)
+        .set({ supervisorId: targetSupervisorId, updatedAt: new Date() })
+        .where(eq(studentGroups.id, group.id))
+        .returning();
+
+      // Re-point all team members' studentProjects to the new copied topic ID
+      await db.update(studentProjects)
+        .set({ topicId: copiedTopic.id, updatedAt: new Date() })
+        .where(inArray(studentProjects.studentId, memberIds));
+
+      // Notifications
+      if (oldSupervisor && oldSupervisor.id !== targetSupervisorId) {
+        await this.createNotification({
+          userId: oldSupervisor.id,
+          title: "Project Supervisor Reassigned",
+          message: `Project team "${group.name}" has been reassigned to ${newSupervisorName} by ${adminName}. Your original project topic "${originalTopic.topicCode || ''} - ${originalTopic.title}" remains active under your profile.`,
+        });
+      }
+
+      await this.createNotification({
+        userId: targetSupervisorId,
+        title: "New Project & Team Allotted (Copied Project)",
+        message: `Project "${originalTopic.title}" has been cloned and allotted to you as "${newTopicCode}" with Project Team "${group.name}" by ${adminName}.`,
+      });
+
+      for (const mId of memberIds) {
+        await this.createNotification({
+          userId: mId,
+          title: "Supervisor & Project Allotment Updated",
+          message: `Your project supervisor has been updated to ${newSupervisorName} under project code ${newTopicCode}.`,
+        });
+      }
+
+      return {
+        success: true,
+        message: `Project copied successfully with new ID ${newTopicCode}. Allotted to ${newSupervisorName}. Original project ${originalTopic.topicCode || ''} retained by ${oldSupervisorName}.`,
+        resolution: "copy",
+        group: updatedGroup as StudentGroup,
+        topic: copiedTopic as ProjectTopic,
+        oldTopic: originalTopic as ProjectTopic,
+        newTopicCode,
+      };
+
+    } else {
+      // OPTION 2: Migrate the same project with same Project ID from Old Supervisor to New Supervisor
+      const [migratedTopic] = await db.update(projectTopics)
+        .set({ submittedById: targetSupervisorId, updatedAt: new Date() })
+        .where(eq(projectTopics.id, originalTopic.id))
+        .returning();
+
+      const [updatedGroup] = await db.update(studentGroups)
+        .set({ supervisorId: targetSupervisorId, updatedAt: new Date() })
+        .where(eq(studentGroups.id, group.id))
+        .returning();
+
+      // Notifications
+      if (oldSupervisor && oldSupervisor.id !== targetSupervisorId) {
+        await this.createNotification({
+          userId: oldSupervisor.id,
+          title: "Project Topic Migrated",
+          message: `Project "${originalTopic.topicCode || ''} - ${originalTopic.title}" and team "${group.name}" have been migrated to ${newSupervisorName} by ${adminName}.`,
+        });
+      }
+
+      await this.createNotification({
+        userId: targetSupervisorId,
+        title: "Project Topic Transferred",
+        message: `Project "${originalTopic.topicCode || ''} - ${originalTopic.title}" and team "${group.name}" have been transferred to your supervision by ${adminName}.`,
+      });
+
+      for (const mId of memberIds) {
+        await this.createNotification({
+          userId: mId,
+          title: "Supervisor Updated",
+          message: `Your project supervisor has been updated to ${newSupervisorName}.`,
+        });
+      }
+
+      return {
+        success: true,
+        message: `Project ${originalTopic.topicCode || ''} migrated successfully to ${newSupervisorName}. Removed from ${oldSupervisorName}.`,
+        resolution: "migrate",
+        group: updatedGroup as StudentGroup,
+        topic: migratedTopic as ProjectTopic,
+      };
+    }
   }
 
   async deleteUser(id: number): Promise<boolean> {
@@ -670,6 +959,8 @@ export class DBStorage {
       groupName: string;
       projectTeamId: string | null;
       course: string | null;
+      isSupervisorConflict?: boolean;
+      assignedSupervisorId?: number | null;
       members: { id: number; firstName: string; lastName: string; enrollmentNumber: string | null; email: string; mobile?: string | null }[];
       progress: number;
     };
@@ -832,6 +1123,8 @@ export class DBStorage {
           groupName: groupData.group.name,
           projectTeamId: groupData.group.projectTeamId,
           course: groupData.group.course,
+          isSupervisorConflict: !!(groupData.group.supervisorId && groupData.group.supervisorId !== supervisorId),
+          assignedSupervisorId: groupData.group.supervisorId,
           members: groupData.members.map(m => ({
             id: m.id,
             firstName: m.firstName,
@@ -1146,7 +1439,9 @@ export class DBStorage {
     const result = await Promise.all(groups.map(async (group) => {
       const members = await this.getStudentGroupMembers(group.id);
       let supervisor = group.supervisorId ? await this.getUser(group.supervisorId) : null;
-      let project: { id: number; topicId: number; status: string; topicCode?: string | null; topicTitle?: string } | null = null;
+      let project: { id: number; topicId: number; status: string; topicCode?: string | null; topicTitle?: string; submittedById?: number | null } | null = null;
+      let topicProposer: { id: number; prefix?: string | null; firstName: string; lastName: string; empId?: string | null; email: string; department?: string | null; designation?: string | null } | null = null;
+      let isSupervisorConflict = false;
 
       // Check if group members have an assigned project
       if (members.length > 0) {
@@ -1154,19 +1449,42 @@ export class DBStorage {
           const mProjects = await this.getStudentProjects(m.id);
           if (mProjects.length > 0 && mProjects[0].topicId) {
             const topic = await this.getProjectTopic(mProjects[0].topicId);
-            project = {
-              id: mProjects[0].id,
-              topicId: mProjects[0].topicId,
-              status: mProjects[0].status,
-              topicCode: topic?.topicCode,
-              topicTitle: topic?.title,
-            };
+            if (topic) {
+              project = {
+                id: mProjects[0].id,
+                topicId: mProjects[0].topicId,
+                status: mProjects[0].status,
+                topicCode: topic.topicCode,
+                topicTitle: topic.title,
+                submittedById: topic.submittedById,
+              };
 
-            // Fallback resolution: If group.supervisorId is null, resolve supervisor from topic
-            if (!supervisor && topic && topic.submittedById) {
-              supervisor = await this.getUser(topic.submittedById);
-              // Self-heal the database record
-              await this.updateStudentGroupSupervisor(group.id, topic.submittedById);
+              // Fallback resolution: If group.supervisorId is null, resolve supervisor from topic
+              if (!supervisor && topic.submittedById) {
+                supervisor = await this.getUser(topic.submittedById);
+                // Self-heal the database record
+                await this.updateStudentGroupSupervisor(group.id, topic.submittedById);
+              }
+
+              if (topic.submittedById) {
+                const proposerUser = await this.getUser(topic.submittedById);
+                if (proposerUser) {
+                  topicProposer = {
+                    id: proposerUser.id,
+                    prefix: proposerUser.prefix,
+                    firstName: proposerUser.firstName,
+                    lastName: proposerUser.lastName,
+                    empId: proposerUser.empId,
+                    email: proposerUser.email,
+                    department: proposerUser.department,
+                    designation: proposerUser.designation,
+                  };
+                }
+              }
+
+              if (supervisor && topic.submittedById && supervisor.id !== topic.submittedById) {
+                isSupervisorConflict = true;
+              }
             }
             break;
           }
@@ -1175,7 +1493,10 @@ export class DBStorage {
 
       return {
         ...group,
+        supervisorId: supervisor ? supervisor.id : group.supervisorId,
         project,
+        isSupervisorConflict,
+        topicProposer,
         members: members.map(m => ({
           id: m.id,
           firstName: m.firstName,
@@ -1403,19 +1724,22 @@ export class DBStorage {
     // Map: supervisorId -> assigned groups
     const supervisorToGroupsMap = new Map<number, any[]>();
     for (const group of allGroups) {
-      if (group.supervisorId) {
-        const list = supervisorToGroupsMap.get(group.supervisorId) || [];
-        list.push({
-          id: group.id,
-          name: group.name,
-          projectTeamId: group.projectTeamId,
-          course: group.course,
-          maxSize: group.maxSize,
-          memberCount: group.members?.length || 0,
-          members: group.members || [],
-          project: group.project,
-        });
-        supervisorToGroupsMap.set(group.supervisorId, list);
+      const effectiveSupervisorId = group.supervisorId || (group.project?.submittedById ?? null);
+      if (effectiveSupervisorId) {
+        const list = supervisorToGroupsMap.get(effectiveSupervisorId) || [];
+        if (!list.some(g => g.id === group.id)) {
+          list.push({
+            id: group.id,
+            name: group.name,
+            projectTeamId: group.projectTeamId,
+            course: group.course,
+            maxSize: group.maxSize,
+            memberCount: group.members?.length || 0,
+            members: group.members || [],
+            project: group.project,
+          });
+        }
+        supervisorToGroupsMap.set(effectiveSupervisorId, list);
       }
     }
 
@@ -1451,11 +1775,17 @@ export class DBStorage {
       const assignedTeams = supTeams.length;
       const totalStudentsSupervised = supTeams.reduce((sum, g) => sum + (g.memberCount || 0), 0);
 
+      const capacity = totalTopics > 0 ? totalTopics : 5;
       let workloadStatus: "available" | "optimal" | "high" | "maximum" = "available";
-      if (assignedTeams === 0) workloadStatus = "available";
-      else if (assignedTeams <= 3) workloadStatus = "optimal";
-      else if (assignedTeams <= 5) workloadStatus = "high";
-      else workloadStatus = "maximum";
+      if (assignedTeams === 0) {
+        workloadStatus = "available";
+      } else if (assignedTeams >= capacity) {
+        workloadStatus = "maximum";
+      } else if (assignedTeams >= Math.ceil(capacity * 0.7)) {
+        workloadStatus = "high";
+      } else {
+        workloadStatus = "optimal";
+      }
 
       return {
         ...sup,
@@ -1678,7 +2008,7 @@ export class DBStorage {
     const metadata = {
       portalName: "Integral University Academic Project Management Portal (IU-APMP)",
       portalCode: "IU-APMP",
-      version: "2.2.0",
+      version: "2.3.0",
       exportedAt: timestamp,
       recordCounts: {
         studentGroups: groupsData.length,
