@@ -101,7 +101,7 @@ function Router() {
         <ProtectedRoute
           path="/supervisor-management"
           component={SupervisorManagement}
-          allowedRoles={[UserRole.ADMIN, UserRole.COORDINATOR, UserRole.SUPERVISOR]}
+          allowedRoles={[UserRole.ADMIN, UserRole.COORDINATOR]}
         />
         <ProtectedRoute path="/settings" component={Settings} />
         <ProtectedRoute path="/notifications" component={Notifications} />

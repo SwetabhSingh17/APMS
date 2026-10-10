@@ -410,10 +410,15 @@ export class DBStorage {
       throw new Error("The selected user is not a valid faculty supervisor");
     }
 
-    // Get group members and their current project
-    const members = await this.getStudentGroupMembers(group.id);
-    const acceptedMembers = members.filter(m => (m as any).status === "accepted" || (m as any).groupId === group.id);
-    const memberIds = acceptedMembers.map(m => m.id);
+    // Query studentGroupMembers with status set to accepted, matching getSupervisorConflicts
+    const acceptedMembershipRows = await db
+      .select({ userId: studentGroupMembers.userId })
+      .from(studentGroupMembers)
+      .where(and(
+        eq(studentGroupMembers.groupId, group.id),
+        eq(studentGroupMembers.status, "accepted")
+      ));
+    const memberIds = acceptedMembershipRows.map(m => m.userId);
 
     if (memberIds.length === 0) {
       throw new Error("No accepted members found in this group");
@@ -458,34 +463,42 @@ export class DBStorage {
 
     if (resolution === "copy") {
       // OPTION 1: Copy the project, assign new PUGID, assign copied project to New Supervisor
-      const newTopicCode = await this.getNextTopicCode();
+      // Wrap topic insert, group update, and studentProjects reassignment in an atomic database transaction
+      const { copiedTopic, updatedGroup, newTopicCode } = await db.transaction(async (tx) => {
+        // Serialize topic-code allocation across concurrent operations
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(26001)`);
 
-      const [copiedTopic] = await db.insert(projectTopics).values({
-        topicCode: newTopicCode,
-        title: originalTopic.title,
-        description: originalTopic.description,
-        technology: originalTopic.technology,
-        projectType: originalTopic.projectType,
-        course: originalTopic.course,
-        estimatedComplexity: originalTopic.estimatedComplexity,
-        submittedById: targetSupervisorId,
-        status: "approved",
-        feedback: originalTopic.feedback,
-        isDeleted: false,
-      }).returning();
+        const newTopicCode = await this.getNextTopicCode(tx);
 
-      // Update student group supervisor
-      const [updatedGroup] = await db.update(studentGroups)
-        .set({ supervisorId: targetSupervisorId, updatedAt: new Date() })
-        .where(eq(studentGroups.id, group.id))
-        .returning();
+        const [copiedTopic] = await tx.insert(projectTopics).values({
+          topicCode: newTopicCode,
+          title: originalTopic.title,
+          description: originalTopic.description,
+          technology: originalTopic.technology,
+          projectType: originalTopic.projectType,
+          course: originalTopic.course,
+          estimatedComplexity: originalTopic.estimatedComplexity,
+          submittedById: targetSupervisorId,
+          status: "approved",
+          feedback: originalTopic.feedback,
+          isDeleted: false,
+        }).returning();
 
-      // Re-point all team members' studentProjects to the new copied topic ID
-      await db.update(studentProjects)
-        .set({ topicId: copiedTopic.id, updatedAt: new Date() })
-        .where(inArray(studentProjects.studentId, memberIds));
+        // Update student group supervisor
+        const [updatedGroup] = await tx.update(studentGroups)
+          .set({ supervisorId: targetSupervisorId, updatedAt: new Date() })
+          .where(eq(studentGroups.id, group.id))
+          .returning();
 
-      // Notifications
+        // Re-point all team members' studentProjects to the new copied topic ID
+        await tx.update(studentProjects)
+          .set({ topicId: copiedTopic.id, updatedAt: new Date() })
+          .where(inArray(studentProjects.studentId, memberIds));
+
+        return { copiedTopic, updatedGroup, newTopicCode };
+      });
+
+      // Notifications sent only after successful transaction commit
       if (oldSupervisor && oldSupervisor.id !== targetSupervisorId) {
         await this.createNotification({
           userId: oldSupervisor.id,
@@ -520,17 +533,22 @@ export class DBStorage {
 
     } else {
       // OPTION 2: Migrate the same project with same Project ID from Old Supervisor to New Supervisor
-      const [migratedTopic] = await db.update(projectTopics)
-        .set({ submittedById: targetSupervisorId, updatedAt: new Date() })
-        .where(eq(projectTopics.id, originalTopic.id))
-        .returning();
+      // Wrap migrate branch's topic and group writes in an atomic database transaction
+      const { migratedTopic, updatedGroup } = await db.transaction(async (tx) => {
+        const [migratedTopic] = await tx.update(projectTopics)
+          .set({ submittedById: targetSupervisorId, updatedAt: new Date() })
+          .where(eq(projectTopics.id, originalTopic.id))
+          .returning();
 
-      const [updatedGroup] = await db.update(studentGroups)
-        .set({ supervisorId: targetSupervisorId, updatedAt: new Date() })
-        .where(eq(studentGroups.id, group.id))
-        .returning();
+        const [updatedGroup] = await tx.update(studentGroups)
+          .set({ supervisorId: targetSupervisorId, updatedAt: new Date() })
+          .where(eq(studentGroups.id, group.id))
+          .returning();
 
-      // Notifications
+        return { migratedTopic, updatedGroup };
+      });
+
+      // Notifications sent only after successful transaction commit
       if (oldSupervisor && oldSupervisor.id !== targetSupervisorId) {
         await this.createNotification({
           userId: oldSupervisor.id,
@@ -677,8 +695,9 @@ export class DBStorage {
     return newTopic as ProjectTopic;
   }
 
-  async getNextTopicCode(): Promise<string> {
-    const existingTopicsWithCodes = await db
+  async getNextTopicCode(txHandle?: any): Promise<string> {
+    const executor = txHandle || db;
+    const existingTopicsWithCodes = await executor
       .select({ topicCode: projectTopics.topicCode })
       .from(projectTopics)
       .where(and(isNotNull(projectTopics.topicCode), like(projectTopics.topicCode, "PUGID26%")));

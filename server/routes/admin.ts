@@ -45,8 +45,8 @@ export function registerAdminRoutes(router: Router, storage: DBStorage) {
         }
     });
 
-    // Supervisor Management Summary (Admin, Coordinator, and Supervisor)
-    router.get("/api/admin/supervisors-summary", requireRole([UserRole.ADMIN, UserRole.COORDINATOR, UserRole.SUPERVISOR]), async (req: Request, res: Response) => {
+    // Supervisor Management Summary (Admin and Coordinator)
+    router.get("/api/admin/supervisors-summary", requireRole([UserRole.ADMIN, UserRole.COORDINATOR]), async (req: Request, res: Response) => {
         try {
             const course = req.query.course as string | undefined;
             const summary = await storage.getSupervisorsSummary(course);

@@ -316,7 +316,16 @@ export default function ManageProject() {
               variant="outline"
               className="h-7 text-xs border-amber-500/50 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 shrink-0 font-medium self-end sm:self-auto"
               onClick={() => {
-                const confObj = supervisorConflicts.find((c) => c.groupId === group.id) || {
+                const existingConflict = supervisorConflicts.find((c) => c.groupId === group.id);
+                if (!existingConflict && !group.supervisor) {
+                  toast({
+                    title: "Cannot Resolve Conflict",
+                    description: "No supervisor is currently assigned to this team to resolve a conflict with.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                const confObj = existingConflict || {
                   groupId: group.id,
                   groupName: group.name,
                   projectTeamId: group.projectTeamId,
@@ -342,6 +351,14 @@ export default function ManageProject() {
                     : { id: 0, name: "Assigned Supervisor", empId: null, email: "" },
                   membersCount: group.members?.length || 0,
                 };
+                if (confObj.newSupervisor.id === 0) {
+                  toast({
+                    title: "Cannot Resolve Conflict",
+                    description: "A valid supervisor must be assigned to the group before resolving.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
                 setPendingSupervisorConflict(confObj);
               }}
             >

@@ -287,7 +287,7 @@ export function SupervisorConflictModal({
                 resolveMutation.mutate({
                   groupId: conflict.groupId,
                   resolution: singleSelectedMode,
-                  newSupervisorId: conflict.newSupervisor.id,
+                  newSupervisorId: conflict.newSupervisor.id && conflict.newSupervisor.id > 0 ? conflict.newSupervisor.id : undefined,
                 })
               }
             >
@@ -431,7 +431,7 @@ export function SupervisorConflictModal({
                           resolveMutation.mutate({
                             groupId: c.groupId,
                             resolution: "copy",
-                            newSupervisorId: c.newSupervisor.id,
+                            newSupervisorId: c.newSupervisor.id && c.newSupervisor.id > 0 ? c.newSupervisor.id : undefined,
                           })
                         }
                         title="Copy project with new sequential PUGID. Old supervisor keeps original topic."
@@ -453,7 +453,7 @@ export function SupervisorConflictModal({
                           resolveMutation.mutate({
                             groupId: c.groupId,
                             resolution: "migrate",
-                            newSupervisorId: c.newSupervisor.id,
+                            newSupervisorId: c.newSupervisor.id && c.newSupervisor.id > 0 ? c.newSupervisor.id : undefined,
                           })
                         }
                         title="Migrate existing project & PUGID to new supervisor. Removed from old supervisor."

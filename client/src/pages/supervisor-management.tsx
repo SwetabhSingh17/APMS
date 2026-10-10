@@ -259,7 +259,7 @@ export default function SupervisorManagement() {
       if (!res.ok) throw new Error("Failed to fetch supervisors summary");
       return res.json();
     },
-    enabled: !!user && (user.role === UserRole.ADMIN || user.role === UserRole.COORDINATOR || user.role === UserRole.SUPERVISOR),
+    enabled: !!user && (user.role === UserRole.ADMIN || user.role === UserRole.COORDINATOR),
     refetchOnWindowFocus: true,
     staleTime: 2000,
   });
@@ -272,7 +272,7 @@ export default function SupervisorManagement() {
       if (!res.ok) throw new Error("Failed to fetch student groups");
       return res.json();
     },
-    enabled: !!user && (user.role === UserRole.ADMIN || user.role === UserRole.COORDINATOR || user.role === UserRole.SUPERVISOR),
+    enabled: !!user && (user.role === UserRole.ADMIN || user.role === UserRole.COORDINATOR),
     refetchOnWindowFocus: true,
     staleTime: 2000,
   });
