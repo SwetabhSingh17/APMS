@@ -24,6 +24,7 @@ This document outlines suggested architectural, security, and maintenance improv
   - [8. Extended Administrative Capabilities](#8-extended-administrative-capabilities)
   - [9. Frontend Polish](#9-frontend-polish)
 - [✅ Resolved Issues & Release Changelog](#resolved-issues--release-changelog)
+  - [v2.3.1 - Completed & Verified](#v231---completed--verified)
   - [v2.3.0 - Completed & Verified](#v230---completed--verified)
   - [v2.2.0 - Completed & Verified](#v220---completed--verified)
   - [v2.1.0 - Completed & Verified](#v210---completed--verified)
@@ -230,6 +231,23 @@ This document outlines suggested architectural, security, and maintenance improv
 ---
 
 ## ✅ Resolved Issues & Release Changelog
+
+### v2.3.1 - Completed & Verified
+
+- [x] **Atomic Database Transactions & Concurrency Advisory Locking for Conflict Resolution** — **COMPLETED**
+  - **Affected Files:** `server/db-storage.ts`
+  - **Resolution:** Wrapped topic cloning, group reassignment, and student project mapping in an atomic database transaction (`db.transaction(async (tx) => { ... })`). Serialized sequential PUGID generation across concurrent conflict resolution requests using transaction-scoped PostgreSQL advisory locking (`SELECT pg_advisory_xact_lock(26001)`). Wrapped migration branch in an atomic transaction and deferred all notification dispatches until post-commit.
+- [x] **Accepted Membership Roster Precision in Conflict Resolver** — **COMPLETED**
+  - **Affected Files:** `server/db-storage.ts`
+  - **Resolution:** Replaced generic user group filtering with a direct database query on `student_group_members` filtering strictly by `status = 'accepted'` and `groupId = group.id`, harmonizing member retrieval with conflict detection logic.
+- [x] **Client-Side Resolution Fallbacks & Missing Supervisor Validation** — **COMPLETED**
+  - **Affected Files:** `client/src/pages/team-management.tsx`, `client/src/pages/manage-project.tsx`, `client/src/components/admin/supervisor-conflict-modal.tsx`
+  - **Resolution:** Guarded conflict resolution buttons to disable/prevent execution if no supervisor is assigned or supervisor ID resolves to 0. Sanitized `newSupervisorId` (`undefined` when `<= 0`) in the modal to avoid ID mismatch with backend fallbacks.
+- [x] **Supervisor Management Summary RBAC Hardening** — **COMPLETED**
+  - **Affected Files:** `server/routes/admin.ts`, `client/src/pages/supervisor-management.tsx`, `client/src/App.tsx`, `client/src/components/layout/sidebar.tsx`
+  - **Resolution:** Restricted `/api/admin/supervisors-summary` strictly to `UserRole.ADMIN` and `UserRole.COORDINATOR` to prevent unauthorized supervisor access to unfiltered faculty directory and team telemetry. Synchronized query `enabled` flags on `client/src/pages/supervisor-management.tsx` to execute exclusively for Administrators and Coordinators matching page route access.
+
+---
 
 ### v2.3.0 - Completed & Verified
 

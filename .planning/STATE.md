@@ -16,12 +16,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-06)
 
 **Core value:** Streamline and govern the academic project lifecycle with strict course isolation (BCA vs MCA), balanced faculty mentorship workload limits, and transparent real-time status reflection across all departmental stakeholders.
-**Current focus:** Milestone v2.3.0 Complete (Supervisor Conflict Resolution & Dynamic Telemetry)
+**Current focus:** Milestone v2.3.1 Complete (Transactional Conflict Atomicity, Advisory PUGID Serialization & Governance Hardening)
 
 ## Current Position
 
-Milestone: v2.3.0 (Active Release)
-Last activity: 2026-10-11 — Completed v2.3.0 Features (Supervisor Conflict Modal, Dynamic Mentorship Telemetry, Cross-Page Cache Invalidation, Faculty Directory Access)
+Milestone: v2.3.1 (Active Release)
+Last activity: 2026-10-11 — Completed v2.3.1 Features (Transaction Atomicity, pg_advisory_xact_lock PUGID Serialization, Accepted Member Filtering, Admin/Coordinator RBAC Hardening)
 
 ## Performance Metrics
 

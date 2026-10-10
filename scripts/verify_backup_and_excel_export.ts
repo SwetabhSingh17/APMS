@@ -71,7 +71,7 @@ async function verifyBackupAndExcelExport() {
         "Metadata contains IU-APMP portal branding",
         exportResult.metadata?.portalName
     );
-    assert(exportResult.metadata?.version === "2.3.0", "Metadata contains version = '2.3.0'");
+    assert(exportResult.metadata?.version === "2.3.1", "Metadata contains version = '2.3.1'");
     assert(exportResult.metadata?.exportedAt !== undefined, "Metadata contains exportedAt timestamp");
 
     const recordCounts = exportResult.metadata?.recordCounts || {};

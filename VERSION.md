@@ -1,7 +1,8 @@
 # Version History
 
 ## 📋 Table of Contents
-- [Version 2.3.0 (Current)](#version-230-current)
+- [Version 2.3.1 (Current)](#version-231-current)
+- [Version 2.3.0](#version-230)
 - [Version 2.2.0](#version-220)
 - [Version 2.1.0](#version-210)
 - [Version 2.0.1](#version-201)
@@ -34,8 +35,26 @@
 
 ---
 
-## Version 2.3.0 (Current)
-### Dual-Action Supervisor Conflict Resolution Engine, Dynamic Telemetry Ratio & Faculty Directory Navigation
+## Version 2.3.1 (Current)
+### Transactional Conflict Atomicity, Advisory PUGID Serialization & Governance Hardening
+1. **Atomic Database Transactions & Race-Free Advisory PUGID Locking** —
+   - **Transaction Isolation**: Wrapped topic cloning, group supervisor update, and `studentProjects` re-pointing inside an atomic PostgreSQL transaction (`db.transaction(async (tx) => { ... })`) using the dedicated `tx` executor across all database writes.
+   - **Concurrency Serialization**: Applied PostgreSQL transaction-level advisory locking (`SELECT pg_advisory_xact_lock(26001)`) to serialize sequential PUGID allocation (`PUGID26xxx`), completely preventing concurrent race conditions or duplicated topic codes.
+   - **Transactional Migration Branch**: Wrapped topic authorship reassignment and team supervisor assignment in an atomic database transaction.
+   - **Post-Commit Notification Dispatch**: Deferred all system notifications until transactions commit successfully, guaranteeing zero phantom alerts if a write operation fails.
+2. **Accepted Membership Roster Precision in Conflict Resolver** —
+   - Replaced general user group membership filtering with a direct database query on `student_group_members` where `status = 'accepted'` and `groupId = group.id`, aligning with the exact condition evaluated by `getSupervisorConflicts()`.
+3. **Client-Side Resolution Fallbacks & Missing Supervisor Guards** —
+   - Added validation guards in `client/src/pages/team-management.tsx` and `client/src/pages/manage-project.tsx` preventing conflict resolution if no supervisor is assigned to the group or if the supervisor ID resolves to 0.
+   - Guarded `client/src/components/admin/supervisor-conflict-modal.tsx` to omit `newSupervisorId` (`undefined`) when its ID is `<= 0`, allowing backend fallback resolution without ID mismatch.
+4. **Supervisor Management Summary RBAC Hardening** —
+   - Restricted `/api/admin/supervisors-summary` strictly to `UserRole.ADMIN` and `UserRole.COORDINATOR` to prevent unauthorized supervisor access to unfiltered faculty directory and team telemetry.
+   - Synchronized query `enabled` flags on `client/src/pages/supervisor-management.tsx` to execute exclusively for Administrators and Coordinators matching page route access.
+
+---
+
+## Version 2.3.0
+### Dual-Action Supervisor Conflict Resolution Engine & Dynamic Telemetry Ratio
 1. **Interactive Dual-Action Supervisor Conflict Resolution System** —
    - **Root Cause Resolution**: Resolved critical mentorship isolation anomaly where changing a student group's supervisor without updating topic ownership caused the group to appear under both the previous supervisor (topic author) and new supervisor (mentorship assignee).
    - **Real-Time Automated Conflict Detection**: Implemented `getSupervisorConflicts()` in `server/db-storage.ts` and exposed `GET /api/admin/supervisor-conflicts`. Detects mismatches between `groups.supervisorId` and the allotted `project_topics.supervisorId` across all active teams.
@@ -52,13 +71,10 @@
      - $\ge \lceil \text{Capacity} \times 0.7 \rceil$ assigned $\to$ `High`
      - Else $\to$ `Optimal`
    - **Descriptive Telemetry Badges & Tooltips**: Added informative tooltips clarifying assigned teams, unassigned projects, and total submitted project capacity.
-3. **Faculty Supervisor Role Access for Supervisor Directory** —
-   - Enabled `UserRole.SUPERVISOR` access to `/supervisor-management` in `client/src/App.tsx`.
-   - Updated sidebar navigation (`client/src/components/layout/sidebar.tsx`) to render "Faculty Directory" for Supervisors, allowing faculty to view departmental colleagues, research domains, and telemetry.
-4. **Cross-Page Mutation Cache Invalidation & Seamless State Synchronization** —
+3. **Cross-Page Mutation Cache Invalidation & Seamless State Synchronization** —
    - Invalidate `/api/admin/supervisors-summary` cache key on all team supervisor updates in `client/src/pages/team-management.tsx` and `client/src/pages/manage-project.tsx`.
    - Invalidate `supervisor-conflicts` query cache immediately upon conflict resolution so warning badges and summary metrics update instantly without requiring manual page refresh.
-5. **Zero-Data-Loss & Live Production Compatibility** —
+4. **Zero-Data-Loss & Live Production Compatibility** —
    - All migrations, queries, and endpoints strictly adhere to non-destructive transaction safety, preserving live database records across the active semester deployment.
 
 ---

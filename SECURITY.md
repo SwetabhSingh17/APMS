@@ -7,7 +7,7 @@ This document outlines the security policies, supported versions, protective mea
 ## 📋 Table of Contents
 
 - [Supported Versions](#supported-versions)
-- [Security Posture (v2.3.0)](#security-posture-v230)
+- [Security Posture (v2.3.1)](#security-posture-v231)
   - [Authentication & Cryptography](#authentication--cryptography)
   - [Access Control & Authorization](#access-control--authorization)
   - [Network & Infrastructure Security](#network--infrastructure-security)
@@ -22,14 +22,14 @@ Currently, the following versions of this project are actively supported with se
 
 | Version | Supported | Notes |
 |:---|:---:|:---|
-| **v2.x** | ✅ | Actively supported (Current production release: v2.3.0) |
+| **v2.x** | ✅ | Actively supported (Current production release: v2.3.1) |
 | **v1.9.x** | ✅ | Critical security maintenance |
 | **v1.8.x** | ✅ | Legacy security maintenance |
 | **< v1.8** | ❌ | Unsupported; please upgrade to v2.x |
 
 ---
 
-## Security Posture (v2.3.0)
+## Security Posture (v2.3.1)
 
 IU-APMP ships with the following protections in place:
 

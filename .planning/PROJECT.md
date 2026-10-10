@@ -27,9 +27,9 @@ Streamline and govern the academic project lifecycle with strict course isolatio
 
 - ✓ **BACKUP-RESTORE**: Upgrade backup export/import to include all 8 tables with topological foreign key insertion order, ZIP archive packaging, and pre-restore snapshots — validated (v2.2.0)
 - ✓ **EXCEL-REPORTING**: Official 8-sheet master university Excel report generator (`.xlsx`) — validated (v2.2.0)
-- ✓ **SUPERVISOR-CONFLICT-RESOLUTION**: Dual-action supervisor conflict detection and resolution modal (Option 1 clone with new PUGID vs Option 2 migrate) — validated (v2.3.0)
+- ✓ **SUPERVISOR-CONFLICT-RESOLUTION**: Dual-action supervisor conflict detection and resolution modal (Option 1 clone with new PUGID vs Option 2 migrate) with atomic transactions, advisory locking, and accepted member precision — validated (v2.3.1)
 - ✓ **DYNAMIC-TELEMETRY**: Real-time supervisor mentorship telemetry ratio (`Active Teams Allotted / Total Projects Submitted`) and dynamic workload capacity formula — validated (v2.3.0)
-- ✓ **SUPERVISOR-DIRECTORY-ACCESS**: Faculty supervisor role access to supervisor management directory and sidebar navigation — validated (v2.3.0)
+- ✓ **SUPERVISOR-MGMT-RBAC**: Strict Administrator and Coordinator governance over `/supervisor-management` and `/api/admin/supervisors-summary` — validated (v2.3.1)
 
 ### Future Goals (Next Milestones)
 

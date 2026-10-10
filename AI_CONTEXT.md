@@ -102,6 +102,7 @@ APMS is a comprehensive web-based project management system for educational inst
     - **Resolution**: `POST /api/admin/supervisor-conflicts/:groupId/resolve` supports two administrative resolution pathways:
       - `copy`: Clones the original project topic for the new supervisor with a generated institutional code (`PUGID26xxx`), re-allots the team to the clone (`isAssigned: true`), and frees the previous supervisor's original topic (`isAssigned: false`) for other student groups.
       - `migrate`: Transfers topic authorship (`supervisorId` on `project_topics`) directly to the new supervisor.
+    - **Transaction Atomicity & Advisory Locking**: Both resolution pathways are wrapped in atomic database transactions (`db.transaction(async (tx) => { ... })`). PUGID generation is serialized using PostgreSQL transaction-level advisory locking (`SELECT pg_advisory_xact_lock(26001)`), completely preventing duplicate topic code allocation under concurrency. Roster member retrieval is queried strictly from `student_group_members` where `status = 'accepted'`, and all notification dispatches are deferred until post-commit.
     - **UI**: Interactive resolution modal (`client/src/components/admin/supervisor-conflict-modal.tsx`) and high-visibility warning banners on the Admin Dashboard and Supervisor Management page.
 
 22. **Dynamic Supervisor Telemetry Ratio & Workload Capacity Formulation**:
@@ -109,8 +110,9 @@ APMS is a comprehensive web-based project management system for educational inst
     - **Calculation**: Computes faculty workload relative to submitted proposals ($C$): $0 \to$ `available`, $\ge C \to$ `maxed`, $\ge \lceil C \times 0.7 \rceil \to$ `high`, else `optimal`.
     - **Cache Invalidation**: Cross-page mutations in `/team-management` and `/manage-project` automatically invalidate `/api/admin/supervisors-summary` and `/api/admin/supervisor-conflicts`.
 
-23. **Supervisor Access to Faculty Directory**:
-    - Supervisors have access to `/supervisor-management` via sidebar ("Faculty Directory") with directory views of departmental colleagues and research fields.
+23. **Supervisor Governance & Strict RBAC Enforcement**:
+    - `/supervisor-management` and the summary aggregation endpoint `GET /api/admin/supervisors-summary` are strictly restricted to `Admin` and `Coordinator` roles to protect comprehensive faculty telemetry and student group rosters.
+    - Faculty supervisors manage their submitted topics, review allotment statuses, and inspect assigned student teams through their dedicated `/projects` ("My Topics & Teams") portal.
 
 ---
 
@@ -223,6 +225,6 @@ APMS includes a robust real-time notification system powered by WebSockets with 
 ## 7. Access Control (RBAC)
 
 - **Student**: Can browse and search topics specific to their course (BCA/MCA), form groups, invite members, and submit milestones. Segregated by Course. Cannot leave or modify group rosters once formed.
-- **Supervisor**: Has dedicated "My Topics & Teams" view showing only own proposed topics and assigned student teams with rosters. Can evaluate assigned groups, grade milestones, and manage MCA topic endorsements. Has access to the Faculty Directory (`/supervisor-management`) to inspect faculty colleagues, research areas, and departmental workloads. Cannot modify team memberships.
+- **Supervisor**: Has dedicated "My Topics & Teams" view (`/projects`) showing only own proposed topics and assigned student teams with rosters. Can evaluate assigned groups, grade milestones, and manage MCA topic endorsements. Cannot modify team memberships.
 - **Coordinator**: Can approve/reject topic proposals, directly author approved topics and assign to faculty, oversee all projects, view department stats, manage student project teams (modify rosters, rename teams, safe team dissolution), manage faculty supervisors via `/supervisor-management` (inspect faculty loads, assign specific groups to topics, review/approve/reject topics), and manually reassign supervisors to project teams with real-time faculty search. Can reset student and supervisor passwords to defaults, but is strictly prohibited from resetting or modifying Administrator or Coordinator accounts (`FORBIDDEN_TARGET_STAFF`).
 - **Admin**: Has full system access, can perform destructive actions (DB resets), manage all users and roles, direct topic creation and faculty assignment, full team management, supervisor governance via `/supervisor-management` (edit profiles, direct group topic allotment, safe unassignment), safe dissolution, reset any user's password, and reassign supervisors.

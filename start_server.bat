@@ -3,7 +3,7 @@ title IU-APMP Server
 setlocal
 
 echo ==========================================================
-echo    IU-APMP - Academic Project Management Portal (v2.3.0)
+echo    IU-APMP - Academic Project Management Portal (v2.3.1)
 echo    Integral University - One-Click Production Server
 echo    By Swetabh Singh
 echo ==========================================================

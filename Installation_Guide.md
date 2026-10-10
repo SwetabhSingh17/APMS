@@ -257,13 +257,16 @@ To verify that your installation is working properly and all features (Excel bul
    npm run check
    ```
 
-2. Run the complete automated test suite across all 9 suites:
+2. Run the complete automated test suite across all 10 suites:
    ```bash
    npm test
    ```
 
 3. Or run specific individual test suites:
    ```bash
+   # Test complete A-Z backup export, topological restore & university excel reporting
+   npm run test:backup
+
    # Test multi-word search engine & sub-millisecond in-memory indexing
    npm run test:search
 

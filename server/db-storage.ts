@@ -2027,7 +2027,7 @@ export class DBStorage {
     const metadata = {
       portalName: "Integral University Academic Project Management Portal (IU-APMP)",
       portalCode: "IU-APMP",
-      version: "2.3.0",
+      version: "2.3.1",
       exportedAt: timestamp,
       recordCounts: {
         studentGroups: groupsData.length,
